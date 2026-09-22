@@ -1,0 +1,591 @@
+﻿{
+    "schema_version":  1,
+    "source":  {
+                   "repository":  "seat_protect",
+                   "subtree":  "code_v5",
+                   "branch":  "main",
+                   "commit":  "89ad65ca5499c488bec10a31a3a5264314746b0c",
+                   "working_tree_clean_at_gate":  true
+               },
+    "migration":  {
+                      "mode":  "allowlist_copy",
+                      "history_imported":  false,
+                      "target_remote_configured":  false,
+                      "generated_at":  "2026-09-22T13:01:26Z"
+                  },
+    "imported_files":  [
+                           {
+                               "source_path":  "ACTIVE_SOLVER_PIPELINE.md",
+                               "candidate_path":  "ACTIVE_SOLVER_PIPELINE.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "51aacd3e67c5505a753fd86e695a134666cdb97f5cf11bb7b71331416c2ba858",
+                               "candidate_sha256":  "4435a93cc4f7c60657b5488afd06451630e7eeed0a248f4a6c69c9e322cce2c2",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Marked internal artifact paths as provenance, not distributed dependencies"
+                           },
+                           {
+                               "source_path":  "config.json",
+                               "candidate_path":  "config.json",
+                               "classification":  "configuration",
+                               "source_sha256":  "2fd261d149183e4e124c90352d21444ffe4e2e2268d3bc82f6d3b83bc3b4eaf5",
+                               "candidate_sha256":  "2fd261d149183e4e124c90352d21444ffe4e2e2268d3bc82f6d3b83bc3b4eaf5",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "configs/config_research_30s.json",
+                               "candidate_path":  "configs/config_research_30s.json",
+                               "classification":  "configuration",
+                               "source_sha256":  "b3130516217d9fda89f5c1c24defec2418dcfe952ad440db646f76f8b520e6be",
+                               "candidate_sha256":  "b3130516217d9fda89f5c1c24defec2418dcfe952ad440db646f76f8b520e6be",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "configs/README.md",
+                               "candidate_path":  "configs/README.md",
+                               "classification":  "configuration",
+                               "source_sha256":  "2257640d5dd2b645ee04e411127bbf1ab59ea49024dd237cbe5e934e0b405ca6",
+                               "candidate_sha256":  "2257640d5dd2b645ee04e411127bbf1ab59ea49024dd237cbe5e934e0b405ca6",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "docs/任务需求、数学模型与实现说明.md",
+                               "candidate_path":  "docs/任务需求、数学模型与实现说明.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "33e3801276c02cb94c83f2a64359acde2b6d5b4bea6160072745e26ef27b25c6",
+                               "candidate_sha256":  "33e3801276c02cb94c83f2a64359acde2b6d5b4bea6160072745e26ef27b25c6",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "FULL_CPP_COVERAGE.md",
+                               "candidate_path":  "FULL_CPP_COVERAGE.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "6f02db41a1338a62178e74564aaebfe98d8b32982cca9fc1159a3e59e1fed127",
+                               "candidate_sha256":  "9fed7c66758c9ef08ea1c9d6ce54cb6fca231c2f416dc1fdf6b1dd934ffeb95d",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Clarified incomplete migration status and external artifact boundary"
+                           },
+                           {
+                               "source_path":  "FULL_CPP_MIGRATION_MAP.md",
+                               "candidate_path":  "FULL_CPP_MIGRATION_MAP.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "2ec886bd087c4f4251c7c7d6f8431dec88c0f6ed69ae9ca7a265f0dba9ae36a0",
+                               "candidate_sha256":  "2a511615023e6f2f6f8a7aaec2f6ab0b9808ea188d0520f0fe949b7cfaf64372",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Recorded clean source commit and allowlist-based migration mode"
+                           },
+                           {
+                               "source_path":  "FULL_CPP_RICH_REFERENCE_STATUS.md",
+                               "candidate_path":  "FULL_CPP_RICH_REFERENCE_STATUS.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "f9795a379abb0312ec5e398f04e9807eb4aff33dfca12eca6c15a860219efaf8",
+                               "candidate_sha256":  "f9795a379abb0312ec5e398f04e9807eb4aff33dfca12eca6c15a860219efaf8",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "NATIVE_FEASIBILITY_STATUS.md",
+                               "candidate_path":  "NATIVE_FEASIBILITY_STATUS.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "206ef20a1653f5613c4ba0b274680293ecf07de41277fee1c91d2fffdd39a760",
+                               "candidate_sha256":  "206ef20a1653f5613c4ba0b274680293ecf07de41277fee1c91d2fffdd39a760",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "README.md",
+                               "candidate_path":  "README.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "be2f59eae7708267c52291378bdfe9a5d9c54bd4668a80242132855845c2d2ff",
+                               "candidate_sha256":  "8f7d5e37dfe245e4764b4d2afac861ee1efca24f555ee2350efb2ef22879d2ba",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Added private-repository boundary, reproducibility scope, and evidence-status warnings"
+                           },
+                           {
+                               "source_path":  "requirements.txt",
+                               "candidate_path":  "requirements.txt",
+                               "classification":  "dependency_manifest",
+                               "source_sha256":  "c89217e7e8c66409895e12284df8a3f921f16a46bdd0168e13771b451d1d5a82",
+                               "candidate_sha256":  "155b1821c37b463ba65e872beb0304c643f2710390421d6dc14ea205840c17dc",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Normalized core Python runtime dependencies to one package per line"
+                           },
+                           {
+                               "source_path":  "requirements-column-generation.txt",
+                               "candidate_path":  "requirements-column-generation.txt",
+                               "classification":  "dependency_manifest",
+                               "source_sha256":  "9d58e9026fc4e5ba165e1de2d6d8919780fd3949dc896c6d198690b3bdd19bb9",
+                               "candidate_sha256":  "9d58e9026fc4e5ba165e1de2d6d8919780fd3949dc896c6d198690b3bdd19bb9",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/build_native_restricted_master.ps1",
+                               "candidate_path":  "research/frontier_cpp_gnn/build_native_restricted_master.ps1",
+                               "classification":  "build_script",
+                               "source_sha256":  "cf93a0d797682ad18977cd050ec249b19141077f9e1762397d7980319290d948",
+                               "candidate_sha256":  "702f9f48f3850b854ffbc05a601ce0fd43e5b56d55a2c4bb1f47a3241f9e8c51",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Removed machine-specific defaults; requires explicit HiGHS root and writes to build directory"
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/build_native_solver_pipeline.ps1",
+                               "candidate_path":  "research/frontier_cpp_gnn/build_native_solver_pipeline.ps1",
+                               "classification":  "build_script",
+                               "source_sha256":  "0cbd371f12b61ce8c4c58ddc3f788a2bb7d5b7b25cbb3ad977a4a9a0ced2ce0c",
+                               "candidate_sha256":  "be315cdb53874d96629525694c2e77b76d50e5bc45464f5ea5fcf8c76c0f3829",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Removed machine-specific defaults; requires explicit HiGHS root and writes to build directory"
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/full_cpp_solver_core.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/full_cpp_solver_core.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "1b05b0ebc9f93c272c1880702d1543690d9eeaeb93f99f34c51783edea595126",
+                               "candidate_sha256":  "1b05b0ebc9f93c272c1880702d1543690d9eeaeb93f99f34c51783edea595126",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/full_cpp_solver_core.hpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/full_cpp_solver_core.hpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "2f8274c2fc2cf41c4618723fd76bcf20470d438eb6f6c0e9cc754e17c99e7476",
+                               "candidate_sha256":  "2f8274c2fc2cf41c4618723fd76bcf20470d438eb6f6c0e9cc754e17c99e7476",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_feasibility_solver.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_feasibility_solver.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "87cfbfba6b4bd4b61ded9fe83c10998a8584abf8e83c1a722e19d64259b4d4ec",
+                               "candidate_sha256":  "87cfbfba6b4bd4b61ded9fe83c10998a8584abf8e83c1a722e19d64259b4d4ec",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_feasibility_solver.hpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_feasibility_solver.hpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "10f5de7fceea7eeac45489f65293b451bf1cef59103338360de7eddd02ee54c4",
+                               "candidate_sha256":  "10f5de7fceea7eeac45489f65293b451bf1cef59103338360de7eddd02ee54c4",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_full_core_probe.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_full_core_probe.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "49c13a860430071ce90a188ffaa0bef4e67891615de7127f28734d5188d30934",
+                               "candidate_sha256":  "49c13a860430071ce90a188ffaa0bef4e67891615de7127f28734d5188d30934",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_json.hpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_json.hpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "72f4367d9b4dc9a6e6a67cafaa58785af3b30a118de515d9f5e90d611e14f96c",
+                               "candidate_sha256":  "72f4367d9b4dc9a6e6a67cafaa58785af3b30a118de515d9f5e90d611e14f96c",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_master_benchmark.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_master_benchmark.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "861d276ba3b4d920e2f85ac467a127d1e014ff0fe97ab827be5809270ac5ea08",
+                               "candidate_sha256":  "861d276ba3b4d920e2f85ac467a127d1e014ff0fe97ab827be5809270ac5ea08",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_master_types.hpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_master_types.hpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "1708e216e0e901ea719432b3b97fc826f1609f2610e87e69748022d155c1fe77",
+                               "candidate_sha256":  "1708e216e0e901ea719432b3b97fc826f1609f2610e87e69748022d155c1fe77",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_monotonic_pipeline.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_monotonic_pipeline.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "a9b34d32dbada9fb96ef77bca138d95422b0c9d8eae4dbd6d4b16ba20488429e",
+                               "candidate_sha256":  "a9b34d32dbada9fb96ef77bca138d95422b0c9d8eae4dbd6d4b16ba20488429e",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_pattern_kernel.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_pattern_kernel.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "83c3603a559c881bc89d1839b472177511391b72d2916a38f2f73833b0723d55",
+                               "candidate_sha256":  "83c3603a559c881bc89d1839b472177511391b72d2916a38f2f73833b0723d55",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_pool_exporter.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_pool_exporter.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "3fbe59679c2856f365ed158d4e227033b63ae36053a6795d210f393632e107ec",
+                               "candidate_sha256":  "3fbe59679c2856f365ed158d4e227033b63ae36053a6795d210f393632e107ec",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_restricted_master.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_restricted_master.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "81f31f440a70a85ff9dc32a6d149dea2dff4b34d116f84510997d974978721dd",
+                               "candidate_sha256":  "81f31f440a70a85ff9dc32a6d149dea2dff4b34d116f84510997d974978721dd",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/native_solver_pipeline.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/native_solver_pipeline.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "24777bc25dca20cb7e82879f80ee7e2ffdd21259d18b3f8436c39ab4303b7510",
+                               "candidate_sha256":  "24777bc25dca20cb7e82879f80ee7e2ffdd21259d18b3f8436c39ab4303b7510",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/README.md",
+                               "candidate_path":  "research/frontier_cpp_gnn/README.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "db9122a1394bcfb5341710ebee7d4eaa6ea4dc19abf367ffc5f786bbad50f2b4",
+                               "candidate_sha256":  "d8228116e5b426fdd7ebf0bfa1469d3ce1c7fac24e201ec93208f01aa8b28e55",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Replaced research-tree overview with the imported active native closure and build boundary"
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/ROADMAP_AND_PROGRESS.md",
+                               "candidate_path":  "research/frontier_cpp_gnn/ROADMAP_AND_PROGRESS.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "70e1e2ebad0c2720871f29077074d09487e9fdf7ca2a21fbad13536991274050",
+                               "candidate_sha256":  "12f85990a31aea514282551bb5b88f6e28dfda59b115dd1b3be1be6b5d59246b",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Marked internal artifact paths as provenance, not distributed dependencies"
+                           },
+                           {
+                               "source_path":  "research/frontier_cpp_gnn/seat_protect_cpp.cpp",
+                               "candidate_path":  "research/frontier_cpp_gnn/seat_protect_cpp.cpp",
+                               "classification":  "native_source",
+                               "source_sha256":  "cfa20c87c22ac7ae41fffa7878f061a359b39723f671d9f974e4972543bb7f0f",
+                               "candidate_sha256":  "cfa20c87c22ac7ae41fffa7878f061a359b39723f671d9f974e4972543bb7f0f",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "RICH_PYTHON_REFERENCE.md",
+                               "candidate_path":  "RICH_PYTHON_REFERENCE.md",
+                               "classification":  "documentation",
+                               "source_sha256":  "91de05aa11382671f3992e51d502d32c77b7a386d0997e7898f0db72598cbbf8",
+                               "candidate_sha256":  "b1243a0d6e7f2f6e769567c7c8a3021ba4dc9546b8ad00dca086ac5a62609a91",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Marked historical artifact references as non-distributed provenance"
+                           },
+                           {
+                               "source_path":  "src/__init__.py",
+                               "candidate_path":  "src/__init__.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "a3001646c100c19ecfce96328c8a5c779f104f377f5ca9f39d2566d2eca80338",
+                               "candidate_sha256":  "a3001646c100c19ecfce96328c8a5c779f104f377f5ca9f39d2566d2eca80338",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/aircraft_seatmap_generator.py",
+                               "candidate_path":  "src/aircraft_seatmap_generator.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "8fda7f2116dbf42a77d1a367f94176b00ee348c56ba9d78a038a2383f0609606",
+                               "candidate_sha256":  "8fda7f2116dbf42a77d1a367f94176b00ee348c56ba9d78a038a2383f0609606",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/allocation_evaluator.py",
+                               "candidate_path":  "src/allocation_evaluator.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "a00ef9f1e5cde0a7949b9837458124db60ddbebbb4730ee31c3b99dbb2f9c3dd",
+                               "candidate_sha256":  "a00ef9f1e5cde0a7949b9837458124db60ddbebbb4730ee31c3b99dbb2f9c3dd",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/allocation_visualizer.py",
+                               "candidate_path":  "src/allocation_visualizer.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "1c0da88e6f85b25f2e9cb3f7140a25adfe81f07e8b0ef7aff27a5a1fba7555eb",
+                               "candidate_sha256":  "1c0da88e6f85b25f2e9cb3f7140a25adfe81f07e8b0ef7aff27a5a1fba7555eb",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/batch_benchmark.py",
+                               "candidate_path":  "src/batch_benchmark.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "de979753df4294c3f041869ddccc2ecd33796b201c93d80ef8dcabbae3cbed80",
+                               "candidate_sha256":  "de979753df4294c3f041869ddccc2ecd33796b201c93d80ef8dcabbae3cbed80",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/benchmark_pricing_snapshot.py",
+                               "candidate_path":  "src/benchmark_pricing_snapshot.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "e7007250a67382561b00f8036fb456bd90f3292258c486ecf2fa17920a2ba513",
+                               "candidate_sha256":  "e7007250a67382561b00f8036fb456bd90f3292258c486ecf2fa17920a2ba513",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/compare_heuristic_column_solutions.py",
+                               "candidate_path":  "src/compare_heuristic_column_solutions.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "e127c47b190c4daa0dd96396c4ac1ac8620ddc48248d5587c3a83f548f7275cd",
+                               "candidate_sha256":  "e127c47b190c4daa0dd96396c4ac1ac8620ddc48248d5587c3a83f548f7275cd",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/exact_column_generation.py",
+                               "candidate_path":  "src/exact_column_generation.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "f8c18f30c4142e6a44a0c06490062882a49496c34af156a380e19b63abf0bd38",
+                               "candidate_sha256":  "f8c18f30c4142e6a44a0c06490062882a49496c34af156a380e19b63abf0bd38",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/heuristic_seat_allocator.py",
+                               "candidate_path":  "src/heuristic_seat_allocator.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "00ab7383274ffe4981017709bcf508bc011ab1af6ddd7b0e992932a6e3f35171",
+                               "candidate_sha256":  "00ab7383274ffe4981017709bcf508bc011ab1af6ddd7b0e992932a6e3f35171",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/passenger_data_generator.py",
+                               "candidate_path":  "src/passenger_data_generator.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "38e562488bc7b0d100665c54b89e9c0356834bae77a5e4fb28db7c2dc5807e25",
+                               "candidate_sha256":  "38e562488bc7b0d100665c54b89e9c0356834bae77a5e4fb28db7c2dc5807e25",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/rerun_heuristic_24cases.py",
+                               "candidate_path":  "src/rerun_heuristic_24cases.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "b94b881d56ed1be9af283faddca01e31b9d4424882c8fba8f505d40775ef30cf",
+                               "candidate_sha256":  "b94b881d56ed1be9af283faddca01e31b9d4424882c8fba8f505d40775ef30cf",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/run_group_size_scaling_benchmark.py",
+                               "candidate_path":  "src/run_group_size_scaling_benchmark.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "d051424a6e79be71930b4e6b303eaf087e8a291ef11cff9e67cdb51399679607",
+                               "candidate_sha256":  "d051424a6e79be71930b4e6b303eaf087e8a291ef11cff9e67cdb51399679607",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/run_lp_heuristic_benchmark.py",
+                               "candidate_path":  "src/run_lp_heuristic_benchmark.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "ecf733286ea1c2283072ba59ebb3af9696b462af267198b8c2ea5110cd0aaaf0",
+                               "candidate_sha256":  "ecf733286ea1c2283072ba59ebb3af9696b462af267198b8c2ea5110cd0aaaf0",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "src/summarize_24case_experiment.py",
+                               "candidate_path":  "src/summarize_24case_experiment.py",
+                               "classification":  "formal_source",
+                               "source_sha256":  "23f7619c4084e8d4a56d4efee613613b2083446eda994565654f7d0d6ecf60a6",
+                               "candidate_sha256":  "23f7619c4084e8d4a56d4efee613613b2083446eda994565654f7d0d6ecf60a6",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/__init__.py",
+                               "candidate_path":  "tests/__init__.py",
+                               "classification":  "test",
+                               "source_sha256":  "86b0fdd4b645e2db252b9228600201bef5410e1efccf75b88b343bc5d5c1759e",
+                               "candidate_sha256":  "86b0fdd4b645e2db252b9228600201bef5410e1efccf75b88b343bc5d5c1759e",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/fixtures/config_100_small.json",
+                               "candidate_path":  "tests/fixtures/config_100_small.json",
+                               "classification":  "small_synthetic_fixture",
+                               "source_sha256":  "b587529ff254a10a69edbb6562ea1ac66e8bd158964bebce6d88371175b0660a",
+                               "candidate_sha256":  "b587529ff254a10a69edbb6562ea1ac66e8bd158964bebce6d88371175b0660a",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/fixtures/general_validation_suite/cases.json",
+                               "candidate_path":  "tests/fixtures/general_validation_suite/cases.json",
+                               "classification":  "small_synthetic_fixture",
+                               "source_sha256":  "84a851d701576d1b0fa66883e198865d83f99d01d3a9290ef080aa974c058635",
+                               "candidate_sha256":  "84a851d701576d1b0fa66883e198865d83f99d01d3a9290ef080aa974c058635",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/fixtures/general_validation_suite/README.md",
+                               "candidate_path":  "tests/fixtures/general_validation_suite/README.md",
+                               "classification":  "small_synthetic_fixture",
+                               "source_sha256":  "3ddd5ede9d927111092ace6b94bde0ba6e8bf48dee9bbd5586756087990a75e4",
+                               "candidate_sha256":  "3ddd5ede9d927111092ace6b94bde0ba6e8bf48dee9bbd5586756087990a75e4",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/general_validation_case_factory.py",
+                               "candidate_path":  "tests/general_validation_case_factory.py",
+                               "classification":  "test",
+                               "source_sha256":  "ae6bf9441c81f5d1a05dcce3f6a632691fb3ccf015a1566b43c147d024819e30",
+                               "candidate_sha256":  "ae6bf9441c81f5d1a05dcce3f6a632691fb3ccf015a1566b43c147d024819e30",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/test_config_and_scoring.py",
+                               "candidate_path":  "tests/test_config_and_scoring.py",
+                               "classification":  "test",
+                               "source_sha256":  "140465f214204692e09ad4a7b6fbe394a6828d386ec297deb6946dee13ecb80e",
+                               "candidate_sha256":  "2d911b26e37f47f2afed6aba713b6b41a65d25e9833a4d871ae6bb25a880bd2a",
+                               "modified_for_candidate":  true,
+                               "modification_reason":  "Made repository-relative config assertions portable and explicitly skipped unavailable external datasets"
+                           },
+                           {
+                               "source_path":  "tests/test_fixed_seat_semantics.py",
+                               "candidate_path":  "tests/test_fixed_seat_semantics.py",
+                               "classification":  "test",
+                               "source_sha256":  "5ba7d3f457fe99b123bf9c4e19b6d695407c0d1eae5ed0702443a2635f5844e3",
+                               "candidate_sha256":  "5ba7d3f457fe99b123bf9c4e19b6d695407c0d1eae5ed0702443a2635f5844e3",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/test_full_cpp_core_parity.py",
+                               "candidate_path":  "tests/test_full_cpp_core_parity.py",
+                               "classification":  "test",
+                               "source_sha256":  "f68f7e9d30975213a63e88ffb5062910ebf287aa3852eb8d16eabbfd6faa7665",
+                               "candidate_sha256":  "f68f7e9d30975213a63e88ffb5062910ebf287aa3852eb8d16eabbfd6faa7665",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/test_general_validation_cases.py",
+                               "candidate_path":  "tests/test_general_validation_cases.py",
+                               "classification":  "test",
+                               "source_sha256":  "79e921da99c2f7e9fa9cc57b80a8ead9ce0bade33b6ac1f3e50c1d6af57c55fe",
+                               "candidate_sha256":  "79e921da99c2f7e9fa9cc57b80a8ead9ce0bade33b6ac1f3e50c1d6af57c55fe",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/test_native_feasibility_solver.py",
+                               "candidate_path":  "tests/test_native_feasibility_solver.py",
+                               "classification":  "test",
+                               "source_sha256":  "9daf8e44586f0b6298726a4f76d0558ba7574197c7776125fb0b3ee1320d107f",
+                               "candidate_sha256":  "9daf8e44586f0b6298726a4f76d0558ba7574197c7776125fb0b3ee1320d107f",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           },
+                           {
+                               "source_path":  "tests/test_solution_comparison.py",
+                               "candidate_path":  "tests/test_solution_comparison.py",
+                               "classification":  "test",
+                               "source_sha256":  "473eb6a6cb2a4f2f9b829ccd70a1f5cd10b05664f5a2fb27eda1f5ec918b41b6",
+                               "candidate_sha256":  "473eb6a6cb2a4f2f9b829ccd70a1f5cd10b05664f5a2fb27eda1f5ec918b41b6",
+                               "modified_for_candidate":  false,
+                               "modification_reason":  null
+                           }
+                       ],
+    "generated_files":  [
+                            {
+                                "path":  ".gitattributes",
+                                "classification":  "other",
+                                "sha256":  "33f7741680475d46d716074d0d202a1004885b02a12bf1adf1f765e316ff700a",
+                                "reason":  "Candidate-only text and binary attribute policy"
+                            },
+                            {
+                                "path":  ".github/pull_request_template.md",
+                                "classification":  "documentation",
+                                "sha256":  "493c004481f12404561eaccd6f3c38591964210419057a5b32a4563fefba6c12",
+                                "reason":  "Candidate-only pull request checklist"
+                            },
+                            {
+                                "path":  ".gitignore",
+                                "classification":  "other",
+                                "sha256":  "b7ca9b066facacebb39c55c901e307ed974abbcbb02872a48450042a8526eeab",
+                                "reason":  "Candidate-only repository exclusion policy"
+                            },
+                            {
+                                "path":  "CONTRIBUTING.md",
+                                "classification":  "documentation",
+                                "sha256":  "25857cc581a19731cf5d02c8d5c18f16f996a2e51595f3184fccb44b906d6284",
+                                "reason":  "Candidate-only collaboration policy"
+                            },
+                            {
+                                "path":  "docs/DEPENDENCIES.md",
+                                "classification":  "documentation",
+                                "sha256":  "f64ca6db013eb7b97be55f05f8fb0dcccb5ce190c89f8b7269666ea48485ad2a",
+                                "reason":  "Candidate-only reproducible dependency boundary"
+                            },
+                            {
+                                "path":  "NOTICE.md",
+                                "classification":  "documentation",
+                                "sha256":  "224295d5c98f0b5eb1b91ee273480b386912da4d050305c12db3795f32ae19c8",
+                                "reason":  "Candidate-only proprietary and third-party notice"
+                            },
+                            {
+                                "path":  "SECURITY.md",
+                                "classification":  "documentation",
+                                "sha256":  "b23bcd40a15ffe28d4beed198072f94cbbb29555f71dcb8a4ba3777a46d3cc3e",
+                                "reason":  "Candidate-only private vulnerability reporting policy"
+                            },
+                            {
+                                "path":  "tests/README.md",
+                                "classification":  "test",
+                                "sha256":  "de84599846c23e81545eb9fc3bbbfbffcf89af4e511ad0f492c8ca224c3a4404",
+                                "reason":  "Candidate-only test tier documentation"
+                            },
+                            {
+                                "path":  "tests/test_general_validation_smoke.py",
+                                "classification":  "test",
+                                "sha256":  "35d9c4a02b22ee99645a7fc4891c7ec339589987a9f89ccb781a96af06791a7c",
+                                "reason":  "Candidate-only fast synthetic correctness smoke"
+                            },
+                            {
+                                "path":  "tests/test_native_smoke.py",
+                                "classification":  "test",
+                                "sha256":  "2d177e4c8401d3c5a9f17d7c76f4a6284a0305d411d3808c3f6b5ff5f606f7be",
+                                "reason":  "Candidate-only external native executable smoke"
+                            }
+                        ],
+    "excluded_after_review":  [
+                                  {
+                                      "source_path":  "tests/test_native_deadline_fallback.py",
+                                      "source_sha256":  "3da48135dfa4c0dd1e11ccdbd5945d7e3e5b8da69183bdc1a6abe7f723989934",
+                                      "reason":  "Depends on non-allowlisted Formal24 harness, external benchmark data, outputs, and a prebuilt executable; retained only in the internal research archive"
+                                  }
+                              ]
+}
