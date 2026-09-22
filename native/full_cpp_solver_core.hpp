@@ -136,6 +136,20 @@ Problem load_problem(
 
 FixedSeatContext preprocess_fixed_seats(const Problem& problem);
 
+struct IndividualScoreComponents {
+    double score_s = 0.0;
+    double score_v = 0.0;
+    double score_p = 0.0;
+
+    double total() const { return score_s + score_v + score_p; }
+};
+
+IndividualScoreComponents evaluate_individual_score(
+    const Problem& problem,
+    int passenger_index,
+    int seat_index
+);
+
 double evaluate_soft_score(
     const Problem& problem,
     const std::vector<int>& passenger_to_seat

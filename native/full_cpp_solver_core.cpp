@@ -267,9 +267,13 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     return problem;
 }
 
-double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
-    if (assignment.size() != problem.passengers.size()) {
-        throw std::runtime_error("score assignment size mismatch");
+IndividualScoreComponents evaluate_individual_score(
+    const Problem& problem, int passenger_index, int seat_index
+) {
+    if (passenger_index < 0
+        || passenger_index >= static_cast<int>(problem.passengers.size())
+        || seat_index < 0 || seat_index >= static_cast<int>(problem.seats.size())) {
+        throw std::runtime_error("individual score index out of range");
     }
     auto derived_value = [&](const Seat& seat) {
         if (!std::isnan(seat.explicit_value)) return seat.explicit_value;
@@ -279,34 +283,45 @@ double evaluate_soft_score(const Problem& problem, const std::vector<int>& assig
         if (seat.bassinet) value += problem.bassinet_value;
         return value;
     };
+    IndividualScoreComponents result;
+    const Passenger& passenger = problem.passengers[passenger_index];
+    const auto old_item = problem.old_seat_index.find(passenger.old_seat);
+    if (old_item == problem.old_seat_index.end()) return result;
+    const Seat& old_seat = problem.old_seats[old_item->second];
+    const Seat& new_seat = problem.seats[seat_index];
+    const int row_diff = new_seat.row - old_seat.row;
+    const double row_penalty = row_diff < 0
+        ? std::abs(row_diff) * (problem.prioritize_front ? problem.front_penalty_reduction : 1.0)
+        : row_diff * (problem.prioritize_front ? problem.back_penalty_factor : 1.0);
+    result.score_s = problem.weight_s * (
+        std::abs(old_seat.x - new_seat.x) + row_penalty
+    );
+    const double old_value = std::isnan(passenger.old_seat_value)
+        ? derived_value(old_seat) : passenger.old_seat_value;
+    result.score_v = problem.weight_v * std::abs(derived_value(new_seat) - old_value);
+    const int mismatch = int(new_seat.window != old_seat.window)
+        + int(new_seat.aisle != old_seat.aisle)
+        + int(new_seat.exit_row != old_seat.exit_row)
+        + int(new_seat.bassinet != old_seat.bassinet)
+        + int(new_seat.near_toilet != old_seat.near_toilet);
+    result.score_p = problem.weight_p * mismatch;
+    if (passenger.has_near_toilet_preference
+        && new_seat.near_toilet != passenger.prefer_near_toilet) {
+        result.score_p += problem.weight_t * passenger.near_toilet_preference_weight;
+    }
+    return result;
+}
+
+double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
+    if (assignment.size() != problem.passengers.size()) {
+        throw std::runtime_error("score assignment size mismatch");
+    }
     double score = 0.0;
     for (int passenger_index = 0;
          passenger_index < static_cast<int>(problem.passengers.size()); ++passenger_index) {
         const int new_index = assignment[passenger_index];
         if (new_index < 0) continue;
-        const Passenger& passenger = problem.passengers[passenger_index];
-        const auto old_item = problem.old_seat_index.find(passenger.old_seat);
-        if (old_item == problem.old_seat_index.end()) continue;
-        const Seat& old_seat = problem.old_seats[old_item->second];
-        const Seat& new_seat = problem.seats[new_index];
-        const int row_diff = new_seat.row - old_seat.row;
-        const double row_penalty = row_diff < 0
-            ? std::abs(row_diff) * (problem.prioritize_front ? problem.front_penalty_reduction : 1.0)
-            : row_diff * (problem.prioritize_front ? problem.back_penalty_factor : 1.0);
-        score += problem.weight_s * (std::abs(old_seat.x - new_seat.x) + row_penalty);
-        const double old_value = std::isnan(passenger.old_seat_value)
-            ? derived_value(old_seat) : passenger.old_seat_value;
-        score += problem.weight_v * std::abs(derived_value(new_seat) - old_value);
-        int mismatch = int(new_seat.window != old_seat.window)
-            + int(new_seat.aisle != old_seat.aisle)
-            + int(new_seat.exit_row != old_seat.exit_row)
-            + int(new_seat.bassinet != old_seat.bassinet)
-            + int(new_seat.near_toilet != old_seat.near_toilet);
-        score += problem.weight_p * mismatch;
-        if (passenger.has_near_toilet_preference
-            && new_seat.near_toilet != passenger.prefer_near_toilet) {
-            score += problem.weight_t * passenger.near_toilet_preference_weight;
-        }
+        score += evaluate_individual_score(problem, passenger_index, new_index).total();
     }
     for (const Group& group : problem.groups) {
         if (group.passengers.size() <= 1) continue;

@@ -94,8 +94,20 @@ bool same_location(const Seat& left, const Seat& right, bool by_row) {
 
 }  // namespace
 
+ConstructionObjective parse_construction_objective(const std::string& value) {
+    if (value == "feasibility") return ConstructionObjective::Feasibility;
+    if (value == "individual-soft") return ConstructionObjective::IndividualSoft;
+    throw std::runtime_error("unknown construction objective: " + value);
+}
+
+const char* construction_objective_name(ConstructionObjective objective) {
+    return objective == ConstructionObjective::IndividualSoft
+        ? "individual-soft" : "feasibility";
+}
+
 FeasibilityResult solve_feasibility_mip(
-    const Problem& problem, double time_limit_seconds, int seed
+    const Problem& problem, double time_limit_seconds, int seed,
+    ConstructionObjective objective
 ) {
     const auto started = std::chrono::steady_clock::now();
     preprocess_fixed_seats(problem);
@@ -108,7 +120,10 @@ FeasibilityResult solve_feasibility_mip(
     for (int passenger = 0; passenger < passenger_count; ++passenger) {
         for (int seat = 0; seat < seat_count; ++seat) {
             if (!static_eligible(problem, passenger, seat)) continue;
-            x[passenger][seat] = model.add_binary(1e-8 * (seat + 1));
+            const double cost = objective == ConstructionObjective::IndividualSoft
+                ? -evaluate_individual_score(problem, passenger, seat).total()
+                : 1e-8 * (seat + 1);
+            x[passenger][seat] = model.add_binary(cost);
         }
         if (std::find_if(x[passenger].begin(), x[passenger].end(),
                         [](int value) { return value >= 0; }) == x[passenger].end()) {
