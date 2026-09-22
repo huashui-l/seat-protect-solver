@@ -7,6 +7,14 @@
 
 namespace full_cpp {
 
+enum class ConstructionObjective {
+    Feasibility,
+    IndividualSoft,
+};
+
+ConstructionObjective parse_construction_objective(const std::string& value);
+const char* construction_objective_name(ConstructionObjective objective);
+
 struct FeasibilityResult {
     std::string status;
     std::vector<int> passenger_to_seat;
@@ -17,7 +25,8 @@ struct FeasibilityResult {
 FeasibilityResult solve_feasibility_mip(
     const Problem& problem,
     double time_limit_seconds,
-    int seed
+    int seed,
+    ConstructionObjective objective = ConstructionObjective::Feasibility
 );
 
 int validate_complete_assignment(
