@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "seatmaps": {
+    "economy_3-3_4rows": {
+      "aircraftModel": "TEST-E33-4",
+      "cabins": [
+        {
+          "name": "Economy",
+          "startRow": 1,
+          "endRow": 4,
+          "seatLabels": ["A", "B", "C", "D", "E", "F"],
+          "aisleAfter": ["C"],
+          "seatClass": "Economy",
+          "bassinetRows": [1],
+          "exitRows": [4],
+          "extraLegroomRows": [1, 4],
+          "toiletRows": [4]
+        }
+      ]
+    },
+    "economy_3-4-3_3rows": {
+      "aircraftModel": "TEST-E343-3",
+      "cabins": [
+        {
+          "name": "Economy",
+          "startRow": 1,
+          "endRow": 3,
+          "seatLabels": ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"],
+          "aisleAfter": ["C", "G"],
+          "seatClass": "Economy",
+          "bassinetRows": [1],
+          "exitRows": [3],
+          "extraLegroomRows": [1, 3],
+          "toiletRows": [3]
+        }
+      ]
+    },
+    "two_cabin_22seats": {
+      "aircraftModel": "TEST-BC-Y",
+      "cabins": [
+        {
+          "name": "Business",
+          "startRow": 1,
+          "endRow": 1,
+          "seatLabels": ["A", "C", "D", "F"],
+          "aisleAfter": ["C"],
+          "seatClass": "Business",
+          "bassinetRows": [1],
+          "exitRows": [],
+          "extraLegroomRows": [1],
+          "toiletRows": [1]
+        },
+        {
+          "name": "Economy",
+          "startRow": 2,
+          "endRow": 4,
+          "seatLabels": ["A", "B", "C", "D", "E", "F"],
+          "aisleAfter": ["C"],
+          "seatClass": "Economy",
+          "bassinetRows": [2],
+          "exitRows": [4],
+          "extraLegroomRows": [2, 4],
+          "toiletRows": [4]
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "identity_keep_seats",
+      "purpose": "同机型且原座位均合法，检查不必要换座和分数回退",
+      "oldSeatmap": "economy_3-3_4rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["identity", "negative-control", "ordinary"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1B", "1C"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C"]},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
+      ]
+    },
+    {
+      "id": "shrink_small_blockers",
+      "purpose": "缩容迁移中的2至5人普通组，验证长交换链所需的小组补列",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["shrink", "ordinary", "small-blockers"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1C", "1D"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["1E", "1F", "1G"]},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
+        {"groupId": 5, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H", "2J"]}
+      ]
+    },
+    {
+      "id": "expansion_spare_capacity",
+      "purpose": "扩容迁移反例，检查缩容专用方法不会误启用",
+      "oldSeatmap": "economy_3-3_4rows",
+      "newSeatmap": "economy_3-4-3_3rows",
+      "expectedValid": true,
+      "tags": ["expansion", "negative-control", "ordinary"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1C", "1D", "1E"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
+      ]
+    },
+    {
+      "id": "full_resource_shrink",
+      "purpose": "22名旅客加2个保护空座恰好占满目标资源",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["shrink", "full-resource", "single-empty"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1F", "1G", "1H", "1J", "1K"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H"]},
+        {
+          "groupId": 5,
+          "cabin": "Y",
+          "oldSeats": ["2J", "3D"],
+          "passengerOverrides": {"1": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+        },
+        {
+          "groupId": 6,
+          "cabin": "Y",
+          "oldSeats": ["3A", "3B"],
+          "passengerOverrides": {"2": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+        }
+      ]
+    },
+    {
+      "id": "dense_full_resource_special_chain",
+      "purpose": "23名旅客加1个保护空座满载缩容，验证高旅客占座率特殊组全局模式",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["shrink", "full-resource", "dense-traveler", "single-empty"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1F", "1G", "1H", "1J", "1K"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H"]},
+        {"groupId": 5, "cabin": "Y", "oldSeats": ["2J", "2K", "3A"]},
+        {
+          "groupId": 6,
+          "cabin": "Y",
+          "oldSeats": ["3B", "3D"],
+          "passengerOverrides": {"1": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+        }
+      ]
+    },
+    {
+      "id": "fixed_and_protected",
+      "purpose": "固定座位与单双侧保护空座并存，检查非法高分候选被拒绝",
+      "oldSeatmap": "economy_3-3_4rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["fixed", "single-empty", "both-empty"],
+      "groups": [
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": ["1B", "2A", "2B"],
+          "passengerOverrides": {"1": {"newSeat": "1B", "mandatoryRule": {"needBothSideEmpty": "Y"}}}
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": ["1E", "2C"],
+          "passengerOverrides": {"1": {"newSeat": "1E", "mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+        },
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
+      ]
+    },
+    {
+      "id": "full_resource_protection_heavy",
+      "purpose": "保护空座主导的满载缩容反例，避免普通组冲突多样策略误启用",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "expectedCurrentHeuristicComplete": false,
+      "tags": ["shrink", "full-resource", "protection-heavy", "negative-control"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1B"], "referenceSeats": ["1B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["1E"], "referenceSeats": ["1E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["1J"], "referenceSeats": ["2B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["2B"], "referenceSeats": ["2E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 5, "cabin": "Y", "oldSeats": ["2E"], "referenceSeats": ["3B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 6, "cabin": "Y", "oldSeats": ["2J"], "referenceSeats": ["3E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 7, "cabin": "Y", "oldSeats": ["3B"], "referenceSeats": ["4B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
+        {"groupId": 8, "cabin": "Y", "oldSeats": ["3E"], "referenceSeats": ["4E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}}
+      ]
+    },
+    {
+      "id": "caregiver_and_ssr",
+      "purpose": "轮椅、摇篮和儿童旅客与同组相邻成人陪护",
+      "oldSeatmap": "economy_3-3_4rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["caregiver", "WCHR", "BSCT", "CHD"],
+      "groups": [
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": ["2C", "2B"],
+          "passengerOverrides": {"1": {"ssr": "WCHR", "needCared": "Y"}}
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": ["1C", "1B"],
+          "passengerOverrides": {"1": {"ssr": "BSCT", "needCared": "Y"}}
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": ["3B", "3A"],
+          "passengerOverrides": {"1": {"ssr": "CHD", "needCared": "Y"}}
+        },
+        {"groupId": 4, "cabin": "Y", "oldSeats": ["2D", "2E", "2F"]}
+      ]
+    },
+    {
+      "id": "conditional_ssr_isolation",
+      "purpose": "同类型SSR的同排和同子排条件隔离资源",
+      "oldSeatmap": "economy_3-3_4rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["SSR", "same-row", "same-subrow"],
+      "groups": [
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": ["1A"],
+          "passengerOverrides": {"1": {"ssr": "UM", "mandatoryRule": {"sameRowNoOtherSSR": "Y"}}}
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": ["2A"],
+          "passengerOverrides": {"1": {"ssr": "UM", "mandatoryRule": {"sameSubRowNoOtherSSR": "Y"}}}
+        },
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
+      ]
+    },
+    {
+      "id": "large_groups_9_10",
+      "purpose": "同时包含9人组和10人组，供定价及启发式规模测试",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": true,
+      "tags": ["large-group", "size-9", "size-10", "shrink"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J", "2K"]}
+      ]
+    },
+    {
+      "id": "two_cabin_valid_groups",
+      "purpose": "商务和经济同行组各自保持单一舱位并可独立求解",
+      "oldSeatmap": "two_cabin_22seats",
+      "newSeatmap": "two_cabin_22seats",
+      "expectedValid": true,
+      "tags": ["two-cabin", "decomposition", "negative-control"],
+      "groups": [
+        {"groupId": 1, "cabin": "C", "oldSeats": ["1A", "1C", "1D"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
+      ]
+    },
+    {
+      "id": "mixed_cabin_group_invalid",
+      "purpose": "非法混舱同行组必须在输入校验阶段被拒绝",
+      "oldSeatmap": "two_cabin_22seats",
+      "newSeatmap": "two_cabin_22seats",
+      "expectedValid": false,
+      "expectedErrorContains": "含多个舱位",
+      "tags": ["invalid", "mixed-cabin"],
+      "groups": [
+        {
+          "groupId": 1,
+          "cabin": "C",
+          "oldSeats": ["1A", "2A"],
+          "passengerOverrides": {"2": {"cabin": "Y"}}
+        }
+      ]
+    },
+    {
+      "id": "target_capacity_invalid",
+      "purpose": "目标机型总需求超过容量时必须拒绝数据",
+      "oldSeatmap": "economy_3-4-3_3rows",
+      "newSeatmap": "economy_3-3_4rows",
+      "expectedValid": false,
+      "expectedErrorContains": "超过目标机型容量",
+      "tags": ["invalid", "capacity"],
+      "groups": [
+        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J", "1K"]},
+        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J", "2K"]},
+        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
+      ]
+    }
+  ]
+}

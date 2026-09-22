@@ -1,0 +1,115 @@
+{
+  "weights": {
+    "w_s": -1.0,
+    "w_v": -0.5,
+    "w_p": -0.8,
+    "w_c": -3.0,
+    "w_b": -0.3,
+    "w_t": -0.5
+  },
+  "algorithm": {
+    "cabin_decomposition_enabled": true,
+    "cabin_min_time_seconds": 1.0,
+    "business_time_limit_seconds": 5.0,
+    "scoring_time_reserve": 0.1,
+    "prioritize_front": true,
+    "front_penalty_reduction": 0.1,
+    "back_penalty_factor": 0.2,
+    "stage3_time_budget": 20.0,
+    "candidate_cap": 48,
+    "paired_rescue_option_cap": 12,
+    "group_centroid_x_factor": 1.0,
+    "group_centroid_y_factor": 1.0,
+    "baby_front_back_factor": 1.0
+  },
+  "mandatory_rules": {
+    "both_side_empty_semantics": "empty_adjacent_seats",
+    "require_two_real_neighbors": true,
+    "both_side_empty_allow_cross_aisle": true
+  },
+  "ssr_rules": {
+    "CHD": {
+      "allow_exit_row": false,
+      "requires_caregiver": true,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": false
+    },
+    "WCHR": {
+      "allow_exit_row": false,
+      "requires_caregiver": true,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": true,
+      "requires_bassinet": false
+    },
+    "BLND": {
+      "allow_exit_row": false,
+      "requires_caregiver": true,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": false
+    },
+    "BSCT": {
+      "allow_exit_row": false,
+      "requires_caregiver": true,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": true
+    },
+    "UM": {
+      "allow_exit_row": false,
+      "requires_caregiver": false,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": false
+    },
+    "EXST": {
+      "allow_exit_row": true,
+      "requires_caregiver": false,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": false
+    },
+    "CBBG": {
+      "allow_exit_row": true,
+      "requires_caregiver": false,
+      "caregiver_allow_cross_aisle": false,
+      "requires_aisle": false,
+      "requires_bassinet": false
+    }
+  },
+  "seat_value": {
+    "business_base": 50,
+    "extra_legroom": 20,
+    "bassinet": 10
+  },
+  "penalty": {
+    "unassigned": 300.0,
+    "violation": 500.0,
+    "time_factor": 10.0,
+    "score_lower_bound": -999999.0
+  },
+  "evaluation": {
+    "max_time_seconds": 60
+  },
+  "column_generation": {
+    "cabin_decomposition_enabled": true,
+    "cabin_min_time_seconds": 5.0,
+    "mp2_node_limit": 1000000,
+    "mp2_time_limit": 600.0,
+    "mp1_node_limit": 10000,
+    "total_time_limit": 3600.0,
+    "pricing_workers": 4,
+    "tolerance": 1e-07
+  },
+  "data": {
+    "oldseatmap": "data/3-4-3seatmap.json",
+    "seatmap": "data/3-3seatmap.json",
+    "groups": "data/100_small_groups.json"
+  },
+  "seat_geometry": {
+    "seat_spacing": 1.0,
+    "aisle_gap": 0.8,
+    "row_spacing": 1.5
+  }
+}
