@@ -1,7 +1,9 @@
 # GNN-Guided 5s Seat Protection Solver：路线与进度
 
-> 本文件保留内部研究路线和证据索引。其中的`outputs/`、`archive/`、GNN权重、
-> Formal24和其他实验产物未进入本协作仓库；相关路径不是克隆后的默认运行依赖。
+> 本文件是从内部研究仓库迁入的历史路线记录。文中的部分 `outputs/...`、
+> `research/frontier_cpp_gnn/...` 和未迁移文件路径仅指来源研究档案，不是克隆后的默认运行依赖。
+> 当前协作仓库的 active native 实现位于 `native/`。历史实验结果不自动构成当前 production、
+> Formal24 或 Full-C++ 已完成的证据。
 
 最后更新：2026-09-11
 

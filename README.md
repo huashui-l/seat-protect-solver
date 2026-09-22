@@ -13,6 +13,7 @@
 > [tests/README.md](tests/README.md) 与 [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)。
 > 会生成结果的脚本应写入被 Git 忽略的本地目录；需要外部数据的命令在取得经授权的
 > 数据后才能运行。
+> `docs/provenance/initial-import.json` 记录首次导入提交时的路径与哈希；后续目录调整由 Git 历史追踪。
 
 本项目研究机型变更后的旅客座位重分配：读取旧机型座位、目标机型座位和同行旅客组，在满足固定座位、特殊旅客服务（SSR）、陪护关系及保护空座等硬约束的前提下，保证每名真实旅客都有座位，严禁改变旅客预订舱位，并尽量保持座位属性、个人偏好和同行组紧凑度。
 
@@ -34,7 +35,7 @@ P6.5-v3当前Gate为`GENERATION LIMITED / component construction limited`：patt
 但现有online component constructor无法稳定组成接近K10 Oracle价值的联合修复组件。研究已停在
 `P6.5a-1 Targeted Component Expansion Diagnostic`（`NOT STARTED`），不会直接跳到targeted pattern generation。
 
-最新状态和证据路径见[frontier_cpp_gnn 路线与进度](research/frontier_cpp_gnn/ROADMAP_AND_PROGRESS.md)。2026-08及更早的
+历史路线和证据索引见[frontier-cpp-gnn 路线与进度](docs/research-status/frontier-cpp-gnn-roadmap.md)。2026-08及更早的
 阶段报告与原始输出已归档到`reports/archive/`和`outputs/archive/`，只用于历史追溯；历史方法台账见
 [算法方法尝试效果台账](reports/archive/2026-08_current-at-the-time/2026-08-17_算法方法尝试效果台账.md)。
 
@@ -180,9 +181,9 @@ MP2固定一个同行组，在该组各旅客所属舱位的完整座位—保�
 seat-protect/
 ├─ config.json                         算法配置；其中数据路径是外部数据契约
 ├─ configs/                            研发配置说明与30秒研究配置
-├─ docs/                               任务规格、依赖与来源清单
+├─ docs/                               任务规格、依赖、来源清单与历史研究状态
 ├─ src/                                Python算法、评估器和辅助脚本
-├─ research/frontier_cpp_gnn/          active native源码及历史路线说明
+├─ native/                             active native源码与构建脚本
 ├─ tests/                              核心、native和手动测试
 └─ .github/                            PR模板；CI将在依赖闭环稳定后加入
 ```

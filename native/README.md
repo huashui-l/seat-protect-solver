@@ -1,8 +1,8 @@
 # Active native solver sources
 
-This directory temporarily retains the existing path of the active C++ source
-closure. Moving it to a dedicated native directory is intentionally deferred to
-a separate change after build and parity baselines are stable.
+This directory contains the active C++ source closure and its PowerShell build
+entry points. Historical frontier C++/GNN research status is preserved under
+[`docs/research-status/`](../docs/research-status/frontier-cpp-gnn-roadmap.md).
 
 The raw JSON feasibility CLI consists of:
 
@@ -21,7 +21,7 @@ The RR and restricted-master pipeline consists of:
 
 The remaining C++ files are build-time probes or benchmark utilities. Full C++
 coverage of all Rich Python active stages remains incomplete; see the root gate
-documents and `ROADMAP_AND_PROGRESS.md`.
+documents and the historical roadmap linked above.
 
 ## Build
 
@@ -31,7 +31,7 @@ stored in this repository.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File `
-  research/frontier_cpp_gnn/build_native_solver_pipeline.ps1 `
+  native/build_native_solver_pipeline.ps1 `
   -HighsRoot $env:HIGHS_ROOT `
   -OutputDir build/native
 ```

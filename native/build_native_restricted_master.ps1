@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $HighsRoot = (Resolve-Path $HighsRoot).Path
 if (-not $OutputDir) {
     $OutputDir = Join-Path $ProjectRoot "build\native"
