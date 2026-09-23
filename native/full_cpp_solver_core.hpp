@@ -77,8 +77,8 @@ struct RichConstructionConfig {
     int pattern_local_branching_radius_growth = 2;
     int pattern_local_branching_max_radius = std::numeric_limits<int>::max();
     int candidate_cap = 48;
-    int candidate_cap_retry = 64;
-    int candidate_cap_full_retry = 128;
+    int candidate_cap_retry = 96;
+    int candidate_cap_full_retry = 192;
     int beam_width_small = 24;
     int beam_moves_small = 20;
     int beam_width_medium = 40;
@@ -215,7 +215,8 @@ struct RichCandidateCache {
     std::vector<std::vector<int>> rankings;
 };
 
-RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state);
+RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state,
+    const std::vector<double>* frozen_owner_regrets = nullptr);
 
 Problem load_problem(
     const std::string& case_path,

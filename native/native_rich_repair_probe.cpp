@@ -44,14 +44,30 @@ int main(int argc, char** argv) {
         }
         if (rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
         full_cpp::GroupConstructionResult diagnostics;
-        full_cpp::repair_rich_assignment(problem, state, rankings,
-            std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+        full_cpp::RichRemainingDiagnostics construction;
+        if (const auto* mode = replay.find("construct_remaining"); mode && mode->bool_or()) {
+            auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            cache.rankings = rankings;
+            std::vector<int> groups;
+            for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) groups.push_back(g);
+            construction = full_cpp::assign_rich_remaining(problem, state, cache, groups,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60));
+        } else {
+            full_cpp::repair_rich_assignment(problem, state, rankings,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+        }
         for (size_t seat = 0; seat < state.seat_to_passenger.size(); ++seat) {
             const int owner = state.seat_to_passenger[seat];
             if (owner >= 0 && state.passenger_to_seat[owner] != static_cast<int>(seat))
                 throw std::runtime_error("orphan occupied seat after repair");
         }
-        std::cout << std::setprecision(17) << "{\"attempted\":" << diagnostics.rich_repair_attempted
+        std::cout << std::setprecision(17) << "{\"groups_considered\":" << construction.groups_considered
+                  << ",\"dfs_attempted\":" << construction.dfs_attempted
+                  << ",\"dfs_succeeded\":" << construction.dfs_succeeded
+                  << ",\"dfs_nodes\":" << construction.dfs_nodes
+                  << ",\"beam_groups\":" << construction.beam_groups
+                  << ",\"transaction_failures\":" << construction.transaction_failures
+                  << ",\"attempted\":" << diagnostics.rich_repair_attempted
                   << ",\"repaired\":" << diagnostics.rich_repair_repaired
                   << ",\"unresolved\":" << diagnostics.rich_repair_unresolved
                   << ",\"search_nodes\":" << diagnostics.rich_repair_nodes << ",\"assignments\":[";

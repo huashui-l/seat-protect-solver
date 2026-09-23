@@ -92,6 +92,7 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
             with self.subTest(repair_seconds=repair_seconds):
                 result = self.run_case("identity_keep_seats", "group-first", algorithm={
                     "small_group_dfs_node_limit": 1,
+                    "stage3_time_budget": 0.0,
                     "final_repair_time_limit": repair_seconds,
                     "vnd_time_budget": 0.0,
                     "enable_restricted_pattern_mip": False,
@@ -108,10 +109,26 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                     self.assertEqual(result["rich_repair_repaired"], result["rich_construction_unassigned"])
                     self.assertTrue(result["rich_candidate_complete"])
 
+    def test_rich_construction_uses_beam_after_dfs_failure_independently_of_q2a(self):
+        result = self.run_case("identity_keep_seats", "group-first", algorithm={
+            "small_group_dfs_node_limit": 1,
+            "small_group_dfs_time_limit": 20.0,
+            "vnd_time_budget": 0.0,
+            "enable_restricted_pattern_mip": False,
+        })
+        self.assertFalse(result["from_scratch_complete"])
+        self.assertGreater(result["rich_dfs_attempted"], 0)
+        self.assertEqual(result["rich_dfs_succeeded"], 0)
+        self.assertGreater(result["rich_beam_groups"], 0)
+        self.assertEqual(result["rich_construction_unassigned"], 0)
+        self.assertEqual(result["rich_repair_attempted"], 0)
+        self.assertTrue(result["rich_candidate_complete"])
+
     def test_worse_complete_repair_does_not_replace_incumbent(self):
         result = self.run_case("shrink_small_blockers", "group-first", algorithm={
             "small_group_dfs_node_limit": 1,
             "small_group_dfs_max_size": 100,
+            "stage3_time_budget": 0.0,
             "vnd_time_budget": 0.0,
             "enable_restricted_pattern_mip": False,
         })
@@ -124,6 +141,7 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         result = self.run_case("fixed_and_protected", "group-first", algorithm={
             "small_group_dfs_node_limit": 1,
             "final_repair_node_limit": 0,
+            "stage3_time_budget": 0.0,
             "vnd_time_budget": 0.0,
             "enable_restricted_pattern_mip": False,
         })

@@ -2,7 +2,7 @@
 
 Audit baseline: clean source snapshot from branch `main`, commit `89ad65ca5499c488bec10a31a3a5264314746b0c`, imported through an explicit allowlist. Source repository history was not copied.
 
-Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_CPP` means native code receives facts or decisions prepared by Python; `PYTHON_ONLY` means the behavior remains Python; `DEAD/UNUSED` means inactive. The Full-C++ Gate is now measured against every `ACTIVE` Rich Reference row, not only V1R.
+Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_CPP` means native code still receives Python-prepared facts or required semantics remain incomplete/unverified; `PYTHON_ONLY` means the behavior remains Python; `DEAD/UNUSED` means inactive. The Full-C++ Gate is now measured against every `ACTIVE` Rich Reference row, not only V1R.
 
 | Component | Python implementation | Existing C++ implementation | Status | Required by V1? | Required by Rich Reference? |
 | --- | --- | --- | --- | --- | --- |
@@ -11,12 +11,12 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | passenger model | Python raw model | indexed native seat/passenger/group model with cabin, SSR, caregiver/protection, and fixed-seat fields | FULL_CPP | indirect | ACTIVE |
 | AssignmentContext/state | complete mutable state | native indexed occupancy, protected-block counts, ownership/SSR maps, assign/remove, and snapshot/restore; full legality integration pending | PARTIAL_CPP | no | ACTIVE |
 | hard legality | evaluator and allocator checks | native feasibility model and final validator cover cabin/fixed/SSR/caregiver/protection/resource isolation | FULL_CPP | indirect | ACTIVE |
-| fixed seats | precheck and assignment | native fixed/reserved preprocessor with Formal24 and invalid-case parity; not yet applied by construction | PARTIAL_CPP | indirect | ACTIVE |
-| candidate ordering/domain | native Python domain and ranking | feasibility candidate sets are raw-native; Rich construction ordering remains Python-only | PARTIAL_CPP | indirect | ACTIVE |
+| fixed seats | precheck and assignment | native fixed/reserved preprocessor applied to independent Rich construction; full snapshot parity remains under audit | PARTIAL_CPP | indirect | ACTIVE |
+| candidate ordering/domain | native Python domain and ranking | native static domains, cached owner regret/cost ranking and remaining-group/passenger ordering with Python stage differentials | PARTIAL_CPP | indirect | ACTIVE |
 | SSR/caregiver | construction, rescue, rebuild | checks supplied flags/resources | PARTIAL_CPP | indirect | ACTIVE |
-| initial construction | anchored, SSR-first, DFS/Beam | direct native feasibility MIP constructs a complete incumbent; Rich DFS/Beam semantics not yet migrated | PARTIAL_CPP | supplied artifact | ACTIVE |
-| small DFS | construction DFS | none | PYTHON_ONLY | no | ACTIVE |
-| beam search | construction Beam | RR pattern Beam | PARTIAL_CPP | yes | ACTIVE, semantics differ |
+| initial construction | anchored, SSR-first, DFS/Beam | independent fixed-state anchored/remaining construction with DFS/Beam; paired SSR construction/rescue still pending; Q0/Q1/Q2A remain fallbacks | PARTIAL_CPP | supplied artifact | ACTIVE |
+| small DFS | construction DFS | native remaining-stage DFS with retry caps, node/time bounds and fixed-care validation; fixture differential passed | PARTIAL_CPP | no | ACTIVE |
+| beam search | construction Beam | native remaining-stage Beam with skips, compactness ranking, dominance and transactional commit; separate RR pattern Beam remains | PARTIAL_CPP | yes | ACTIVE |
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |
 | protection exchange | protected multi-group pattern MIP | none | PYTHON_ONLY | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |

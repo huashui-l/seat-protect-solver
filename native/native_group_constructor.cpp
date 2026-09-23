@@ -698,7 +698,6 @@ GroupConstructionResult construct_group_first(
         }
     }
 
-    result.from_scratch_state = state.save();
     if (complete && validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
         result.from_scratch_complete = true;
         result.from_scratch_score = evaluate_soft_score(
@@ -928,53 +927,48 @@ GroupConstructionResult construct_rich_m1(
     (void)q0_assignment;
     const auto started = std::chrono::steady_clock::now();
     GroupConstructionResult result = q2a_result;
-    const bool has_construction_state = !q2a_result.from_scratch_state.passenger_to_seat.empty();
-    const auto& construction_assignment = has_construction_state
-        ? q2a_result.from_scratch_state.passenger_to_seat : q2a_result.passenger_to_seat;
-    result.rich_construction_score = evaluate_soft_score(problem, construction_assignment);
-    result.rich_repair_score = result.rich_construction_score;
-    result.rich_construction_assigned = 0;
-    for (int seat : construction_assignment) result.rich_construction_assigned += seat >= 0;
-    result.rich_construction_unassigned = static_cast<int>(problem.passengers.size())
-        - result.rich_construction_assigned;
-    result.rich_candidate_complete = result.rich_construction_unassigned == 0
-        && validate_complete_assignment(problem, construction_assignment) == 0;
-
-    // M1 keeps Q0/Q1/Q2A as the audited fallback, then performs the native
-    // construction/repair pass against the same shared deadline.
-    if (!result.rich_candidate_complete && problem.rich.final_repair_node_limit > 0
-        && problem.rich.final_repair_time_limit > 0.0
-        && std::chrono::steady_clock::now() < global_deadline) {
-        AssignmentState state = fixed_initial_state(problem);
-        const auto cache = build_rich_candidate_cache(problem, state);
-        bool rebuilt = true;
-        if (has_construction_state) {
-            state.restore(q2a_result.from_scratch_state);
-        } else for (int passenger = 0; passenger < static_cast<int>(q2a_result.passenger_to_seat.size()); ++passenger) {
-            const int seat = q2a_result.passenger_to_seat[passenger];
-            if (seat < 0 || state.passenger_to_seat[passenger] >= 0) continue;
-            if (!state.assign(passenger, seat)) { rebuilt = false; break; }
-        }
-        if (rebuilt) {
-            repair_rich_assignment(problem, state, cache.rankings, global_deadline, result);
-            if (validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
-                result.rich_candidate_complete = true;
-                result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
-                if (result.rich_repair_score > result.group_construction_score + kTolerance) {
-                    result.passenger_to_seat = state.passenger_to_seat;
-                    result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
-                    result.group_construction_score = result.rich_repair_score;
-                    result.score_delta = result.rich_repair_score - result.q0_score;
-                    result.selected_incumbent = "rich-m1";
-                }
-            }
-        }
+    AssignmentState state = fixed_initial_state(problem);
+    const auto cache = build_rich_candidate_cache(problem, state);
+    const auto construction_deadline = std::min(global_deadline, started
+        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(problem.rich.construction_time_budget)));
+    std::vector<int> anchored, groups;
+    for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
+        groups.push_back(g);
+        if (std::any_of(problem.groups[g].passengers.begin(), problem.groups[g].passengers.end(),
+                [&](int p) { return state.passenger_to_seat[p] >= 0; })) anchored.push_back(g);
     }
-    result.rich_construction_seconds = std::chrono::duration<double>(
-        std::chrono::steady_clock::now() - started).count();
-    result.rich_repair_seconds = result.rich_construction_seconds;
+    const auto capture = [&](const RichRemainingDiagnostics& diagnostics) {
+        result.rich_dfs_attempted += diagnostics.dfs_attempted;
+        result.rich_dfs_succeeded += diagnostics.dfs_succeeded;
+        result.rich_dfs_nodes += diagnostics.dfs_nodes;
+        result.rich_beam_groups += diagnostics.beam_groups;
+    };
+    if (!anchored.empty()) capture(assign_rich_remaining(problem, state, cache, anchored, construction_deadline));
+    // Paired SSR construction/rescue remains a separate pending migration.
+    // This pass fills non-cared passengers; repair handles missing cared passengers.
+    capture(assign_rich_remaining(problem, state, cache, groups, construction_deadline));
+    const auto construction_finished = std::chrono::steady_clock::now();
+    result.rich_construction_seconds = std::chrono::duration<double>(construction_finished - started).count();
     result.rich_construction_carry_seconds = std::max(0.0,
-        problem.rich.construction_time_budget - result.rich_construction_seconds);
+        std::chrono::duration<double>(construction_deadline - construction_finished).count());
+    result.rich_construction_unassigned = static_cast<int>(std::count(
+        state.passenger_to_seat.begin(), state.passenger_to_seat.end(), -1));
+    result.rich_construction_assigned = static_cast<int>(problem.passengers.size()) - result.rich_construction_unassigned;
+    result.rich_construction_score = evaluate_soft_score(problem, state.passenger_to_seat);
+    if (result.rich_construction_unassigned > 0) {
+        repair_rich_assignment(problem, state, cache.rankings, global_deadline, result);
+    }
+    result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
+    result.rich_candidate_complete = validate_complete_assignment(problem, state.passenger_to_seat) == 0;
+    // Q0/Q1/Q2A stay independent fallbacks, never the construction stage input.
+    if (result.rich_candidate_complete && result.rich_repair_score > result.group_construction_score + kTolerance) {
+        result.passenger_to_seat = state.passenger_to_seat;
+        result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
+        result.group_construction_score = result.rich_repair_score;
+        result.score_delta = result.rich_repair_score - result.q0_score;
+        result.selected_incumbent = "rich-m1";
+    }
     return result;
 }
 

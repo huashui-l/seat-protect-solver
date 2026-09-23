@@ -23,27 +23,14 @@ restricted/protected master semantics remain outstanding. Native repair now
 uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
 caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
 
-The production Q2A-to-repair boundary now preserves the actual construction
-snapshot separately from the selected legal fallback. Previously Q2A discarded
-an incomplete candidate, so the repair entry inspected the complete fallback
-and effectively skipped its production repair path. Failed Q2A recovery now
-restores the last committed snapshot, including protection resources; repair
-receives that state. Only a complete, legal, strictly better repaired candidate
-replaces the fallback. Construction assigned/unassigned counts remain the
-pre-repair checkpoint, and candidate completeness is reported separately from
-the complete selected incumbent. A legal fallback remains eligible for VND.
-Zero repair time/node limits disable the stage, matching Python. Caregiver
-lookup uses external group ID rather than comparing it with an internal index.
-Regression fixtures cover a ten-passenger repair, disabled repair with fixed
-assignments retained, equal-score fallback retention, and a worse complete
-repair (-79.970 versus incumbent -71.995) rejected by final selection; the test
-harness independently audits final legality and score. This is the existing
-Q2A candidate feeding partial Rich repair, not exact Python Rich construction.
-Exact construction, repair semantics, and production stage scheduling remain
-outstanding.
-Release build and the native/state-replay-enabled public suite passed after
-this boundary fix: 71 tests, 12,276 subtests, 9 skips (including all 12,000
-state-operation differentials). The two existing conversion warnings remain.
+Construction and repair candidates are kept separate from the selected legal
+Q0/Q1/Q2A fallback. Only a complete, legal, strictly better candidate replaces
+that fallback. Construction assigned/unassigned counts remain the pre-repair
+checkpoint; a legal fallback remains eligible for VND. Earlier Q2A snapshot
+repair wiring established this boundary; the independent Rich remaining-passenger
+constructor below now supplies the candidate state instead. Repair disable,
+equal-score retention and worse-candidate rejection remain covered by public
+CLI tests with independent evaluator audits.
 
 Relocation repair now has a shared native stage function, `repair_rich_assignment`,
 used by production and a dedicated replay probe. Given an assignment state and
@@ -84,10 +71,10 @@ multiple toilet preferences, old-seat reservation pressure, contextual baby
 interference, and stable input-seat ordering for equal costs. Regret feasibility
 is distinct from assignment admission: Python's feasibility predicate does not
 require the passenger to be unassigned or enforce fixed-seat identity. The
-native assignment admission checks remain in place. Production repair builds
-this cache from the fixed initial state before restoring the partial candidate.
-This replaces its individual-score-only and seat-ID-tie ranking, but does not
-yet wire a complete independent Rich construction stage.
+native assignment admission checks remain in place. Production builds
+this cache from the fixed initial state and shares it between construction and repair.
+This replaces its individual-score-only and seat-ID-tie ranking. The remaining-passenger
+construction stage below uses updated context costs while preserving these initial owner regrets.
 The existing stage probe's `rank_only` replay compares native cache costs,
 regrets and rankings against all three actual Python functions. All 35 scenarios
 matched costs/regrets to 10 decimal places and exact candidate order, including
@@ -97,6 +84,39 @@ Release MSVC build and the native/state-replay-enabled public suite passed:
 77 tests, 12,335 subtests, 9 skips; the two existing conversion warnings remain.
 This validates the cache in the exercised states and its repair integration,
 not full construction ordering, runtime schedule or Formal24 quality parity.
+
+`assign_rich_remaining` now implements the frozen Python remaining-passenger
+stage in a separate native construction module. It uses stable group priority
+(anchors, feasible-domain size, protection/care demand, group size), passenger
+protection/domain/regret/old-position ordering, dynamic costs with frozen owner
+regrets, three DFS candidate caps, exact node counting and DFS-to-Beam fallback.
+Beam supports skipped passengers, compactness-based move ordering, all single-empty
+choices, resource/local-SSR dominance, stable retention and transactional commits.
+Static global SSR filtering and branch-local SSR checks remain separate, as in
+Python; final commits recheck the combined state. Missing candidate-cap settings
+now use Python's dependent defaults; explicit frozen 48/64/128 settings are retained.
+
+Production M1 now starts its own candidate at fixed state, runs anchored groups
+then all remaining non-cared passengers, and passes that candidate and the frozen
+ranking cache to repair. Q0/Q1/Q2A are selection fallbacks rather than construction
+input. Construction timing/counts are captured before repair, and raw CLI output
+includes Rich DFS/Beam counters. A production regression forces Q2A and Rich DFS
+failure but observes successful independent Rich Beam completion without repair.
+Paired SSR construction/rescue (between anchored and remaining passes), complete
+adaptive/carry runtime scheduling, and full-pipeline quality parity are still pending;
+repair is not claimed as an equivalent substitute for those missing stages.
+
+Direct replay calls actual Python `assign_remaining_passengers` and the production
+native function on identical states. Tests cover DFS and Beam on 11 public fixtures,
+candidate retries, node-limit clamping, disabled DFS time, expired stage time and
+omitted cap settings. Exact assignments, protection resources and all six non-time
+diagnostic fields are compared. Generous per-DFS time and deterministic node limits
+isolate search semantics; this does not establish default wall-clock cutoff parity.
+Final verification on a complete rebuild of the frozen source passed: 81 public
+tests, 12,361 subtests and 9 skips, with native and state replay both enabled.
+This includes all 12,000 state operations and 26 construction replay subtests.
+The two pre-existing conversion warnings remain. No Formal24 run or quality-parity
+claim is attached to this remaining-construction checkpoint.
 
 The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
 protocol, materializes native patterns, and runs the restricted master. The

@@ -26,7 +26,6 @@ struct GroupConstructionResult {
     double q1_score = 0.0;
     double from_scratch_score = 0.0;
     bool from_scratch_complete = false;
-    AssignmentSnapshot from_scratch_state;
     long long from_scratch_dfs_nodes = 0;
     long long from_scratch_beam_nodes = 0;
     int from_scratch_dfs_groups = 0;
@@ -87,6 +86,18 @@ void repair_rich_assignment(
     const std::vector<std::vector<int>>& passenger_sorted_seats,
     std::chrono::steady_clock::time_point global_deadline,
     GroupConstructionResult& diagnostics
+);
+
+struct RichRemainingDiagnostics {
+    int groups_considered = 0, dfs_attempted = 0, dfs_succeeded = 0;
+    long long dfs_nodes = 0;
+    int beam_groups = 0, transaction_failures = 0;
+};
+
+RichRemainingDiagnostics assign_rich_remaining(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    const std::vector<int>& group_indices,
+    std::chrono::steady_clock::time_point global_deadline
 );
 
 void improve_rich_vnd_m2(

@@ -55,6 +55,8 @@ struct FeasibilityResult {
     int rich_construction_assigned = 0;
     int rich_construction_unassigned = 0;
     bool rich_candidate_complete = false;
+    int rich_dfs_attempted = 0, rich_dfs_succeeded = 0, rich_beam_groups = 0;
+    long long rich_dfs_nodes = 0;
     double rich_repair_score = 0.0;
     int rich_repair_repaired = 0;
     int rich_repair_unresolved = 0;

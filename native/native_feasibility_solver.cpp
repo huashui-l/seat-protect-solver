@@ -227,6 +227,10 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_construction_assigned = group_result.rich_construction_assigned;
             result.rich_construction_unassigned = group_result.rich_construction_unassigned;
             result.rich_candidate_complete = group_result.rich_candidate_complete;
+            result.rich_dfs_attempted = group_result.rich_dfs_attempted;
+            result.rich_dfs_succeeded = group_result.rich_dfs_succeeded;
+            result.rich_dfs_nodes = group_result.rich_dfs_nodes;
+            result.rich_beam_groups = group_result.rich_beam_groups;
             result.rich_repair_score = group_result.rich_repair_score;
             result.rich_repair_repaired = group_result.rich_repair_repaired;
             result.rich_repair_unresolved = group_result.rich_repair_unresolved;

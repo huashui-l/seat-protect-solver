@@ -200,7 +200,10 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = algorithm->find("pattern_local_branching_radius_growth")) problem.rich.pattern_local_branching_radius_growth = static_cast<int>(item->number_or(problem.rich.pattern_local_branching_radius_growth));
         if (const Value* item = algorithm->find("pattern_local_branching_max_radius")) problem.rich.pattern_local_branching_max_radius = static_cast<int>(item->number_or(problem.rich.pattern_local_branching_max_radius));
         if (const Value* item = algorithm->find("candidate_cap")) problem.rich.candidate_cap = static_cast<int>(item->number_or(problem.rich.candidate_cap));
+        problem.rich.candidate_cap_retry = std::max(64, problem.rich.candidate_cap * 2);
         if (const Value* item = algorithm->find("candidate_cap_retry")) problem.rich.candidate_cap_retry = static_cast<int>(item->number_or(problem.rich.candidate_cap_retry));
+        problem.rich.candidate_cap_full_retry = std::max(128,
+            std::max(problem.rich.candidate_cap, problem.rich.candidate_cap_retry) * 2);
         if (const Value* item = algorithm->find("candidate_cap_full_retry")) problem.rich.candidate_cap_full_retry = static_cast<int>(item->number_or(problem.rich.candidate_cap_full_retry));
         if (const Value* item = algorithm->find("beam_width_small")) problem.rich.beam_width_small = static_cast<int>(item->number_or(problem.rich.beam_width_small));
         if (const Value* item = algorithm->find("beam_moves_small")) problem.rich.beam_moves_small = static_cast<int>(item->number_or(problem.rich.beam_moves_small));
@@ -633,7 +636,8 @@ std::vector<std::pair<int, int>> rich_placement_domain(
     return options;
 }
 
-RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state) {
+RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state,
+    const std::vector<double>* frozen_owner_regrets) {
     RichCandidateCache result;
     const int count = static_cast<int>(problem.passengers.size());
     const int seats = static_cast<int>(problem.seats.size());
@@ -686,7 +690,8 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
             result.costs[p][s] = -(score + problem.weight_b * impact);
         }
     }
-    for (int p = 0; p < count; ++p) {
+    if (frozen_owner_regrets) result.owner_regrets = *frozen_owner_regrets;
+    for (int p = 0; p < count && !frozen_owner_regrets; ++p) {
         const auto own = problem.seat_index.find(problem.passengers[p].old_seat);
         if (own == problem.seat_index.end() || !state.rich_seat_feasible(p, own->second)) continue;
         double alternative = std::numeric_limits<double>::infinity();
