@@ -1387,6 +1387,31 @@ build passed with the two pre-existing C4244 conversion warnings.
 
 ## Correctness
 
+### Follow-up regression isolation on the frozen 54f827c artifacts
+
+Nonbinding construction/repair/VND replay passed against the actual frozen
+Python functions for the Economy cabins of `reverse:100_edge`,
+`forward:full_normal`, and `reverse:full_edge`. This isolates deterministic
+component semantics; it is not a rerun of the 60-second acceptance benchmark.
+
+For `forward:full_normal`, replaying both restricted implementations from the
+recorded final assignment and the same 3,363-column native elite store produced
+identical assignments and all non-time diagnostics: five attempts, zero accepted,
+zero score gain. This checks that particular master entry state, not the
+unrecorded historical Python generation trajectory or original pre-master state.
+Local diagnostic results remain under `build/native/restricted_diagnostic`.
+
+The other two Economy cabins exhausted the global deadline before restricted
+MIP could attempt a solve. Their Q0/Q1/Q2A preparation consumed 16.611 seconds
+(`reverse:100_edge`) and 24.154 seconds (`reverse:full_edge`). C++ Rich scores
+before restricted were better than Python's corresponding pre-restricted scores,
+but Python then gained 33.356556 and 43.947945 respectively in its restricted
+stage. Thus shifting the construction origin fixed expired entry but did not
+restore the reference's budget availability. Fallback scheduling remains an
+integration issue to resolve while preserving the 60-second total deadline and
+the required Q0/Q1/Q2A fallback behavior. No limits or benchmark parameters were
+changed during this isolation, and no new full Formal24 run was made.
+
 - Rich Python Formal24 complete: `24/24`
 - unassigned: `0`
 - hard violations: `0`
