@@ -2,6 +2,7 @@
 #include "native_feasibility_solver.hpp"
 
 #include <iomanip>
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
@@ -80,6 +81,16 @@ int main(int argc, char** argv) {
                         for (const auto& seat : request.at("current_targets").array)
                             targets.push_back(seat.is_null() ? -1 : problem.seat_index.at(seat.string));
                         patterns = full_cpp::generate_rich_rigid_relaxed_patterns(problem, g, targets, options, active_types);
+                        if (const auto* value_blocks = replay.find("value_blocks"); value_blocks && value_blocks->bool_or()) {
+                            std::vector<int> assignment(problem.passengers.size(), -1);
+                            for (size_t p = 0; p < targets.size(); ++p) assignment[problem.groups[g].passengers[p]] = targets[p];
+                            const auto metrics = full_cpp::build_rich_repair_queue(problem, assignment);
+                            const auto metric = std::find_if(metrics.begin(), metrics.end(), [&](const auto& m) { return m.group_id == problem.groups[g].id; });
+                            const auto windows = full_cpp::build_rich_structured_windows(problem, g, options, *metric);
+                            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(
+                                replay.find("expired") && replay.at("expired").bool_or() ? -1 : 60);
+                            full_cpp::generate_rich_value_block_patterns(problem, g, options, *metric, windows, active_types, deadline, patterns);
+                        }
                     } else {
                         std::vector<full_cpp::RichPlacement> selected;
                         for (const auto& choice : request.at("choices").array)

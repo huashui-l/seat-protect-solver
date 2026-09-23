@@ -1030,6 +1030,84 @@ RichStructuredWindows build_rich_structured_windows(const Problem& problem, int 
     return result;
 }
 
+void generate_rich_value_block_patterns(const Problem& problem, int group_index,
+    const std::vector<std::vector<RichPlacement>>& options, const RichGroupRepairMetric& current_metric,
+    const RichStructuredWindows& windows, const std::vector<std::string>& active_ssr_types,
+    std::chrono::steady_clock::time_point deadline, std::vector<RichTieredPattern>& patterns
+) {
+    const auto& group = problem.groups[group_index];
+    const bool global = problem.rich_full_resource_global_blocks;
+    if (current_metric.value_mismatch_score >= 0.0 && !global) return;
+    for (int p : group.passengers) {
+        const auto& item = problem.passengers[p];
+        if (!item.ssr.empty() || item.need_cared || item.has_new_seat || item.need_single_empty || item.need_both_empty) return;
+    }
+    const auto& block_windows = global ? windows.all_row_windows : windows.row_windows;
+    const size_t window_count = global ? block_windows.size() : std::min(size_t(4), block_windows.size());
+    const auto seat_less = [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; };
+    std::set<std::vector<int>> seen;
+    const size_t size = group.passengers.size();
+    const auto popcount = [](size_t mask) { size_t count = 0; while (mask) { mask &= mask - 1; ++count; } return count; };
+    for (size_t w = 0; w < window_count; ++w) {
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        const auto& window = block_windows[w];
+        std::set<int> pool_set;
+        for (const auto& row : options) for (const auto& option : row)
+            if (std::binary_search(window.begin(), window.end(), problem.seats[option.seat].row)) pool_set.insert(option.seat);
+        std::vector<int> pool(pool_set.begin(), pool_set.end());
+        std::sort(pool.begin(), pool.end(), seat_less);
+        if (pool.size() < size || pool.empty()) continue;
+        const auto anchors = global ? std::vector<int>{pool[0], pool[pool.size()/4], pool[pool.size()/2], pool[3*pool.size()/4], pool.back()} : pool;
+        std::set<int> used_anchors;
+        for (int anchor : anchors) {
+            if (!used_anchors.insert(anchor).second) continue;
+            if (std::chrono::steady_clock::now() >= deadline) break;
+            auto block = pool;
+            const auto key = [&](int s) {
+                const auto& seat = problem.seats[s]; const auto& origin = problem.seats[anchor];
+                return std::make_tuple(std::abs(seat.x-origin.x)+std::abs(seat.y-origin.y),
+                    std::abs(seat.y-origin.y), seat.x, seat.id);
+            };
+            std::stable_sort(block.begin(), block.end(), [&](int a, int b) { return key(a) < key(b); });
+            block.resize(size);
+            std::sort(block.begin(), block.end(), seat_less);
+            if (!seen.insert(block).second) continue;
+            // The frozen algorithm uses exact subset matching without an internal
+            // clock check or a group-size cap; retain those search semantics.
+            if (size >= std::numeric_limits<size_t>::digits) throw std::runtime_error("value block exceeds native subset index width");
+            const size_t count = size_t(1) << size;
+            std::vector<double> dp(count, -std::numeric_limits<double>::infinity());
+            std::vector<int> parent(count, -1);
+            std::vector<std::vector<const RichPlacement*>> choices(size, std::vector<const RichPlacement*>(size, nullptr));
+            for (size_t p = 0; p < size; ++p) for (size_t s = 0; s < size; ++s)
+                for (const auto& option : options[p]) if (option.seat == block[s]) { choices[p][s] = &option; break; }
+            dp[0] = 0.0;
+            for (size_t mask = 0; mask < count; ++mask) {
+                const size_t p = popcount(mask);
+                if (p >= size || dp[mask] == -std::numeric_limits<double>::infinity()) continue;
+                for (size_t s = 0; s < size; ++s) {
+                    const size_t bit = size_t(1) << s;
+                    if ((mask & bit) || !choices[p][s]) continue;
+                    const double score = dp[mask] - choices[p][s]->individual_cost;
+                    if (score > dp[mask | bit]) { dp[mask | bit] = score; parent[mask | bit] = static_cast<int>(s); }
+                }
+            }
+            if (parent.back() < 0) continue;
+            std::vector<RichPlacement> selected(size);
+            for (size_t mask = count-1; mask;) {
+                const int s = parent[mask]; const size_t previous = mask ^ (size_t(1) << s);
+                const size_t p = popcount(previous); selected[p] = *choices[p][s]; mask = previous;
+            }
+            auto pattern = build_rich_exact_pattern(problem, group_index, selected, active_ssr_types);
+            auto existing = std::find_if(patterns.begin(), patterns.end(), [&](const auto& old) {
+                return old.pattern.assignments == pattern.assignments && old.pattern.blocked_by == pattern.blocked_by;
+            });
+            RichTieredPattern item{std::move(pattern), global ? "global_value_block" : "value_block"};
+            if (existing == patterns.end()) patterns.push_back(std::move(item)); else *existing = std::move(item);
+        }
+    }
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

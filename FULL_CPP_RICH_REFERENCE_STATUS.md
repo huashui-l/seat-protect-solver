@@ -647,6 +647,33 @@ legality/scoring checks. The structured suite also passed after adding an explic
 repair-queue length assertion. `git diff --check` passed. No Formal24 or profiling
 run was performed.
 
+Structured value-block and global-value-block generation now exist natively in
+`generate_rich_value_block_patterns`. Ordinary groups with negative value mismatch
+use the first four capped windows and all lexical seat anchors; the full-resource
+mode uses all windows and five deduplicated quantile anchors. Nearest blocks follow
+the frozen Manhattan/vertical/x/seat ordering, are deduplicated across windows and
+matched to passengers by strict-update subset DP in ascending mask/seat order.
+Generated patterns replace matching rigid/relaxed entries in place and retain
+Python's `value_block` / `global_value_block` source labels. The function checks the
+clock at window and anchor boundaries only, matching the frozen prefix. No
+algorithmic group-size cap is introduced; an unrepresentable native subset index
+fails explicitly rather than invoking an undefined shift.
+
+The oracle now executes the frozen AST through the value-block section, with
+nonbinding deadlines and a separate already-expired case. The structured suite
+passed 7 tests and 65 subtests. Public construction states cover global blocks;
+a value-mismatch synthetic requires ordinary value blocks, and an expired deadline
+requires neither value-block source. Ordered pattern contents, keyed coefficients,
+master costs and source replacement all match Python. Rebuilt DFS, final recording,
+special pricing and complete structured production integration remain required.
+This is not a completed M3 or Formal24 quality gate.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 122 tests and 13,821 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

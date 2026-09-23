@@ -9,6 +9,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <chrono>
 
 namespace full_cpp {
 
@@ -248,6 +249,11 @@ struct RichStructuredWindows {
 
 RichStructuredWindows build_rich_structured_windows(const Problem& problem, int group_index,
     const std::vector<std::vector<RichPlacement>>& options, const RichGroupRepairMetric& current_metric);
+
+void generate_rich_value_block_patterns(const Problem& problem, int group_index,
+    const std::vector<std::vector<RichPlacement>>& options, const RichGroupRepairMetric& current_metric,
+    const RichStructuredWindows& windows, const std::vector<std::string>& active_ssr_types,
+    std::chrono::steady_clock::time_point deadline, std::vector<RichTieredPattern>& patterns);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

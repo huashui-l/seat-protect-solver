@@ -16,7 +16,7 @@ from tests.test_native_rich_pipeline import construction_prefix
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def python_rigid_relaxed(case, config, assignments):
+def python_rigid_relaxed(case, config, assignments, value_blocks=False, expired=False):
     tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
     function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
                     and n.name == "generate_structured_group_patterns")
@@ -27,10 +27,18 @@ def python_rigid_relaxed(case, config, assignments):
     stop = next(i for i, n in enumerate(loop.body) if isinstance(n, ast.Assign)
                 and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "group_deadline")
     code = compile(ast.Module(body=loop.body[start:stop], type_ignores=[]), "frozen_rigid_relaxed", "exec")
+    block_stop = next(i for i, n in enumerate(loop.body) if isinstance(n, ast.AnnAssign)
+                      and isinstance(n.target, ast.Name) and n.target.id == "pattern_by_signature")
+    block_code = compile(ast.Module(body=loop.body[stop + 1:block_stop], type_ignores=[]), "frozen_value_blocks", "exec")
     new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
     old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
     fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
     baby = exact._baby_pairs(new, case["groupsData"], config["weights"], config)
+    scorer = evaluator.IncrementalSoftScorer(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                                           case["groupsData"], config["weights"], config)
+    metrics = rich._group_repair_metrics(case["groupsData"], assignments, new, config["weights"], config, old)
+    activation = next(n for n in function.body if isinstance(n, ast.Assign)
+                      and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "full_resource_global_blocks")
     result = []
     for group in case["groupsData"]:
         namespace = dict(rich.__dict__, group=group, passengers=group["psrs"], group_id=group["groupId"],
@@ -39,6 +47,15 @@ def python_rigid_relaxed(case, config, assignments):
                          context=types.SimpleNamespace(assigned_seats=assignments), diagnostics={"three_tier_active": False},
                          cache=exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed))
         exec(code, namespace)
+        if value_blocks:
+            namespace.update(new_seats_data=case["newSeatmapData"]["seats"], old_seats_data=case["oldSeatmapData"]["seats"],
+                             resource_demand=rich._seat_demand_for_budgeting(case["groupsData"]),
+                             traveler_demand=sum(len(g["psrs"]) for g in case["groupsData"]),
+                             current_metric=metrics[group["groupId"]], target_span=max(0, metrics[group["groupId"]]["row_span"] - 2),
+                             old_topology=old, config=config, evaluator_module=evaluator, scorer=scorer,
+                             group_deadline=rich.time.perf_counter() + (-1.0 if expired else 60.0))
+            exec(compile(ast.Module(body=[activation], type_ignores=[]), "frozen_global_activation", "exec"), namespace)
+            exec(block_code, namespace)
         for pattern, source in namespace["tiered_patterns"].values():
             result.append(dict(group_id=pattern.group_id, signature=pattern.signature, source=source,
                                assignments=pattern.assignments, blocked_by=pattern.blocked_by,
@@ -144,13 +161,13 @@ class NativeRichStructuredTests(unittest.TestCase):
                                            structured_research_min_group_size=0)
                 self.replay_windows(case, config)
 
-    def replay(self, case, assignments, config=None):
+    def replay(self, case, assignments, config=None, value_blocks=False, expired=False):
         config = copy.deepcopy(config or self.config)
         active = sorted({p["ssr"] for g in case["groupsData"] for p in g["psrs"] if p.get("ssr")})
         config["_column_generation_active_ssr_types"] = active
         config["input_contract"] = {"seatmaps_by_direction": {
             "public-test": {"old": "old.json", "new": "new.json"}}}
-        expected = python_rigid_relaxed(case, config, assignments)
+        expected = python_rigid_relaxed(case, config, assignments, value_blocks, expired)
         requests = [dict(group_index=i, current_targets=[assignments.get((g["groupId"], p["hostnum"])) for p in g["psrs"]])
                     for i, g in enumerate(case["groupsData"])]
         with tempfile.TemporaryDirectory() as directory:
@@ -158,7 +175,8 @@ class NativeRichStructuredTests(unittest.TestCase):
             for name, value in {
                 "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
                 "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
-                "replay.json": {"rigid_relaxed": requests, "active_ssr_types": active},
+                "replay.json": {"rigid_relaxed": requests, "active_ssr_types": active,
+                                "value_blocks": value_blocks, "expired": expired},
             }.items():
                 (work / name).write_text(json.dumps(value), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
@@ -233,3 +251,26 @@ class NativeRichStructuredTests(unittest.TestCase):
                 config["algorithm"].update(business_time_limit_seconds=60.0, structured_rigid_shift_rows=1)
                 actual = self.replay(case, {(101, 1): "10F", (101, 2): "2A", (101, 3): "10D"}, config)
                 self.assertTrue(actual)
+
+    def test_value_blocks_match_frozen_prefix_and_overwrite_sources(self):
+        prefix = construction_prefix()
+        sources = set()
+        for case in self.cases[:11]:
+            config = copy.deepcopy(self.config)
+            config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
+                                       construction_time_budget=60.0, small_group_dfs_time_limit=20.0)
+            assignments = prefix(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                                 case["groupsData"], config["weights"], config)["context"].assigned_seats
+            with self.subTest(case=case["id"]):
+                actual = self.replay(case, assignments, config, value_blocks=True)
+                sources.update(p["source"] for p in actual)
+        self.assertIn("global_value_block", sources)
+        case = self.synthetic([(101, {}), (101, {})])
+        case["oldSeatmapData"] = copy.deepcopy(case["oldSeatmapData"])
+        config = copy.deepcopy(self.config)
+        config["algorithm"]["business_time_limit_seconds"] = 60.0
+        assignments = {(101, 1): "2A", (101, 2): "2B"}
+        actual = self.replay(case, assignments, config, value_blocks=True)
+        self.assertIn("value_block", {p["source"] for p in actual})
+        expired = self.replay(case, assignments, config, value_blocks=True, expired=True)
+        self.assertFalse(any(p["source"].endswith("value_block") for p in expired))
