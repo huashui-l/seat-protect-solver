@@ -24,7 +24,7 @@ class NativeRichRepairTests(unittest.TestCase):
         cls.cases = materialize_cases()
 
     def replay(self, case, initial, rankings, node_limit=20000, expected_orphan_count=0, construct_algorithm=None,
-               paired_algorithm=None, rescue_algorithm=None, vnd_algorithm=None, vnd_group_rebuild=False):
+               paired_algorithm=None, rescue_algorithm=None, vnd_algorithm=None, vnd_group_rebuild=False, vnd_caregiver_rebuild=False):
         config = copy.deepcopy(self.config)
         config["algorithm"].update(final_repair_node_limit=node_limit, final_repair_time_limit=10.0)
         if construct_algorithm is not None:
@@ -58,7 +58,7 @@ class NativeRichRepairTests(unittest.TestCase):
                        for (group, p), row in zip(passengers, rankings)}
             if vnd_algorithm is not None:
                 from tests.test_native_rich_vnd import python_vnd_prefix
-                expected = python_vnd_prefix(vnd_group_rebuild)(seats_data, case["oldSeatmapData"]["seats"],
+                expected = python_vnd_prefix(vnd_group_rebuild, vnd_caregiver_rebuild)(seats_data, case["oldSeatmapData"]["seats"],
                     case["groupsData"], groups, context, ordered, config["weights"], config,
                     rich.time.perf_counter() + 60.0)
             elif construct_algorithm is not None or paired_algorithm is not None or rescue_algorithm is not None:
@@ -90,7 +90,7 @@ class NativeRichRepairTests(unittest.TestCase):
                 "replay.json": {"assignments": initial, "rankings": rankings,
                                 "construct_remaining": construct_algorithm is not None,
                                 "paired_ssrs": paired_algorithm is not None,
-                                "paired_rescue": rescue_algorithm is not None, "vnd_prefix": vnd_algorithm is not None, "vnd_group_rebuild": vnd_group_rebuild},
+                                "paired_rescue": rescue_algorithm is not None, "vnd_prefix": vnd_algorithm is not None, "vnd_group_rebuild": vnd_group_rebuild, "vnd_caregiver_rebuild": vnd_caregiver_rebuild},
             }.items():
                 (work / name).write_text(json.dumps(data), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),

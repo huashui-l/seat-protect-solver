@@ -25,7 +25,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
 | 1-opt / 2-swap | VND | stateful Python-ordered move/swap prefix differential passed; production still uses earlier approximate VND | PARTIAL_CPP | no | ACTIVE |
 | 3-cycle | VND explicit cycle | stateful Python-ordered cycle prefix differential passed; production integration pending | PARTIAL_CPP | no | ACTIVE |
-| caregiver rebuild | VND joint rebuild | native caregiver-pair rescue exists in repair; full VND caregiver joint rebuild remains Python-only | PARTIAL_CPP | no | ACTIVE |
+| caregiver rebuild | VND joint rebuild | stateful joint permutations, caregiver adjacency, global infant effects and ordered commits match full Python VND replay; production integration pending | PARTIAL_CPP | no | ACTIVE |
 | RR/search generation | separate orchestration | native task/Beam/commit/deadline | FULL_CPP | yes | Rich INACTIVE |
 | simulated annealing | none active | none | DEAD/UNUSED | no | Rich INACTIVE |
 | structured pattern handling | elite store, structured/special pricing | raw native Problem adapter, seat/protection resources, SSR location encoding, stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |

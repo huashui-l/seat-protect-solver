@@ -670,7 +670,7 @@ RichConstructionDiagnostics construct_rich_assignment(
 
 RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
     AssignmentState& state, const std::vector<std::vector<int>>& rankings,
-    std::chrono::steady_clock::time_point deadline, bool include_group_rebuild
+    std::chrono::steady_clock::time_point deadline, bool include_group_rebuild, bool include_caregiver_rebuild
 ) {
     RichOrdinaryVndDiagnostics diagnostics;
     const auto expired = [&]() { return std::chrono::steady_clock::now() >= deadline; };
@@ -925,6 +925,119 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
         }
         if (!accepted) break;
     }
+    if (!include_caregiver_rebuild) return diagnostics;
+    const auto requires_care = [&](int p) {
+        const auto& item = problem.passengers[p];
+        const auto rule = problem.ssr_rules.find(item.ssr);
+        return item.need_cared || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
+    };
+    const auto individual = [&](int p, int seat) {
+        std::vector<int> isolated(n, -1);
+        isolated[p] = seat;
+        return evaluate_rich_group_score(problem, isolated, problem.passengers[p].group).total();
+    };
+    const auto baby_score = [&](const std::vector<int>& assignment) {
+        return evaluate_score_components(problem, assignment).score_b;
+    };
+    double baseline_baby = baby_score(state.passenger_to_seat);
+    for (int care_group : group_order) {
+        const auto& care_keys = keys_by_group[care_group];
+        if (!std::any_of(care_keys.begin(), care_keys.end(), requires_care)
+            || !std::all_of(care_keys.begin(), care_keys.end(), [&](int p) {
+                const auto& item = problem.passengers[p];
+                return item.fixed_seat.empty() && !item.need_both_empty && !item.need_single_empty;
+            })) continue;
+        if (expired()) break;
+        const double care_center = center(care_group);
+        std::vector<bool> preferred(problem.groups.size(), false);
+        for (int p : care_keys)
+            for (int i = 0; i < std::min(related_cap, static_cast<int>(rankings[p].size())); ++i) {
+                const int owner = state.seat_to_passenger[rankings[p][i]];
+                if (owner >= 0 && problem.passengers[owner].group != care_group) preferred[problem.passengers[owner].group] = true;
+            }
+        std::vector<int> partners;
+        for (int g : rebuild_groups) if (g != care_group && care_keys.size() + keys_by_group[g].size() <= 7) partners.push_back(g);
+        std::stable_sort(partners.begin(), partners.end(), [&](int left, int right) {
+            return std::make_pair(!preferred[left], std::abs(care_center - center(left)))
+                < std::make_pair(!preferred[right], std::abs(care_center - center(right)));
+        });
+        if (partners.size() > static_cast<size_t>(partner_cap)) partners.resize(partner_cap);
+        for (int ordinary_group : partners) {
+            if (expired()) break;
+            const auto& ordinary_keys = keys_by_group[ordinary_group];
+            auto joint = care_keys;
+            joint.insert(joint.end(), ordinary_keys.begin(), ordinary_keys.end());
+            std::vector<int> seats;
+            double current = 0.0;
+            for (int p : joint) { seats.push_back(state.passenger_to_seat[p]); current += individual(p, seats.back()); }
+            current += compact(group_seats[care_group]);
+            current += compact(group_seats[ordinary_group]);
+            current += baseline_baby;
+            double best = current;
+            std::vector<int> best_assignment;
+            AssignmentState external(problem);
+            external.restore(state.save());
+            // These groups contain no protection users; removing them exactly
+            // excludes their occupied and SSR seats without changing blocks.
+            for (int p : joint) external.remove(p);
+            std::vector<int> permutation(joint.size());
+            std::iota(permutation.begin(), permutation.end(), 0);
+            do {
+                if (expired()) break;
+                auto proposal = state.passenger_to_seat;
+                bool feasible = true;
+                for (size_t i = 0; i < joint.size(); ++i) {
+                    proposal[joint[i]] = seats[permutation[i]];
+                    if (!external.rich_seat_feasible(joint[i], proposal[joint[i]])) { feasible = false; break; }
+                }
+                if (!feasible) continue;
+                for (int p : care_keys) {
+                    if (!requires_care(p)) continue;
+                    const auto rule = problem.ssr_rules.find(problem.passengers[p].ssr);
+                    const bool cross = rule != problem.ssr_rules.end() && rule->second.caregiver_allow_cross_aisle;
+                    const auto& seat = problem.seats[proposal[p]];
+                    const auto& neighbors = cross ? seat.row_neighbors : seat.same_block_neighbors;
+                    if (!std::any_of(care_keys.begin(), care_keys.end(), [&](int other) {
+                        return other != p && problem.passengers[other].ssr.empty()
+                            && std::find(neighbors.begin(), neighbors.end(), proposal[other]) != neighbors.end();
+                    })) { feasible = false; break; }
+                }
+                if (!feasible) continue;
+                double value = 0.0;
+                for (int p : joint) value += individual(p, proposal[p]);
+                for (int g : {care_group, ordinary_group}) {
+                    std::vector<int> group_seat_list;
+                    for (int p : keys_by_group[g]) group_seat_list.push_back(proposal[p]);
+                    value += compact(group_seat_list);
+                }
+                value += baby_score(proposal);
+                ++diagnostics.evaluated_moves;
+                if (value > best + problem.rich.local_search_epsilon) { best = value; best_assignment = std::move(proposal); }
+            } while (std::next_permutation(permutation.begin(), permutation.end()));
+            if (best_assignment.empty()) continue;
+            const auto snapshot = state.save();
+            for (int p : joint) state.remove(p);
+            auto submission = joint;
+            std::stable_sort(submission.begin(), submission.end(), [&](int left, int right) { return requires_care(left) < requires_care(right); });
+            bool committed = true;
+            for (int p : submission) if (!state.assign(p, best_assignment[p])) { committed = false; break; }
+            if (!committed) {
+                for (int p : joint) state.remove(p);
+                for (int p : submission) state.assign(p, snapshot.passenger_to_seat[p]);
+                continue;
+            }
+            for (int g : {care_group, ordinary_group}) {
+                group_seats[g].clear();
+                for (int p : keys_by_group[g]) group_seats[g].push_back(state.passenger_to_seat[p]);
+            }
+            baseline_baby = baby_score(state.passenger_to_seat);
+            ++diagnostics.accepted_moves;
+            ++diagnostics.caregiver_rebuilds;
+            diagnostics.score_improvement += best - current;
+            break;
+        }
+    }
+    diagnostics.stopped_by_deadline = expired();
     return diagnostics;
 }
 

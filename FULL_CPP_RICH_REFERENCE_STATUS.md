@@ -440,6 +440,29 @@ Final Release rebuild and the full native/state-replay-enabled suite passed:
 the 12,000-operation replay and both VND prefix variants. The two pre-existing
 conversion warnings remain. No Formal24 or profiling run was performed.
 
+The stateful VND probe now includes caregiver joint rebuilding against the full
+frozen `improve_assignment_with_safe_neighborhoods` function. It preserves related
+partner ordering, permutations of the current joint seat order, external-state
+feasibility screening, caregiver adjacency, global infant interference, strict
+epsilon acceptance and non-cared-first submission/restoration order. Twenty-four
+public/order and cap/epsilon scenarios match exact assignments, protection blocks,
+assignment insertion order, search counters and score improvements. Two additional
+BLND/BSCT synthetic scenarios require accepted joint row exchanges; the BSCT case
+also includes a passenger outside the rebuilt pair in global infant scoring.
+
+This closes the caregiver portion of the direct VND differential, not production
+VND migration. Production still calls the previous approximate VND. Retaining the
+actual construction/repair state and frozen rankings, integrating stateful VND and
+its elite capture, and validating production stage transitions remain required.
+Structured/special patterns, protected MIP, LNS/local branching and exact restricted
+master integration also remain incomplete. No Formal24 quality gate or profiling
+was run at this checkpoint.
+
+Release /O2 build passed with the two existing conversion warnings. The full
+native/state-replay-enabled suite passed 103 tests and 13,238 subtests, with 9
+skips. The subsequently expanded BLND/BSCT acceptance test separately passed both
+subtests. The full suite includes the 12,000-operation state differential.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

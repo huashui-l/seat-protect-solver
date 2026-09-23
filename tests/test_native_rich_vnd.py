@@ -8,7 +8,9 @@ from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
 
 
-def python_vnd_prefix(include_group_rebuild=False):
+def python_vnd_prefix(include_group_rebuild=False, include_caregiver_rebuild=False):
+    if include_caregiver_rebuild:
+        return rich.improve_assignment_with_safe_neighborhoods
     tree = ast.parse((Path(__file__).resolve().parents[1] / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
     function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
                     and n.name == "improve_assignment_with_safe_neighborhoods")
@@ -82,4 +84,29 @@ class NativeRichVndTests(unittest.TestCase):
 class NativeRichVndGroupTests(NativeRichVndTests):
     def replay(self, *args, **kwargs):
         kwargs["vnd_group_rebuild"] = True
+        return repair_tests.NativeRichRepairTests.replay(self, *args, **kwargs)
+
+
+class NativeRichVndCaregiverTests(NativeRichVndGroupTests):
+    def test_caregiver_rebuild_accepts_joint_row_exchange(self):
+        for ssr in ("BLND", "BSCT"):
+            with self.subTest(ssr=ssr):
+                case = self.synthetic([(101, {"ssr": ssr}), (101, {}), (202, {}), (202, {}), (303, {})])
+                for seatmap in ("oldSeatmapData", "newSeatmapData"):
+                    next(s for s in case[seatmap]["seats"] if s["seatId"] == "2A")["hasBassinet"] = True
+                desired = ["2A", "2B", "1A", "1B", "4A"]
+                passengers = [p for g in case["groupsData"] for p in g["psrs"]]
+                for passenger, seat in zip(passengers, desired):
+                    passenger["oldSeat"]["seatNum"] = seat
+                # Singleton rankings keep ordinary moves at their current positions;
+                # the joint permutation must move the caregiver and cared passenger.
+                # The fifth passenger contributes a baby interaction outside the pair.
+                initial = [[1, "1B"], [0, "1A"], [2, "2A"], [3, "2B"], [4, "4A"]]
+                result = self.replay(case, initial, [[s] for s in ["1A", "1B", "2A", "2B", "4A"]], vnd_algorithm={})
+                self.assertGreater(result["vnd"]["caregiver_rebuilds"], 0)
+                self.assertEqual(result["assignments"], desired)
+
+    def replay(self, *args, **kwargs):
+        kwargs["vnd_group_rebuild"] = True
+        kwargs["vnd_caregiver_rebuild"] = True
         return repair_tests.NativeRichRepairTests.replay(self, *args, **kwargs)

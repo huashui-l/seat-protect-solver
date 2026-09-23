@@ -93,7 +93,8 @@ int main(int argc, char** argv) {
         if (const auto* vnd_mode = replay.find("vnd_prefix"); vnd_mode && vnd_mode->bool_or()) {
             vnd = full_cpp::improve_rich_ordinary_vnd(state, rankings,
                 std::chrono::steady_clock::now() + std::chrono::seconds(60),
-                replay.find("vnd_group_rebuild") && replay.at("vnd_group_rebuild").bool_or());
+                replay.find("vnd_group_rebuild") && replay.at("vnd_group_rebuild").bool_or(),
+                replay.find("vnd_caregiver_rebuild") && replay.at("vnd_caregiver_rebuild").bool_or());
         } else if (pipeline) {
             const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             const auto combined = full_cpp::construct_rich_assignment(problem, state, cache,
@@ -219,7 +220,7 @@ int main(int argc, char** argv) {
             << ",\"score_improvement\":" << vnd.score_improvement
             << ",\"stopped_by_deadline\":" << (vnd.stopped_by_deadline ? "true" : "false")
             << ",\"one_opt\":" << vnd.one_opt << ",\"swaps\":" << vnd.swaps
-            << ",\"cycles\":" << vnd.cycles << ",\"group_rebuilds\":" << vnd.group_rebuilds << "}}\n";
+            << ",\"cycles\":" << vnd.cycles << ",\"group_rebuilds\":" << vnd.group_rebuilds << ",\"caregiver_rebuilds\":" << vnd.caregiver_rebuilds << "}}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
