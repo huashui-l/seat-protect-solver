@@ -136,6 +136,20 @@ $SeatProtectCliCompile = (
 if ($LASTEXITCODE -ne 0) {
     throw "raw-native seat-protection CLI compilation failed"
 }
+$RepairProbeObject = Join-Path $OutputDir "native_rich_repair_probe.obj"
+$RepairProbeSource = Join-Path $PSScriptRoot "native_rich_repair_probe.cpp"
+$RepairProbeOutput = Join-Path $OutputDir "native_rich_repair_probe.exe"
+$RepairProbeCompile = (
+    'call "{0}" -arch=x64 -host_arch=x64 >nul && ' +
+    'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{1}" "{2}" && ' +
+    'link /nologo "{1}" "{3}" "{4}" "{5}" "{6}" "{7}" "{8}" /LIBPATH:"{9}" highs.lib /OUT:"{10}"'
+) -f $DevCmd, $RepairProbeObject, $RepairProbeSource, $FullCoreObject, `
+    $GroupConstructorObject, $FeasibilitySolverObject, $RichPatternAdapterObject, `
+    $KernelObject, $MasterObject, $Library, $RepairProbeOutput
+& cmd.exe /d /c $RepairProbeCompile
+if ($LASTEXITCODE -ne 0) {
+    throw "native Rich repair probe compilation failed"
+}
 $StateReplayCompile = (
     'call "{0}" -arch=x64 -host_arch=x64 >nul && ' +
     'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{1}" "{2}" && ' +
@@ -154,3 +168,4 @@ Write-Host "built=$KernelStandaloneOutput"
 Write-Host "built=$FullCoreProbeOutput"
 Write-Host "built=$SeatProtectCliOutput"
 Write-Host "built=$StateReplayOutput"
+Write-Host "built=$RepairProbeOutput"

@@ -82,6 +82,13 @@ GroupConstructionResult construct_rich_m1(
     std::chrono::steady_clock::time_point global_deadline
 );
 
+void repair_rich_assignment(
+    const Problem& problem, AssignmentState& state,
+    const std::vector<std::vector<int>>& passenger_sorted_seats,
+    std::chrono::steady_clock::time_point global_deadline,
+    GroupConstructionResult& diagnostics
+);
+
 void improve_rich_vnd_m2(
     const Problem& problem,
     std::vector<int>& assignment,

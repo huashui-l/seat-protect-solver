@@ -45,6 +45,38 @@ Release build and the native/state-replay-enabled public suite passed after
 this boundary fix: 71 tests, 12,276 subtests, 9 skips (including all 12,000
 state-operation differentials). The two existing conversion warnings remain.
 
+Relocation repair now has a shared native stage function, `repair_rich_assignment`,
+used by production and a dedicated replay probe. Given an assignment state and
+per-passenger ordered candidates, it follows Python's frozen active-caregiver
+set, dynamic minimum-feasible-domain mover selection, external-key ordering,
+care-group member release/permutation, group-local caregiver validation, rollback,
+node accounting, and unresolved-count rules. Cared passengers no longer fall
+through to ordinary single-seat repair, and caregiver repair need not wait for
+unrelated groups to be complete. Production passes its current full individual-score
+ranking; migration of Python construction's exact cached ranking remains pending.
+The probe calls the same function with identical state/rankings as actual Python
+`repair_unassigned_by_local_relocation`. Tests compare exact assignments,
+protection resources and all four non-timing repair counters, including a two-node
+MRV completion, failed-branch rollback, frozen caregiver protection, care-group SSR
+permutation with another group still missing, and public fixture partial states.
+
+One explicit frozen-reference defect is retained as a separate reproduction,
+not counted as repair parity: `caregiver_and_ssr` with everyone initially missing
+and seat-input-order candidate lists leaves Python with 9 assignments but 12
+occupied seats (orphan occupancy at 1B, 1E, 2B). Its static missing list revisits
+adult caregivers assigned by an earlier paired repair. Native assignment state
+rejects duplicate assignments and therefore diverges on this inconsistent state.
+Public parity scenarios keep adults already seated when testing missing cared
+passengers; this does not establish equivalence for every possible repair entry
+state or prove that the reference defect is unreachable in the full pipeline.
+The frozen Python source is unchanged. Production retains final legality checks
+and strict incumbent fallback; exact full-pipeline parity remains unproven.
+Validation: Release build passed; the native/state-replay-enabled public suite
+passed 76 tests and 12,300 subtests, with 9 skips. After adding the probe's orphan
+occupancy assertion, the final rebuild and all 5 repair tests / 24 subtests also
+passed. The known-reference-defect test is explicitly separate from exact-state
+parity comparisons. No Formal24 checkpoint was run for this change.
+
 The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
 protocol, materializes native patterns, and runs the restricted master. The
 adapter encodes seat/protection resources, SSR row/subrow locations, caregiver

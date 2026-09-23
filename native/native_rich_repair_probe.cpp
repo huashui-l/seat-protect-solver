@@ -1,0 +1,60 @@
+#include "native_group_constructor.hpp"
+
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
+
+int main(int argc, char** argv) {
+    if (argc != 4) return 2;
+    try {
+        const auto problem = full_cpp::load_problem(argv[1], argv[2]);
+        const auto replay = native_json::parse_file(argv[3]);
+        full_cpp::AssignmentState state(problem);
+        for (const auto& entry : replay.at("assignments").array) {
+            const int passenger = static_cast<int>(entry.array.at(0).number);
+            const int seat = problem.seat_index.at(entry.array.at(1).string);
+            const int block = entry.array.size() > 2 && !entry.array[2].is_null()
+                ? problem.seat_index.at(entry.array[2].string) : -1;
+            if (!state.assign(passenger, seat, block)) throw std::runtime_error("invalid replay assignment");
+        }
+        std::vector<std::vector<int>> rankings;
+        for (const auto& row : replay.at("rankings").array) {
+            rankings.emplace_back();
+            for (const auto& seat : row.array) rankings.back().push_back(problem.seat_index.at(seat.string));
+        }
+        if (rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
+        full_cpp::GroupConstructionResult diagnostics;
+        full_cpp::repair_rich_assignment(problem, state, rankings,
+            std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+        for (size_t seat = 0; seat < state.seat_to_passenger.size(); ++seat) {
+            const int owner = state.seat_to_passenger[seat];
+            if (owner >= 0 && state.passenger_to_seat[owner] != static_cast<int>(seat))
+                throw std::runtime_error("orphan occupied seat after repair");
+        }
+        std::cout << std::setprecision(17) << "{\"attempted\":" << diagnostics.rich_repair_attempted
+                  << ",\"repaired\":" << diagnostics.rich_repair_repaired
+                  << ",\"unresolved\":" << diagnostics.rich_repair_unresolved
+                  << ",\"search_nodes\":" << diagnostics.rich_repair_nodes << ",\"assignments\":[";
+        for (size_t p = 0; p < problem.passengers.size(); ++p) {
+            if (p) std::cout << ',';
+            const int seat = state.passenger_to_seat[p];
+            if (seat < 0) std::cout << "null";
+            else std::cout << '"' << problem.seats[seat].id << '"';
+        }
+        std::cout << "],\"blocked\":[";
+        for (size_t p = 0; p < problem.passengers.size(); ++p) {
+            if (p) std::cout << ',';
+            std::cout << '[';
+            for (size_t b = 0; b < state.assigned_blocked[p].size(); ++b) {
+                if (b) std::cout << ',';
+                std::cout << '"' << problem.seats[state.assigned_blocked[p][b]].id << '"';
+            }
+            std::cout << ']';
+        }
+        std::cout << "]}\n";
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 3;
+    }
+}

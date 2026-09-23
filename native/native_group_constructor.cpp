@@ -722,6 +722,204 @@ GroupConstructionResult construct_group_first(
     return result;
 }
 
+void repair_rich_assignment(
+    const Problem& problem, AssignmentState& state,
+    const std::vector<std::vector<int>>& rankings,
+    std::chrono::steady_clock::time_point global_deadline,
+    GroupConstructionResult& result
+) {
+    if (problem.rich.final_repair_node_limit <= 0 || problem.rich.final_repair_time_limit <= 0.0) return;
+    const auto started = std::chrono::steady_clock::now();
+    const auto deadline = std::min(global_deadline, started
+        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(problem.rich.final_repair_time_limit)));
+    const auto exhausted = [&]() {
+        return result.rich_repair_nodes >= problem.rich.final_repair_node_limit
+            || std::chrono::steady_clock::now() >= deadline;
+    };
+    const auto needs_care = [&](int passenger) {
+        const auto& item = problem.passengers[passenger];
+        const auto rule = problem.ssr_rules.find(item.ssr);
+        return item.need_cared || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
+    };
+    const auto adult = [&](int passenger) {
+        const auto& item = problem.passengers[passenger];
+        return item.ssr.empty() && !item.need_cared && !item.need_both_empty && !item.need_single_empty;
+    };
+    const auto care_neighbors = [&](int passenger, int seat) -> const std::vector<int>& {
+        const auto rule = problem.ssr_rules.find(problem.passengers[passenger].ssr);
+        const bool cross = rule != problem.ssr_rules.end() && rule->second.caregiver_allow_cross_aisle;
+        return cross ? problem.seats[seat].row_neighbors : problem.seats[seat].same_block_neighbors;
+    };
+    const auto key = [&](int passenger) {
+        const auto& item = problem.passengers[passenger];
+        return std::make_pair(item.group_id, item.hostnum);
+    };
+    std::set<int> active_caregivers;
+    for (const auto& group : problem.groups) {
+        for (int cared : group.passengers) {
+            const int seat = state.passenger_to_seat[cared];
+            if (seat < 0 || !needs_care(cared)) continue;
+            const auto& neighbors = care_neighbors(cared, seat);
+            for (int other : group.passengers) {
+                const auto& item = problem.passengers[other];
+                if (item.ssr.empty() && !item.need_both_empty && !item.need_single_empty
+                    && std::find(neighbors.begin(), neighbors.end(), state.passenger_to_seat[other]) != neighbors.end())
+                    active_caregivers.insert(other);
+            }
+        }
+    }
+    const auto movable = [&](int passenger) {
+        return problem.passengers[passenger].fixed_seat.empty() && adult(passenger)
+            && !active_caregivers.count(passenger);
+    };
+    const auto care_satisfied = [&](int group_index) {
+        if (group_index < 0) return true;
+        const auto& group = problem.groups[group_index];
+        for (int cared : group.passengers) {
+            const int seat = state.passenger_to_seat[cared];
+            if (seat < 0 || !needs_care(cared)) continue;
+            const auto& neighbors = care_neighbors(cared, seat);
+            bool satisfied = false;
+            for (int other : group.passengers) {
+                if (other != cared && adult(other)
+                    && std::find(neighbors.begin(), neighbors.end(), state.passenger_to_seat[other]) != neighbors.end())
+                    satisfied = true;
+            }
+            if (!satisfied) return false;
+        }
+        return true;
+    };
+    const auto relocate = [&](auto&& self, std::vector<int>& movers, size_t index, int care_group) -> bool {
+        if (index == movers.size()) return care_satisfied(care_group);
+        if (exhausted()) return false;
+        size_t best_position = index;
+        std::vector<int> best_candidates;
+        for (size_t position = index; position < movers.size(); ++position) {
+            std::vector<int> candidates;
+            for (int seat : rankings[movers[position]]) {
+                if (state.can_assign(movers[position], seat)) candidates.push_back(seat);
+            }
+            if (candidates.empty()) return false;
+            if (position == index || candidates.size() < best_candidates.size()) {
+                best_position = position;
+                best_candidates = std::move(candidates);
+            }
+        }
+        std::swap(movers[index], movers[best_position]);
+        const int passenger = movers[index];
+        for (int seat : best_candidates) {
+            ++result.rich_repair_nodes;
+            if (state.assign(passenger, seat)) {
+                if (self(self, movers, index + 1, care_group)) {
+                    std::swap(movers[index], movers[best_position]);
+                    return true;
+                }
+                state.remove(passenger);
+            }
+            if (exhausted()) break;
+        }
+        std::swap(movers[index], movers[best_position]);
+        return false;
+    };
+    std::vector<int> missing;
+    for (int passenger = 0; passenger < static_cast<int>(problem.passengers.size()); ++passenger)
+        if (state.passenger_to_seat[passenger] < 0) missing.push_back(passenger);
+    for (int passenger : missing) {
+        if (exhausted()) break;
+        ++result.rich_repair_attempted;
+        const auto& item = problem.passengers[passenger];
+        bool repaired = false;
+        if (needs_care(passenger)) {
+            const auto& group = problem.groups[item.group];
+            for (int seat : rankings[passenger]) {
+                if (std::chrono::steady_clock::now() >= deadline) break;
+                for (int caregiver : group.passengers) {
+                    if (!adult(caregiver) || !problem.passengers[caregiver].fixed_seat.empty()) continue;
+                    for (int caregiver_seat : care_neighbors(passenger, seat)) {
+                        if (std::chrono::steady_clock::now() >= deadline) break;
+                        std::set<int> conflicts;
+                        for (int resource : {seat, caregiver_seat}) {
+                            const int owner = state.seat_to_passenger[resource];
+                            if (owner >= 0 && owner != caregiver) conflicts.insert(owner);
+                        }
+                        for (int other : group.passengers) {
+                            const auto& member = problem.passengers[other];
+                            if (other != passenger && other != caregiver && state.passenger_to_seat[other] >= 0
+                                && member.fixed_seat.empty() && !member.need_both_empty && !member.need_single_empty)
+                                conflicts.insert(other);
+                        }
+                        bool allowed = true;
+                        for (int other : conflicts) {
+                            const auto& member = problem.passengers[other];
+                            if (!movable(other) && !(member.group == item.group && member.fixed_seat.empty()
+                                && !member.need_both_empty && !member.need_single_empty)) allowed = false;
+                        }
+                        if (!allowed) continue;
+                        std::vector<int> movers(conflicts.begin(), conflicts.end());
+                        std::sort(movers.begin(), movers.end(), [&](int left, int right) {
+                            return std::make_tuple(rankings[left].size(), !needs_care(left),
+                                       problem.passengers[left].ssr.empty(), key(left))
+                                < std::make_tuple(rankings[right].size(), !needs_care(right),
+                                       problem.passengers[right].ssr.empty(), key(right));
+                        });
+                        const auto before = state.save();
+                        if (state.passenger_to_seat[caregiver] >= 0) state.remove(caregiver);
+                        for (int other : movers) state.remove(other);
+                        // Caregivers have no protection demand. Reserve their seat
+                        // through occupancy before assigning the cared passenger.
+                        if (state.assign(caregiver, caregiver_seat) && state.assign(passenger, seat)
+                            && relocate(relocate, movers, 0, item.group)) {
+                            repaired = true;
+                            break;
+                        }
+                        state.restore(before);
+                    }
+                    if (repaired) break;
+                }
+                if (repaired) break;
+            }
+        } else {
+            for (int seat : rankings[passenger]) {
+                std::vector<int> blocks;
+                const auto& neighbors = problem.both_side_empty_allow_cross_aisle
+                    ? problem.seats[seat].row_neighbors : problem.seats[seat].same_block_neighbors;
+                if (item.need_both_empty) {
+                    if (problem.require_two_real_neighbors && neighbors.size() != 2) continue;
+                    if (std::any_of(neighbors.begin(), neighbors.end(), [&](int s) { return state.blocked_count[s] > 0; })) continue;
+                    blocks.push_back(-1);
+                } else if (item.need_single_empty) {
+                    for (int neighbor : problem.seats[seat].same_block_neighbors)
+                        if (state.blocked_count[neighbor] == 0) blocks.push_back(neighbor);
+                } else blocks.push_back(-1);
+                for (int block : blocks) {
+                    std::set<int> conflicts;
+                    std::vector<int> resources{seat};
+                    if (item.need_both_empty) resources.insert(resources.end(), neighbors.begin(), neighbors.end());
+                    else if (block >= 0) resources.push_back(block);
+                    for (int resource : resources)
+                        if (state.seat_to_passenger[resource] >= 0) conflicts.insert(state.seat_to_passenger[resource]);
+                    if (std::any_of(conflicts.begin(), conflicts.end(), [&](int p) { return !movable(p); })) continue;
+                    std::vector<int> movers(conflicts.begin(), conflicts.end());
+                    std::sort(movers.begin(), movers.end(), [&](int left, int right) { return key(left) < key(right); });
+                    const auto before = state.save();
+                    for (int other : movers) state.remove(other);
+                    if (state.assign(passenger, seat, block) && relocate(relocate, movers, 0, -1)) {
+                        repaired = true;
+                        break;
+                    }
+                    state.restore(before);
+                }
+                if (repaired) break;
+            }
+        }
+        if (repaired) ++result.rich_repair_repaired;
+    }
+    result.rich_repair_unresolved = static_cast<int>(std::count(
+        state.passenger_to_seat.begin(), state.passenger_to_seat.end(), -1));
+    result.rich_repair_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+}
+
 GroupConstructionResult construct_rich_m1(
     const Problem& problem, const std::vector<int>& q0_assignment,
     const GroupConstructionResult& q2a_result,
@@ -757,157 +955,19 @@ GroupConstructionResult construct_rich_m1(
             if (!state.assign(passenger, seat)) { rebuilt = false; break; }
         }
         if (rebuilt) {
-            const auto repair_deadline = std::min(
-                global_deadline,
-                started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                    std::chrono::duration<double>(problem.rich.final_repair_time_limit)
-                )
-            );
-            std::vector<int> missing;
-            for (int passenger = 0; passenger < static_cast<int>(problem.passengers.size()); ++passenger)
-                if (state.passenger_to_seat[passenger] < 0) missing.push_back(passenger);
-            const auto movable = [&](int passenger) {
-                const Passenger& item = problem.passengers[passenger];
-                return item.fixed_seat.empty() && item.ssr.empty() && !item.need_cared
-                    && !item.need_both_empty && !item.need_single_empty;
-            };
-            const auto relocate = [&](auto&& self, const std::vector<int>& movers, size_t index) -> bool {
-                if (index >= movers.size()) return true;
-                if (result.rich_repair_nodes >= problem.rich.final_repair_node_limit
-                    || std::chrono::steady_clock::now() >= repair_deadline) return false;
-                int passenger = movers[index];
-                const AssignmentSnapshot before = state.save();
-                const std::vector<int> empty_incumbent(problem.passengers.size(), -1);
-                for (int seat : seat_candidates(problem, state, empty_incumbent, passenger)) {
-                    for (int block : block_choices(problem, state, passenger, seat)) {
-                        ++result.rich_repair_nodes;
-                        if (state.assign(passenger, seat, block)
-                            && self(self, movers, index + 1)) return true;
-                        state.restore(before);
-                        if (result.rich_repair_nodes >= problem.rich.final_repair_node_limit
-                            || std::chrono::steady_clock::now() >= repair_deadline) return false;
-                    }
-                }
-                state.restore(before);
-                return false;
-            };
-            for (int passenger : missing) {
-                if (std::chrono::steady_clock::now() >= repair_deadline) break;
-                ++result.rich_repair_attempted;
-                bool repaired = false;
-                const Passenger& missing_item = problem.passengers[passenger];
-                const auto missing_rule = problem.ssr_rules.find(missing_item.ssr);
-                const bool needs_caregiver = missing_item.need_cared
-                    || (missing_rule != problem.ssr_rules.end()
-                        && missing_rule->second.requires_caregiver);
-                if (needs_caregiver) {
-                    const Group* group = nullptr;
-                    for (const Group& candidate : problem.groups)
-                        if (candidate.id == missing_item.group_id) { group = &candidate; break; }
-                    if (group) {
-                        for (int caregiver : group->passengers) {
-                            const Passenger& caregiver_item = problem.passengers[caregiver];
-                            if (!caregiver_item.ssr.empty() || caregiver_item.need_cared
-                                || caregiver_item.need_both_empty || caregiver_item.need_single_empty
-                                || !caregiver_item.fixed_seat.empty()) continue;
-                            const int old_caregiver_seat = state.passenger_to_seat[caregiver];
-                            if (old_caregiver_seat >= 0 && !movable(caregiver)) continue;
-                            std::vector<int> care_seats(problem.seats.size());
-                            std::iota(care_seats.begin(), care_seats.end(), 0);
-                            const bool cross = missing_rule != problem.ssr_rules.end()
-                                && missing_rule->second.caregiver_allow_cross_aisle;
-                            std::stable_sort(care_seats.begin(), care_seats.end(), [&](int left, int right) {
-                                return evaluate_individual_score(problem, passenger, left).total()
-                                    > evaluate_individual_score(problem, passenger, right).total();
-                            });
-                            if (care_seats.size() > static_cast<size_t>(problem.rich.paired_rescue_option_cap))
-                                care_seats.resize(problem.rich.paired_rescue_option_cap);
-                            for (int missing_seat : care_seats) {
-                                const auto& neighbors = cross ? problem.seats[missing_seat].row_neighbors
-                                                               : problem.seats[missing_seat].same_block_neighbors;
-                                for (int caregiver_seat : neighbors) {
-                                    const AssignmentSnapshot before = state.save();
-                                    std::vector<int> conflicts;
-                                    for (int resource : {missing_seat, caregiver_seat}) {
-                                        const int owner = state.seat_to_passenger[resource];
-                                        if (owner >= 0 && owner != caregiver
-                                            && std::find(conflicts.begin(), conflicts.end(), owner) == conflicts.end())
-                                            conflicts.push_back(owner);
-                                    }
-                                    if (old_caregiver_seat >= 0) state.remove(caregiver);
-                                    bool movable_conflicts = true;
-                                    for (int owner : conflicts) movable_conflicts = movable_conflicts && movable(owner);
-                                    if (!movable_conflicts) { state.restore(before); continue; }
-                                    for (int owner : conflicts) state.remove(owner);
-                                    ++result.rich_repair_nodes;
-                                    if (state.assign(caregiver, caregiver_seat)
-                                        && state.assign(passenger, missing_seat)
-                                        && relocate(relocate, conflicts, 0)
-                                        && validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
-                                        ++result.rich_repair_repaired;
-                                        repaired = true;
-                                        break;
-                                    }
-                                    state.restore(before);
-                                    if (result.rich_repair_nodes >= problem.rich.final_repair_node_limit
-                                        || std::chrono::steady_clock::now() >= repair_deadline) break;
-                                }
-                                if (repaired) break;
-                            }
-                            if (repaired) break;
-                        }
-                    }
-                }
-                if (repaired) continue;
-                const std::vector<int> empty_incumbent(problem.passengers.size(), -1);
-                std::vector<int> repair_seats(problem.seats.size());
-                std::iota(repair_seats.begin(), repair_seats.end(), 0);
-                std::stable_sort(repair_seats.begin(), repair_seats.end(), [&](int left, int right) {
+            std::vector<std::vector<int>> rankings(problem.passengers.size());
+            for (int passenger = 0; passenger < static_cast<int>(rankings.size()); ++passenger) {
+                auto& seats = rankings[passenger];
+                seats.resize(problem.seats.size());
+                std::iota(seats.begin(), seats.end(), 0);
+                std::stable_sort(seats.begin(), seats.end(), [&](int left, int right) {
                     const double ls = evaluate_individual_score(problem, passenger, left).total();
                     const double rs = evaluate_individual_score(problem, passenger, right).total();
                     if (std::abs(ls - rs) > kTolerance) return ls > rs;
                     return problem.seats[left].id < problem.seats[right].id;
                 });
-                if (repair_seats.size() > static_cast<size_t>(problem.rich.candidate_cap_full_retry))
-                    repair_seats.resize(problem.rich.candidate_cap_full_retry);
-                for (int seat : repair_seats) {
-                    std::vector<int> blocks;
-                    if (problem.passengers[passenger].need_both_empty) blocks.push_back(-1);
-                    else if (problem.passengers[passenger].need_single_empty)
-                        for (int neighbor : problem.seats[seat].same_block_neighbors) blocks.push_back(neighbor);
-                    else blocks.push_back(-1);
-                    for (int block : blocks) {
-                        const AssignmentSnapshot before = state.save();
-                        std::vector<int> required{seat};
-                        if (problem.passengers[passenger].need_both_empty) {
-                            const auto& neighbors = problem.both_side_empty_allow_cross_aisle
-                                ? problem.seats[seat].row_neighbors : problem.seats[seat].same_block_neighbors;
-                            required.insert(required.end(), neighbors.begin(), neighbors.end());
-                        } else if (block >= 0) required.push_back(block);
-                        std::vector<int> conflicts;
-                        for (int resource : required) {
-                            const int owner = state.seat_to_passenger[resource];
-                            if (owner >= 0 && std::find(conflicts.begin(), conflicts.end(), owner) == conflicts.end())
-                                conflicts.push_back(owner);
-                        }
-                        bool movable_conflicts = true;
-                        for (int owner : conflicts) movable_conflicts = movable_conflicts && movable(owner);
-                        if (!movable_conflicts) continue;
-                        for (int owner : conflicts) state.remove(owner);
-                        ++result.rich_repair_nodes;
-                        if (state.assign(passenger, seat, block) && relocate(relocate, conflicts, 0)) {
-                            ++result.rich_repair_repaired;
-                            repaired = true;
-                            break;
-                        }
-                        state.restore(before);
-                        if (result.rich_repair_nodes >= problem.rich.final_repair_node_limit
-                            || std::chrono::steady_clock::now() >= repair_deadline) break;
-                    }
-                    if (repaired) break;
-                }
-                if (!repaired) ++result.rich_repair_unresolved;
             }
+            repair_rich_assignment(problem, state, rankings, global_deadline, result);
             if (validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
                 result.rich_candidate_complete = true;
                 result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
