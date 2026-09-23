@@ -74,7 +74,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument(
         "--construction-objective",
-        choices=("feasibility", "individual-soft", "group-soft"),
+        choices=("feasibility", "individual-soft", "group-soft", "group-first"),
         required=True,
     )
     args = parser.parse_args()
@@ -189,6 +189,16 @@ def main() -> None:
             "dfs_groups": int(result.get("dfs_groups", 0)),
             "beam_groups": int(result.get("beam_groups", 0)),
             "groups_improved": int(result.get("groups_improved", 0)),
+            "q1_selected_incumbent": result.get("q1_selected_incumbent", ""),
+            "q1_score": float(result.get("q1_score", 0.0)),
+            "from_scratch_score": float(result.get("from_scratch_score", 0.0)),
+            "from_scratch_complete": bool(result.get("from_scratch_complete", False)),
+            "from_scratch_dfs_nodes": int(result.get("from_scratch_dfs_nodes", 0)),
+            "from_scratch_beam_nodes": int(result.get("from_scratch_beam_nodes", 0)),
+            "from_scratch_dfs_groups": int(result.get("from_scratch_dfs_groups", 0)),
+            "from_scratch_beam_groups": int(result.get("from_scratch_beam_groups", 0)),
+            "recovery_attempts": int(result.get("recovery_attempts", 0)),
+            "recovery_succeeded": int(result.get("recovery_succeeded", 0)),
             "score_detail": {key: detail[key] for key in (*COMPONENTS, "total_soft_score")},
             "native_wall_seconds": float(result["wall_seconds"]),
             "process_wall_seconds": process_wall,
@@ -254,6 +264,13 @@ def main() -> None:
             "dfs_groups": sum(row["dfs_groups"] for row in rows),
             "beam_groups": sum(row["beam_groups"] for row in rows),
             "groups_improved": sum(row["groups_improved"] for row in rows),
+            "from_scratch_complete": sum(row["from_scratch_complete"] for row in rows),
+            "from_scratch_dfs_nodes": sum(row["from_scratch_dfs_nodes"] for row in rows),
+            "from_scratch_beam_nodes": sum(row["from_scratch_beam_nodes"] for row in rows),
+            "from_scratch_dfs_groups": sum(row["from_scratch_dfs_groups"] for row in rows),
+            "from_scratch_beam_groups": sum(row["from_scratch_beam_groups"] for row in rows),
+            "recovery_attempts": sum(row["recovery_attempts"] for row in rows),
+            "recovery_succeeded": sum(row["recovery_succeeded"] for row in rows),
             "fallback_reasons": dict(Counter(
                 row["fallback_reason"] for row in rows if row["fallback_reason"]
             )),
