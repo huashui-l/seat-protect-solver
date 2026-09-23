@@ -31,6 +31,17 @@ produced complete evaluator-valid assignments; this remains a stage checkpoint,
 not Formal24 quality parity. Structured/special pattern semantics and the
 protected multi-group/LNS stages are still pending.
 
+M3 adapter validation (2026-09-23): MSVC build passed; the public suite with
+`SEAT_PROTECT_NATIVE_EXE` set passed 56 tests and 39 subtests, with 10 skips.
+External evaluator audits at a 20-second budget passed for
+`forward:50_normal`, `forward:full_edge`, and `reverse:full_edge`: all complete,
+zero hard violations, zero unassigned, and zero score error. These are three
+smoke cases, not the 24-case 60-second parity gate. The current adapter still
+uses the existing RR beam pattern semantics, omits baby-pair objective terms,
+and uses a provisional 0.5-second master cap; exact ACTIVE stage orchestration
+and configuration budgets remain outstanding. Equal-score master results do
+not replace or relabel the incoming incumbent.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

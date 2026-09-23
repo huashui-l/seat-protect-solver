@@ -177,13 +177,14 @@ FeasibilityResult solve_feasibility_mip(
                 result.rich_selected_pattern_count = pattern_result.selected_pattern_count;
                 result.rich_pattern_score = pattern_result.score;
                 if (pattern_result.complete
-                    && pattern_result.score >= group_result.group_construction_score - 1e-9) {
+                    && pattern_result.score > group_result.group_construction_score + 1e-9) {
                     group_result.passenger_to_seat = pattern_result.passenger_to_seat;
                     group_result.group_construction_score = pattern_result.score;
                     group_result.selected_components = evaluate_score_components(
                         problem, pattern_result.passenger_to_seat
                     );
                     group_result.selected_incumbent = "rich-m3-pattern-master";
+                    group_result.score_delta = pattern_result.score - group_result.q0_score;
                 }
             }
             result.passenger_to_seat = group_result.passenger_to_seat;

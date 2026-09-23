@@ -95,6 +95,9 @@ class NativeGroupSoftTests(unittest.TestCase):
                 group["component_deltas"]["score_c"] + individual_delta,
                 0.0,
             )
+        elif group["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master"}:
+            self.assertGreater(group["native_score"], q0["native_score"])
+            self.assertAlmostEqual(group["score_delta"], group["native_score"] - group["q0_score"])
         else:
             self.assertEqual("q0", group["selected_incumbent"])
             self.assertAlmostEqual(q0["native_score"], group["native_score"])
@@ -113,7 +116,7 @@ class NativeGroupSoftTests(unittest.TestCase):
         ):
             with self.subTest(case=case_id):
                 result = self.run_case(case_id)
-                self.assertIn(result["selected_incumbent"], {"q0", "group-aware"})
+                self.assertIn(result["selected_incumbent"], {"q0", "group-aware", "rich-m2-vnd", "rich-m3-pattern-master"})
 
     def test_beam_is_deterministic_and_bounded(self):
         first = self.run_case("large_groups_9_10")

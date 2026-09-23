@@ -18,11 +18,14 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                 result = self.run_group_first(case_id)
                 recovery_attempts += result["recovery_attempts"]
                 self.assertGreaterEqual(result["native_score"], result["q1_score"])
-                if result["selected_incumbent"] == "q2a-group-first":
+                if (result["from_scratch_complete"]
+                        and result["from_scratch_score"] > result["q1_score"] + 1e-9):
                     selected += 1
                     escaped_q1_stall += result["q1_selected_incumbent"] == "q0"
                     self.assertTrue(result["from_scratch_complete"])
                     self.assertGreater(result["from_scratch_score"], result["q1_score"])
+                elif result["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master"}:
+                    self.assertGreaterEqual(result["native_score"], result["q1_score"])
                 else:
                     self.assertIn(result["selected_incumbent"], {"q0", "group-aware"})
                     self.assertAlmostEqual(result["native_score"], result["q1_score"])
@@ -37,7 +40,10 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
             "conditional_ssr_isolation",
         ):
             with self.subTest(case=case_id):
-                self.run_group_first(case_id)
+                result = self.run_group_first(case_id)
+                self.assertGreater(result["rich_pattern_count"], 0)
+                self.assertGreater(result["rich_selected_pattern_count"], 0)
+                self.assertGreaterEqual(result["rich_pattern_score"], result["rich_vnd_score"] - 1e-8)
 
     def test_group_first_replay_is_deterministic_and_bounded(self):
         first = self.run_group_first("large_groups_9_10")
