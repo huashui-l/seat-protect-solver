@@ -53,6 +53,28 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
         self.assertGreater(native_count, 0)
         self.assertGreater(fallback_count, 0)
 
+    def test_extended_short_profile_uses_lns_carry_and_keeps_legal_incumbent(self):
+        profile = json.loads((Path(__file__).resolve().parents[1]
+                             / "configs/config_native_rich_4p5s_search.json").read_text(encoding="utf-8"))
+        for case_id in ("shrink_small_blockers", "dense_full_resource_special_chain",
+                        "full_resource_protection_heavy", "two_cabin_valid_groups"):
+            with self.subTest(case=case_id):
+                result = self.run_case(case_id, "rich-fast", algorithm=profile["algorithm"])
+                cabins = result.get("cabin_decomposition", {}).get("cabins", {})
+                results = [c["result"] for c in cabins.values()] if cabins else [result]
+                for cabin in results:
+                    self.assertTrue(cabin["complete"])
+                    self.assertLessEqual(cabin["rich_search_deadline"], 4.5)
+                    if cabin["rich_candidate_complete"]:
+                        self.assertTrue(cabin["rich_multigroup_lns"]["enabled"])
+                        self.assertGreaterEqual(cabin["rich_multigroup_lns"]["score_improvement"], -1e-8)
+                        self.assertGreaterEqual(cabin["native_score"], cabin["rich_vnd_score"] - 1e-8)
+                        lns = cabin["rich_stage_timing"]["lns"]
+                        self.assertEqual(0, lns["base_budget"])
+                        self.assertGreater(lns["effective_budget"], 0)
+                    for timing in cabin["rich_stage_timing"].values():
+                        self.assertLessEqual(timing["deadline"], cabin["rich_search_deadline"])
+
     def test_group_first_defers_fallback_search_until_after_rich(self):
         result = self.run_case("shrink_small_blockers", "group-first", algorithm={
             "enable_conflict_component_lns": False,

@@ -110,6 +110,16 @@ C++ 60s run is 24.154 points (mean normalized per-case loss 4.34%). All 24 score
 are lower; this profile is a speed/quality tradeoff. See the existing Rich status
 ledger for per-case results, provenance and retained acceptance boundaries.
 
+## Short profile with 4.5 seconds of search
+
+`configs/config_native_rich_4p5s_search.json` uses the same `rich-fast --time-limit 5`
+entry. Relative to the first 5s profile it enables native conflict-component LNS
+and reserves 0.5s for scoring/overhead. LNS has zero base budget but receives
+unused construction/repair/VND/pattern carry before restricted MIP; zero base
+budget does not disable it. Existing solve-count and stagnation limits remain,
+so exhausted neighborhoods may still finish early. No artificial wait is added.
+The preserved 60s `group-first` profile and archived results are unchanged.
+
 ## Build
 
 Windows x64, PowerShell, Visual Studio C++ tools, and an externally obtained
