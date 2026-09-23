@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 import json
+import random
 import subprocess
 import tempfile
 import unittest
@@ -14,6 +15,79 @@ from tests import test_native_rich_repair as repair_tests
 class NativeRichPlacementTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def replay_patterns(self, case, active_types):
+        config = copy.deepcopy(self.config)
+        config["_column_generation_active_ssr_types"] = active_types
+        config["input_contract"] = {"seatmaps_by_direction": {
+            "public-test": {"old": "old.json", "new": "new.json"}}}
+        new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+        old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+        fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+        baby_cost = exact._baby_pairs(new, case["groupsData"], config["weights"], config)
+        requests, expected = [], []
+        rng = random.Random(4109)
+        for g, group in enumerate(case["groupsData"]):
+            options = exact._placement_options(group, new, old, config["weights"], config, fixed)
+            for iteration in range(8):
+                choices = [[p, (0 if iteration == 0 else rng.randrange(len(row)))] for p, row in enumerate(options)]
+                if iteration % 2:
+                    choices.reverse()
+                selected = [options[p][i] for p, i in choices]
+                pattern = exact._pattern_from_placements(group, selected, new, config["weights"], config, baby_cost)
+                expected.append(dict(group_id=pattern.group_id, signature=pattern.signature,
+                                     assignments=pattern.assignments, blocked_by=pattern.blocked_by,
+                                     seat_resources=sorted(pattern.seat_resources), infant_seats=sorted(pattern.infant_seats),
+                                     occupied_seats=sorted(pattern.occupied_seats), ssr_all=pattern.ssr_all,
+                                     ssr_flagged=pattern.ssr_flagged, master_cost=pattern.master_cost,
+                                     caregiver_ok=exact._caregiver_ok(group, selected, new, config)))
+                requests.append(dict(group_index=g, choices=choices))
+        expected = json.loads(json.dumps(expected))
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"pattern_assembly": requests, "active_ssr_types": active_types},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                  str(work / "replay.json")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)
+        self.assertEqual(len(actual), len(expected))
+        for native, python in zip(actual, expected):
+            with self.subTest(group=python["group_id"], signature=python["signature"]):
+                self.assertAlmostEqual(native.pop("master_cost"), python.pop("master_cost"), places=8)
+                # Resource coefficients are keyed rows, not search-order lists.
+                for name in ("ssr_all", "ssr_flagged"):
+                    native[name] = {json.dumps(k): v for k, v in native[name]}
+                    python[name] = {json.dumps(k): v for k, v in python[name]}
+                self.assertEqual(native, python)
+        return actual
+
+    def test_public_pattern_assembly_coefficients_costs_and_caregivers(self):
+        for case in self.cases[:11]:
+            with self.subTest(case=case["id"]):
+                active = sorted({p["ssr"] for g in case["groupsData"] for p in g["psrs"] if p.get("ssr")})
+                self.replay_patterns(case, active)
+
+    def test_pattern_flag_expansion_and_infant_pair_correction(self):
+        case = self.synthetic([(101, {"ssr": "BSCT", "mandatoryRule": {"sameRowNoOtherSSR": "Y"}}),
+                               (101, {}), (101, {"ssr": "BSCT"}),
+                               (202, {"ssr": "UM", "mandatoryRule": {"sameSubRowNoOtherSSR": "Y"}}),
+                               (202, {"ssr": "UM"}),
+                               (303, {"needCared": "Y"}), (303, {}),
+                               (404, {"mandatoryRule": {"needSingleSideEmpty": "Y"}})])
+        for active in ([], ["BSCT", "UM", "UNKNOWN"]):
+            with self.subTest(active=active):
+                actual = self.replay_patterns(case, active)
+                self.assertTrue(any(p["infant_seats"] for p in actual))
+                self.assertTrue(any(not p["caregiver_ok"] for p in actual))
+                self.assertTrue(any(p["blocked_by"] for p in actual))
+                self.assertTrue(any(count > 1 for p in actual for count in p["ssr_all"].values()))
+                if active:
+                    self.assertTrue(any('UNKNOWN' in key for p in actual for key in p["ssr_flagged"]))
 
     def replay(self, case, config=None, invalid=False):
         config = copy.deepcopy(config or self.config)

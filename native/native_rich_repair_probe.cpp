@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
-        if (const auto* mode = replay.find("placement_options"); mode && mode->bool_or()) {
+        if ((replay.find("placement_options") && replay.at("placement_options").bool_or()) || replay.find("pattern_assembly")) {
             const auto fixed = full_cpp::preprocess_fixed_seats(problem);
             const auto seats = [&](const std::vector<int>& indices) {
                 std::cout << '[';
@@ -24,6 +24,64 @@ int main(int argc, char** argv) {
                 if (item.subrow < 0) std::cout << "\"row\"," << item.row;
                 else std::cout << "\"subrow\",[" << item.row << ',' << item.subrow << ']';
             };
+            if (const auto* requests = replay.find("pattern_assembly")) {
+                std::vector<std::string> active_types;
+                for (const auto& type : replay.at("active_ssr_types").array) active_types.push_back(type.string);
+                std::cout << std::setprecision(17) << '[';
+                bool first = true;
+                for (const auto& request : requests->array) {
+                    const int g = static_cast<int>(request.at("group_index").number);
+                    const auto options = full_cpp::build_rich_placement_options(problem, g, fixed);
+                    std::vector<full_cpp::RichPlacement> selected;
+                    for (const auto& choice : request.at("choices").array)
+                        selected.push_back(options.at(static_cast<size_t>(choice.array[0].number)).at(static_cast<size_t>(choice.array[1].number)));
+                    const auto pattern = full_cpp::build_rich_exact_pattern(problem, g, selected, active_types);
+                    if (!first) std::cout << ',';
+                    first = false;
+                    std::cout << "{\"group_id\":" << pattern.group_id << ",\"signature\":[";
+                    for (size_t i = 0; i < pattern.placements.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& placement = pattern.placements[i];
+                        std::cout << '[' << placement.passenger_index << ",\"" << problem.seats[placement.seat].id << "\",";
+                        seats(placement.blocked);
+                        std::cout << ']';
+                    }
+                    std::cout << "],\"assignments\":[";
+                    for (size_t i = 0; i < pattern.assignments.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& entry = pattern.assignments[i];
+                        std::cout << "[[" << pattern.group_id << ',' << problem.passengers[entry.first].hostnum
+                            << "],\"" << problem.seats[entry.second].id << "\"]";
+                    }
+                    std::cout << "],\"blocked_by\":[";
+                    for (size_t i = 0; i < pattern.blocked_by.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& entry = pattern.blocked_by[i];
+                        std::cout << "[\"" << problem.seats[entry.first].id << "\",[" << pattern.group_id << ','
+                            << problem.passengers[entry.second].hostnum << "]]";
+                    }
+                    std::cout << "],\"seat_resources\":"; seats(pattern.seat_resources);
+                    std::cout << ",\"infant_seats\":"; seats(pattern.infant_seats);
+                    std::cout << ",\"occupied_seats\":"; seats(pattern.occupied_seats);
+                    const auto coefficients = [&](const char* name, const auto& values) {
+                        std::cout << ",\"" << name << "\":[";
+                        bool first_coefficient = true;
+                        for (const auto& entry : values) {
+                            if (!first_coefficient) std::cout << ',';
+                            first_coefficient = false;
+                            std::cout << "[["; location(entry.first.location);
+                            std::cout << ",\"" << entry.first.ssr << "\"]," << entry.second << ']';
+                        }
+                        std::cout << ']';
+                    };
+                    coefficients("ssr_all", pattern.ssr_all);
+                    coefficients("ssr_flagged", pattern.ssr_flagged);
+                    std::cout << ",\"master_cost\":" << pattern.master_cost << ",\"caregiver_ok\":"
+                        << (full_cpp::rich_placements_caregiver_ok(problem, g, selected) ? "true" : "false") << '}';
+                }
+                std::cout << "]\n";
+                return 0;
+            }
             std::cout << std::setprecision(17) << '{';
             for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
                 if (g) std::cout << ',';

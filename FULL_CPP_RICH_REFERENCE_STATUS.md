@@ -552,6 +552,37 @@ native/state-replay-enabled regression passed 113 tests and 13,295 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed.
 
+Native `build_rich_exact_pattern` now assembles complete placement combinations
+into the frozen Python pattern representation: passenger-index-ordered placement
+signatures, host-ordered assignments, seat/host-ordered protection ownership,
+occupied/protected/infant resource sets, SSR count rows, conditional flag rows and
+master cost. A flagged location activates every supplied active SSR type, falling
+back to configured rule types when the supplied list is empty. Coefficients are
+stored as keyed maps; their container iteration order is not Python's repr-sorted
+tuple order. Pattern search identity remains the ordered placement signature.
+
+Master cost includes individual cost and centroid compactness, then subtracts
+same-group ordered infant/occupant pair costs to cancel those master baby
+variables. Self-pairs are excluded, matching `baby_interference_score`. The
+separate `rich_placements_caregiver_ok` follows Python's eligible-adult and
+cross-aisle rules. Assembly itself does not reject overlapping resources, SSR
+multiplicity or caregiver failure, because those checks belong to its callers.
+
+The frozen `_pattern_from_placements` and `_caregiver_ok` provide the direct
+oracle. Public and synthetic combinations cover reordered input placements,
+resource overlap, protection modes, multiple infants, duplicate SSR counts,
+all-active-type flag expansion and valid/invalid caregiver adjacency. Together
+with existing placement-domain tests, the targeted suite passed 8 tests and 492
+subtests. Production structured generation and exact restricted/protected master
+consumers still remain to be integrated. No M3 completion or Formal24 parity claim
+is made by this assembly checkpoint.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 115 tests and 13,756 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

@@ -740,6 +740,95 @@ std::vector<std::vector<RichPlacement>> build_rich_placement_options(
     return result;
 }
 
+bool rich_placements_caregiver_ok(const Problem& problem, int group_index,
+    const std::vector<RichPlacement>& placements
+) {
+    const auto& group = problem.groups[group_index];
+    std::vector<int> seats(group.passengers.size(), -1);
+    for (const auto& placement : placements) seats[placement.passenger_index] = placement.seat;
+    for (size_t i = 0; i < group.passengers.size(); ++i) {
+        const auto& passenger = problem.passengers[group.passengers[i]];
+        const auto rule = ssr_rule(problem, passenger);
+        if (!passenger.need_cared && !rule.requires_caregiver) continue;
+        const auto& seat = problem.seats[seats[i]];
+        const auto& neighbors = rule.caregiver_allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+        bool found = false;
+        for (size_t j = 0; j < group.passengers.size(); ++j)
+            if (j != i && is_adult_caregiver(problem.passengers[group.passengers[j]])
+                && std::find(neighbors.begin(), neighbors.end(), seats[j]) != neighbors.end()) found = true;
+        if (!found) return false;
+    }
+    return true;
+}
+
+RichExactPattern build_rich_exact_pattern(const Problem& problem, int group_index,
+    const std::vector<RichPlacement>& placements, const std::vector<std::string>& active_ssr_types
+) {
+    RichExactPattern pattern;
+    pattern.group_id = problem.groups[group_index].id;
+    pattern.placements = placements;
+    std::stable_sort(pattern.placements.begin(), pattern.placements.end(),
+        [](const auto& a, const auto& b) { return a.passenger_index < b.passenger_index; });
+    std::set<int> occupied, resources, infants;
+    auto active_types = active_ssr_types;
+    if (active_types.empty()) for (const auto& rule : problem.ssr_rules) active_types.push_back(rule.first);
+    double individual_cost = 0.0;
+    for (const auto& placement : placements) {
+        pattern.assignments.emplace_back(placement.passenger, placement.seat);
+        for (int seat : placement.blocked) pattern.blocked_by.emplace_back(seat, placement.passenger);
+        occupied.insert(placement.seat);
+        resources.insert(placement.resources.begin(), placement.resources.end());
+        if (placement.is_infant) infants.insert(placement.seat);
+        for (const auto& resource : placement.ssr_resources) ++pattern.ssr_all[resource];
+        for (const auto& location : placement.ssr_flag_locations)
+            for (const auto& ssr : active_types) pattern.ssr_flagged[{location, ssr}] = 1;
+        individual_cost += placement.individual_cost;
+    }
+    std::sort(pattern.assignments.begin(), pattern.assignments.end(), [&](const auto& a, const auto& b) {
+        return std::make_pair(problem.passengers[a.first].hostnum, problem.seats[a.second].id)
+            < std::make_pair(problem.passengers[b.first].hostnum, problem.seats[b.second].id);
+    });
+    std::sort(pattern.blocked_by.begin(), pattern.blocked_by.end(), [&](const auto& a, const auto& b) {
+        return std::make_pair(problem.seats[a.first].id, problem.passengers[a.second].hostnum)
+            < std::make_pair(problem.seats[b.first].id, problem.passengers[b.second].hostnum);
+    });
+    const auto ordered_seats = [&](const std::set<int>& values) {
+        std::vector<int> result(values.begin(), values.end());
+        std::sort(result.begin(), result.end(), [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; });
+        return result;
+    };
+    pattern.occupied_seats = ordered_seats(occupied);
+    pattern.seat_resources = ordered_seats(resources);
+    pattern.infant_seats = ordered_seats(infants);
+    double x = 0.0, y = 0.0, dx = 0.0, dy = 0.0;
+    for (const auto& assignment : pattern.assignments) {
+        x += problem.seats[assignment.second].x;
+        y += problem.seats[assignment.second].y;
+    }
+    if (!pattern.assignments.empty()) {
+        x /= pattern.assignments.size(); y /= pattern.assignments.size();
+        for (const auto& assignment : pattern.assignments) {
+            dx = std::max(dx, std::abs(problem.seats[assignment.second].x - x));
+            dy = std::max(dy, std::abs(problem.seats[assignment.second].y - y));
+        }
+    }
+    pattern.master_cost = individual_cost - problem.weight_c
+        * (problem.group_centroid_x_factor * dx + problem.group_centroid_y_factor * dy);
+    // The master's baby variables count same-group occupants too. Cancel those
+    // ordered pairs in the column. The evaluator excludes self-pairs.
+    for (int u : pattern.infant_seats) for (int v : pattern.occupied_seats) {
+        if (u == v) continue;
+        const auto& infant = problem.seats[u];
+        const auto& other = problem.seats[v];
+        if (infant.cabin != other.cabin) continue;
+        double factor = 0.0;
+        if (infant.row == other.row && infant.subrow == other.subrow) factor = 1.0;
+        else if (std::abs(infant.row - other.row) == 1) factor = problem.baby_front_back_factor;
+        pattern.master_cost += problem.weight_b * factor / (1.0 + std::abs(infant.x - other.x));
+    }
+    return pattern;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

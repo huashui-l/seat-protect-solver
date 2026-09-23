@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <utility>
+#include <tuple>
 
 namespace full_cpp {
 
@@ -172,11 +173,17 @@ struct FixedSeatContext {
 struct RichSsrLocation {
     int row = 0;
     int subrow = -1;  // -1 denotes the whole row.
+    bool operator<(const RichSsrLocation& other) const {
+        return std::make_tuple(subrow >= 0, row, subrow) < std::make_tuple(other.subrow >= 0, other.row, other.subrow);
+    }
 };
 
 struct RichSsrResource {
     RichSsrLocation location;
     std::string ssr;
+    bool operator<(const RichSsrResource& other) const {
+        return std::tie(location, ssr) < std::tie(other.location, other.ssr);
+    }
 };
 
 struct RichPlacement {
@@ -192,6 +199,21 @@ struct RichPlacement {
 
 std::vector<std::vector<RichPlacement>> build_rich_placement_options(
     const Problem& problem, int group_index, const FixedSeatContext& fixed);
+
+struct RichExactPattern {
+    int group_id = -1;
+    std::vector<RichPlacement> placements;
+    std::vector<std::pair<int, int>> assignments;  // global passenger, seat; sorted by hostnum.
+    std::vector<std::pair<int, int>> blocked_by;   // seat, global passenger; sorted by seat ID/hostnum.
+    std::vector<int> seat_resources, infant_seats, occupied_seats;
+    std::map<RichSsrResource, int> ssr_all, ssr_flagged;
+    double master_cost = 0.0;
+};
+
+bool rich_placements_caregiver_ok(const Problem& problem, int group_index,
+    const std::vector<RichPlacement>& placements);
+RichExactPattern build_rich_exact_pattern(const Problem& problem, int group_index,
+    const std::vector<RichPlacement>& placements, const std::vector<std::string>& active_ssr_types);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
