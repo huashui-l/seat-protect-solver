@@ -218,6 +218,11 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = values->find("bassinet")) problem.bassinet_value = item->number_or(problem.bassinet_value);
     }
     if (const Value* algorithm = config.find("algorithm")) {
+        if (const Value* item = algorithm->find("enable_protected_multigroup_pattern_mip")) problem.rich.protected_multigroup_enabled = item->bool_or(false);
+        if (const Value* item = algorithm->find("protected_multigroup_root_limit")) problem.rich.protected_multigroup_root_limit = std::max(1, static_cast<int>(item->number_or(8)));
+        if (const Value* item = algorithm->find("protected_multigroup_max_groups")) problem.rich.protected_multigroup_max_groups = std::max(2, static_cast<int>(item->number_or(4)));
+        if (const Value* item = algorithm->find("protected_multigroup_component_limit")) problem.rich.protected_multigroup_component_limit = std::max(1, static_cast<int>(item->number_or(30)));
+        if (const Value* item = algorithm->find("protected_multigroup_options_per_group")) problem.rich.protected_multigroup_options_per_group = std::max(2, static_cast<int>(item->number_or(20)));
         if (const Value* item = algorithm->find("protected_dynamic_relocation_enabled")) problem.rich.protected_dynamic_relocation_enabled = item->bool_or(true);
         if (const Value* item = algorithm->find("protected_dynamic_relocation_seconds")) problem.rich.protected_dynamic_relocation_seconds = std::max(0.01, item->number_or(0.08));
         if (const Value* item = algorithm->find("protected_dynamic_relocation_columns")) problem.rich.protected_dynamic_relocation_columns = std::max(1, static_cast<int>(item->number_or(6)));
@@ -369,6 +374,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     };
     problem.rich_quality_repair_active = setting("business_time_limit_seconds", 5.0)
         >= setting("three_tier_min_business_time_seconds", 10.0);
+    const auto* priority_mip = stage_algorithm ? stage_algorithm->find("enable_priority_multigroup_pattern_mip") : nullptr;
+    problem.rich.priority_multigroup_enabled = priority_mip && priority_mip->bool_or(false)
+        && setting("business_time_limit_seconds", 5.0) >= setting("priority_multigroup_min_business_time_seconds", 10.0);
     problem.rich_conflict_diversity_time_active = problem.rich_stage_budgets.business_time_limit
         >= setting("three_tier_min_business_time_seconds", 10.0);
     const auto* three_tier = stage_algorithm ? stage_algorithm->find("enable_three_tier_patterns") : nullptr;

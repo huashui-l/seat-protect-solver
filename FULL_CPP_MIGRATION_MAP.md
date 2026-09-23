@@ -19,7 +19,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | beam search | construction Beam | native remaining-stage Beam with skips, compactness ranking, dominance and transactional commit; separate RR pattern Beam remains | PARTIAL_CPP | yes | ACTIVE |
 | construction repair queue | `_group_repair_metrics`, `_repair_priority_key` | native metrics, quality threshold, exact priority ordering, full queue retention and top-20 diagnostics; direct and combined Python differentials | FULL_CPP | no | ACTIVE |
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |
-| protection exchange | protected multi-group pattern MIP | native released-resource pricing, direct elite insertion, conditional SSR conflicts and component reconstruction verified; component selection/MIP and production orchestration pending | PARTIAL_CPP | no | ACTIVE |
+| protection exchange | protected multi-group pattern MIP | native complete protected function: roots/components, released pricing, conditional SSR MIP, reconstruction and strict acceptance verified; multi-pass production orchestration pending | PARTIAL_CPP | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
 | group matching | exact bitmask matching | stateful Python-ordered related-group partitions and bitmask matching integrated in production; combined stage differential passed | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
@@ -43,7 +43,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | Special dual pricing | `generate_special_dual_pricing_patterns` | native continuous restricted LP, group/seat dual extraction and repair-priority DFS orchestration; complete-function differential passed; production post-protected placement pending | PARTIAL_CPP | no | ACTIVE |
 | structured pattern handling | elite store, structured/special pricing | raw native Problem adapter, seat/protection resources, SSR location encoding, stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |
 | elite pattern store | `record_elite_pattern`, `_elite_pattern_eviction_candidate`, stage capture | native identity/resource/conflict handling, replacement, pinning and stable eviction with direct Python replay; construction/repair/VND capture and affected-group scores integrated; construction-frozen conflict-diversity activation and current-state candidate recording implemented; structured generation integrated; protected/restricted pattern consumers pending | PARTIAL_CPP | no | ACTIVE |
-| restricted/protected master | Python HiGHS stages | native RR restricted master; raw M3 adapter invokes it with native patterns | PARTIAL_CPP | yes | ACTIVE, semantics differ |
+| restricted/protected master | Python HiGHS stages | native protected component MIP matches frozen Python; Rich restricted MIP remains pending; independent RR master is still a different production consumer | PARTIAL_CPP | yes | ACTIVE, semantics differ |
 | final validation | independent evaluator | native feasibility validator plus external Python audit | PARTIAL_CPP | external | ACTIVE |
 | serialization | Python benchmark output | raw-native assignment JSON and legacy solver-ready JSON | FULL_CPP | yes | ACTIVE |
 

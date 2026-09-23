@@ -11,6 +11,8 @@ from unittest.mock import patch
 from src import heuristic_seat_allocator as rich
 from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
+from tests.test_native_rich_elite import python_capture_namespace
+from src import allocation_evaluator as evaluator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -88,6 +90,136 @@ class NativeRichPatternContextTests(unittest.TestCase):
         for component, native, python in zip(components, actual["rebuilt"], expected):
             with self.subTest(case=case["id"], component=component): self.assertEqual(native, python)
         return actual
+
+    def protected_replay(self, case, algorithm, variant="active", initial_override=None, extra_patterns=()):
+        config = copy.deepcopy(self.config)
+        config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
+            construction_time_budget=60.0, small_group_dfs_time_limit=20.0,
+            enable_protected_multigroup_pattern_mip=True, enable_priority_multigroup_pattern_mip=True,
+            protected_dynamic_relocation_seconds=120.0, structured_pattern_dfs_per_group=120.0)
+        config["algorithm"].update(algorithm)
+        config.setdefault("column_generation", {})["dfs_node_limit"] = 100
+        config["input_contract"] = {"seatmaps_by_direction": {
+            "public-test": {"old": "old.json", "new": "new.json"}}}
+        global_names = ("_SEAT_NEIGHBORS", "_SEAT_ROW_NEIGHBORS", "_SEAT_SUBROW", "_SEAT_X", "_SEAT_ROW_INDEX",
+                        "_ACTIVE_CONFIG", "_OLD_SEATS", "_OLD_SEAT_X", "_OLD_SEAT_OWNER_REGRET", "_GROUP_COMPACT_CACHE")
+        with patch.multiple(rich, **{name: getattr(rich, name) for name in global_names}):
+            built = construction_prefix()(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                                          case["groupsData"], config["weights"], config)
+            groups = built["groups"]
+            keys = [(g.group_id, p.hostnum) for g in groups for p in g.passengers]
+            if initial_override is None:
+                context = built["context"]
+                if len(context.assigned_seats) != len(keys):
+                    context = rich.AssignmentContext(built["seats"])
+                    for g in groups:
+                        for p in g.passengers:
+                            self.assertTrue(context.assign_passenger(p, case["referenceAssignments"][g.group_id, p.hostnum], g.group_id))
+            else:
+                context = rich.AssignmentContext(built["seats"])
+                passengers = [(g.group_id, p) for g in groups for p in g.passengers]
+                for index, seat, *block in initial_override:
+                    gid, passenger = passengers[index]
+                    self.assertTrue(context.assign_passenger(passenger, seat, gid, chosen_block=block[0] if block else None))
+            initial = [[keys.index(key), seat, *sorted(context.assigned_blocked.get(key, ()))[:1]]
+                       for key, seat in context.assigned_seats.items()]
+            scorer = evaluator.IncrementalSoftScorer(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                                                    case["groupsData"], config["weights"], config)
+            captured = python_capture_namespace(context, groups, scorer, 12)
+            captured["capture_stage_patterns"]("current")
+            if initial_override is None:
+                rich.generate_structured_group_patterns(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                    case["groupsData"], context, scorer, config["weights"], config, rich.time.perf_counter() + 120,
+                    captured["record_elite_pattern"])
+            for gid, assignments, blocked in extra_patterns:
+                proposal = dict(context.assigned_seats)
+                proposal.update({(gid, host): seat for host, seat in assignments})
+                captured["record_elite_pattern"](gid, tuple(((gid, host), seat) for host, seat in assignments),
+                    scorer.components(proposal, {gid})["total_soft_score"], "fixture", dict(blocked), False)
+            elite = captured["elite_pattern_store"]
+            patterns = [dict(group_id=gid, **pattern) for gid, entries in elite.items() for pattern in entries.values()]
+            duration = -1.0 if variant == "expired" else 120.0
+            expected = rich.improve_protected_multigroup_pattern_mip(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                case["groupsData"], groups, context, elite, scorer, config["weights"], config, rich.time.perf_counter() + duration)
+            expected_elite = {str(gid): list(entries.values()) for gid, entries in elite.items()}
+            expected_assignment = [context.assigned_seats.get(key) for key in keys]
+            expected_blocks = [sorted(context.assigned_blocked.get(key, ())) for key in keys]
+            expected_order = [keys.index(key) for key in context.assigned_seats]
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"pattern_context": dict(protected_mip=True, initial=initial, patterns=patterns,
+                                                          pairs=[], deadline_seconds=duration)},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                  str(work / "replay.json")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)
+        self.assertEqual(actual["state"]["assignments"], expected_assignment)
+        self.assertEqual([sorted(row) for row in actual["state"]["blocked"]], expected_blocks)
+        self.assertEqual(actual["state"]["assignment_order"], expected_order)
+        native_d = actual["diagnostics"]
+        native_d.pop("seconds"); expected.pop("seconds")
+        self.assertAlmostEqual(native_d.pop("score_improvement"), expected.pop("score_improvement"), places=8)
+        self.assertEqual(len(native_d["accepted_components"]), len(expected["accepted_components"]))
+        for a, b in zip(native_d["accepted_components"], expected["accepted_components"]):
+            a.pop("elapsed_seconds"); b.pop("elapsed_seconds")
+            self.assertAlmostEqual(a.pop("delta"), b.pop("delta"), places=8)
+        self.assertEqual(native_d, json.loads(json.dumps(expected)))
+        expected_elite = json.loads(json.dumps(expected_elite))
+        self.assertEqual(actual["elite"].keys(), expected_elite.keys())
+        for gid, entries in expected_elite.items():
+            self.assertEqual(len(actual["elite"][gid]), len(entries))
+            for a, b in zip(actual["elite"][gid], entries):
+                b.setdefault("conflict_groups", [])
+                self.assertAlmostEqual(a.pop("local_score"), b.pop("local_score"), places=8)
+                self.assertEqual(a, b)
+        return actual
+
+    def test_complete_protected_mip_matches_frozen_function(self):
+        calls = patterns = components = 0
+        for case in self.cases[:11]:
+            for algorithm, variant in (({}, "active"), ({"protected_dynamic_relocation_enabled": False}, "active"),
+                    ({"enable_protected_multigroup_pattern_mip": False, "enable_priority_multigroup_pattern_mip": False}, "disabled"),
+                    ({}, "expired")):
+                with self.subTest(case=case["id"], algorithm=algorithm, variant=variant):
+                    actual = self.protected_replay(case, algorithm, variant)
+                    calls += actual["diagnostics"]["dynamic_relocation_calls"]
+                    patterns += actual["diagnostics"]["dynamic_relocation_patterns"]
+                    components += actual["diagnostics"]["components_tested"]
+        self.assertGreater(calls, 0)
+        self.assertGreater(patterns, 0)
+        self.assertGreater(components, 0)
+
+    def test_protected_mip_accepts_joint_improvement_and_rejects_fixed_violation(self):
+        for fixed in (False, True):
+            with self.subTest(fixed=fixed):
+                protected = {"ssr": "TEST_A", "oldSeat": {"seatNum": "1B", "seatValue": ""},
+                             "mandatoryRule": {"needSingleSideEmpty": "Y", "sameRowNoOtherSSR": "Y"}}
+                if fixed: protected["newSeat"] = {"seatNum": "3B"}
+                case = self.synthetic([(20, protected), (10, {"ssr": "TEST_A", "oldSeat": {"seatNum": "2A", "seatValue": ""}})])
+                actual = self.protected_replay(case, {"protected_dynamic_relocation_enabled": False}, initial_override=[[0, "3B", "3A"], [1, "1B"]],
+                    extra_patterns=[(20, [(1, "1B")], [(1, ["1A"])]), (10, [(1, "2A")], []), (10, [(1, "1D")], [])])
+                self.assertGreater(actual["diagnostics"]["conditional_ssr_rows"], 0)
+                self.assertEqual(actual["diagnostics"]["accepted"], 0 if fixed else 1)
+
+    def test_priority_mip_activation_and_clamped_limits(self):
+        case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),
+                               (20, {"oldSeat": {"seatNum": "1B", "seatValue": ""}}),
+                               (10, {"oldSeat": {"seatNum": "2A", "seatValue": ""}})])
+        for threshold in (120.0, 121.0):
+            with self.subTest(threshold=threshold):
+                actual = self.protected_replay(case, dict(enable_protected_multigroup_pattern_mip=False,
+                    priority_multigroup_min_business_time_seconds=threshold, protected_dynamic_relocation_enabled=False,
+                    protected_multigroup_root_limit=0, protected_multigroup_max_groups=0,
+                    protected_multigroup_component_limit=0, protected_multigroup_options_per_group=0),
+                    initial_override=[[0, "4A"], [1, "1F"], [2, "1A"]],
+                    extra_patterns=[(20, [(1, "1A"), (2, "1B")], []), (10, [(1, "2A")], [])])
+                self.assertEqual(actual["diagnostics"]["accepted"], 1 if threshold == 120 else 0)
+                self.assertEqual(actual["diagnostics"]["enabled"], threshold == 120)
 
     def test_public_pattern_reconstruction_and_conflicts(self):
         rng = random.Random(20260923)

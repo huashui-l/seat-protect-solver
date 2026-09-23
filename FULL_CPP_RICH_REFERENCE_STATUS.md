@@ -1016,6 +1016,39 @@ Validation: Release /O2 build passed with the two existing conversion warnings.
 Full native/state-replay-enabled regression passed 136 tests and 18,230 subtests
 with 9 skips. `git diff --check` passed.
 
+### Complete protected MIP function
+
+`improve_rich_protected_mip` now ports the complete frozen protected/priority
+multi-group MIP function. It preserves activation and parameter clamps, initial
+repair metrics, stable root/option ranking, conflict-priority component selection,
+tested-component deduplication, outside-resource filtering **after** option
+truncation, dynamic pricing of conflict groups, and sorted group/resource model
+rows. The native binary model includes occupied/protected resources and conditional
+SSR incompatibility rows with the same column order and HiGHS settings. Selected
+columns are reconstructed in an isolated context; complete hard validation and a
+strict full Rich-score improvement are required before replacing the current state.
+Full scoring uses incremental Rich preference semantics, not a sum of local
+pattern scores. All original diagnostic counters and component records are emitted.
+
+Full-function replay covers eleven public fixtures with normal execution,
+dynamic pricing disabled, both root types disabled and expired deadlines (44
+variants), comparing diagnostics, accepted components, final state/order/protection
+and complete post-pricing elite contents. Separate synthetic cases require an
+accepted joint improvement, actual conditional SSR rows, rejection of an attractive
+fixed-seat violation, priority-only activation at its business-time threshold and
+the frozen lower clamps on root/component/group/option limits.
+
+The component function is native; its production multi-pass loop, stage captures,
+carry accounting and post-protected special pricing are not yet wired. LNS,
+Rich restricted MIP and the final full-stage quality gate remain open. No Formal24
+or profiling run was performed.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+Full native/state-replay-enabled regression passed 139 tests and 18,278 subtests
+with 9 skips. Coverage assertions require actual tested components, dynamic
+pricing calls and newly inserted patterns in the public replay. `git diff --check`
+passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

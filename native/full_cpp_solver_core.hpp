@@ -73,6 +73,9 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
+    bool protected_multigroup_enabled = false, priority_multigroup_enabled = false;
+    int protected_multigroup_root_limit = 8, protected_multigroup_max_groups = 4;
+    int protected_multigroup_component_limit = 30, protected_multigroup_options_per_group = 20;
     bool protected_dynamic_relocation_enabled = true;
     double protected_dynamic_relocation_seconds = 0.08;
     int protected_dynamic_relocation_columns = 6;

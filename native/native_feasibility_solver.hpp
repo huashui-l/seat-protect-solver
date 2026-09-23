@@ -7,6 +7,26 @@
 
 namespace full_cpp {
 
+struct RichProtectedAcceptedComponent {
+    std::vector<int> groups;
+    double delta = 0.0, elapsed_seconds = 0.0;
+    int test_index = 0;
+};
+struct RichProtectedMipDiagnostics {
+    bool enabled = false, protected_roots_enabled = false, priority_roots_enabled = false;
+    bool stopped_by_deadline = false, roots_initialized = false;
+    int protected_root_count = 0, priority_root_count = 0;
+    int roots_considered = 0, components_tested = 0, mip_columns = 0;
+    int dynamic_relocation_calls = 0, dynamic_relocation_patterns = 0, conditional_ssr_rows = 0, accepted = 0;
+    double score_improvement = 0.0, seconds = 0.0;
+    std::string reason;
+    std::vector<std::vector<int>> tested_components;
+    std::vector<RichProtectedAcceptedComponent> accepted_components;
+};
+RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
+    AssignmentState& state, RichEliteStore& elite, std::chrono::steady_clock::time_point deadline);
+void write_rich_protected_mip_diagnostics(std::ostream& output, const RichProtectedMipDiagnostics& diagnostics);
+
 struct RichSpecialPricingDiagnostics {
     bool enabled = false;
     std::string lp_status = "disabled";

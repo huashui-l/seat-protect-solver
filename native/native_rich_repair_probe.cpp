@@ -22,6 +22,11 @@ int main(int argc, char** argv) {
             std::vector<std::pair<int, full_cpp::RichElitePattern>> patterns;
             for (const auto& item : input->at("patterns").array) {
                 full_cpp::RichElitePattern pattern;
+                if (const auto* value = item.find("local_score")) pattern.local_score = value->number;
+                if (const auto* value = item.find("source")) pattern.source = value->string;
+                if (const auto* value = item.find("pinned")) pattern.pinned = value->bool_or();
+                if (const auto* values = item.find("conflict_groups"))
+                    for (const auto& value : values->array) pattern.conflict_groups.push_back(static_cast<int>(value.number));
                 for (const auto& entry : item.at("assignments").array)
                     pattern.assignments.emplace_back(static_cast<int>(entry.array[0].number), entry.array[1].string);
                 for (const auto& entry : item.at("blocked_by_host").array) {
@@ -68,6 +73,20 @@ int main(int argc, char** argv) {
                 std::cout << ",\"assignment_order\":"; ints(snapshot.assignment_order);
                 std::cout << '}';
             };
+            if (const auto* mode = input->find("protected_mip"); mode && mode->bool_or()) {
+                full_cpp::RichEliteStore elite;
+                for (const auto& entry : patterns)
+                    elite.insert_relocation(entry.first, entry.second, [&]() { return entry.second.local_score; });
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(input->at("deadline_seconds").number));
+                const auto stats = full_cpp::improve_rich_protected_mip(problem, state, elite, deadline);
+                std::cout << std::setprecision(17) << "],\"diagnostics\":";
+                full_cpp::write_rich_protected_mip_diagnostics(std::cout, stats);
+                std::cout << ",\"elite\":"; full_cpp::write_rich_elite_store(std::cout, elite);
+                std::cout << ",\"state\":"; write_snapshot(state.save());
+                std::cout << "}\n";
+                return 0;
+            }
             std::cout << "],\"rebuilt\":["; first = true;
             for (const auto& indexes : input->at("components").array) {
                 std::map<int, full_cpp::RichElitePattern> choices;
