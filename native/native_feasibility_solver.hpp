@@ -40,7 +40,7 @@ struct RichLnsDiagnostics {
     bool enabled = false, stopped_by_deadline = false, initialized = false;
     int components_tested = 0, max_tested_component_size = 0, options_generated = 0, search_nodes = 0;
     int accepted_rebuilds = 0, accepted_worsening = 0, stagnation_rounds = 0, dynamic_reorders = 0;
-    int ejection_chains_generated = 0, ejection_chains_accepted = 0;
+    int ejection_chains_generated = 0, ejection_chains_accepted = 0, solver_errors = 0;
     int minimum_size = 0, initial_size = 0, maximum_size = 0, configured_maximum = 0;
     double score_improvement = 0.0, best_soft_score = 0.0, seconds = 0.0;
     std::vector<RichGroupRepairMetric> repair_queue;
@@ -57,7 +57,7 @@ RichLnsDiagnostics improve_rich_lns_stage(const Problem& problem,
 std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& state,
     const RichLnsWorkspace& workspace, const std::vector<int>& component,
     const std::map<int, std::vector<RichLnsOption>>& options, int root,
-    double local_time_limit, std::chrono::steady_clock::time_point deadline);
+    double local_time_limit, std::chrono::steady_clock::time_point deadline, int* solver_errors = nullptr);
 
 struct RichProtectedAcceptedComponent {
     std::vector<int> groups;

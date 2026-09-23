@@ -1281,6 +1281,30 @@ were complete/legal and reproduced CSV scores with maximum error 4.55e-13.
 Metric boundary tests and native runtime schedule tests passed 7 tests and 14
 subtests. The 60-second native comparison has not yet been completed.
 
+### First full-pipeline Formal24 attempt: failed, not a parity result
+
+The frozen `338b075` run in `outputs/research/full_cpp_rich_60s_338b075`
+completed eleven cases (all complete/legal), then aborted on
+`forward:full_stress` with `LNS MIP API error`. Of those eleven, ten improved
+against Python and `forward:full_normal` regressed by 3.05. No full 24-case
+summary exists; this run does not pass the gate and is retained unchanged.
+
+The failure was reproduced as a HiGHS 1.15.1 presolve/postsolve error: the
+solver reports an infeasible primal vector and `kError`. Frozen Python reads
+the solution and discards an incomplete group selection. Native LNS now does
+the same instead of aborting the entire allocator, with `solver_errors` in
+its diagnostics. Model-construction and solution-access API errors still fail
+explicitly. An independently generated 3-group/9-seat model reproduces the
+failure without private data. Release /O2 passed; LNS tests passed 12 tests
+and 18,901 subtests. The temporary model dump is not part of production code.
+
+The outer `run_allocation` cabin decomposition is also missing in the native
+entry point: frozen configuration enables per-cabin ordering, proportional
+budgets and final-cabin remaining-time allocation. This is an outstanding
+ACTIVE orchestration requirement, despite the completed single-cabin stages.
+It must be migrated and tested before another full parity run. No profiling,
+5-second compression, parameter tuning or reference change is justified.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

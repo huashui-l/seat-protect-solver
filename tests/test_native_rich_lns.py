@@ -86,6 +86,7 @@ class NativeRichLnsTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         actual = json.loads(run.stdout)
         actual["diagnostics"].pop("seconds")
+        self.assertEqual(actual["diagnostics"].pop("solver_errors"), 0)
         expected["diagnostics"].pop("seconds")
         expected = json.loads(json.dumps(expected))
         def compare(a, b, path):
@@ -185,6 +186,44 @@ class NativeRichLnsTests(unittest.TestCase):
         self.assertEqual(actual[1:4], [{}, {}, {}])
         self.assertEqual(actual[4], {"0": ["1D", "1A"], "1": ["1B", "1E"]})
         self.assertEqual(actual[5], {})
+
+    def test_lns_solver_error_discards_incomplete_choice(self):
+        # Independently generated set-partition model: Random(20260923), trial 204,
+        # then column deletion. HiGHS 1.15.1 presolve returns kError with an
+        # incomplete primal vector; this contains no private benchmark data.
+        import highspy
+        case = self.synthetic([(10, {})] * 3 + [(20, {})] * 4 + [(30, {})] * 2)
+        seats = ["1A", "1B", "1C", "1D", "1E", "1F", "2A", "2B", "2C"]
+        columns = [[0, 8.3, [4, 5, 8]], [0, 6.2, [1, 3, 8]], [0, 5.0, [3, 5, 7]], [0, 3.4, [3, 6, 8]], [0, 9.9, [1, 3, 5]], [0, 6.4, [1, 2, 8]], [0, 0.2, [0, 1, 4]], [0, 0.1, [3, 4, 7]], [0, 10.0, [3, 7, 8]], [1, 3.9, [2, 3, 7, 8]], [1, 6.1, [1, 2, 3, 5]], [1, 7.1, [1, 5, 7, 8]], [1, 7.9, [1, 3, 4, 6]], [1, 9.4, [0, 1, 3, 7]], [1, 1.8, [1, 6, 7, 8]], [1, 0.2, [3, 4, 5, 8]], [1, 3.6, [0, 1, 2, 8]], [1, 2.8, [0, 1, 2, 3]], [2, 2.4, [2, 7]], [2, 6.6, [1, 5]], [2, 4.6, [4, 5]], [2, 2.1, [5, 7]], [2, 7.7, [4, 8]], [2, 0.2, [6, 8]], [2, 9.3, [0, 8]], [2, 10.0, [3, 6]], [2, 5.7, [3, 8]]]
+        h = highspy.Highs()
+        h.setOptionValue("output_flag", False)
+        h.setOptionValue("threads", 1)
+        for _ in range(3): h.addRow(1, 1, 0, [], [])
+        for _ in seats: h.addRow(-highspy.kHighsInf, 1, 0, [], [])
+        options = {g: [] for g in range(3)}
+        for g, cost, indexes in columns:
+            rows = [g] + [i + 3 for i in indexes]
+            h.addCol(cost, 0, 1, len(rows), rows, [1] * len(rows))
+            h.changeColIntegrality(h.getNumCol() - 1, highspy.HighsVarType.kInteger)
+            chosen = [seats[i] for i in indexes]
+            options[g].append([-cost, chosen, chosen])
+        self.assertEqual(h.run(), highspy.HighsStatus.kError)
+        self.assertLess(sum(v > .5 for v in h.getSolution().col_value), 3)
+        config = copy.deepcopy(self.config)
+        config["input_contract"] = {"seatmaps_by_direction": {"public-test": {"old": "old.json", "new": "new.json"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"pattern_context": {"initial": [[i, seat] for i, seat in enumerate(seats)],
+                    "lns_master": [{"component": [0, 1, 2], "root": 0, "options": options}]}},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"), str(work / "replay.json")],
+                                 capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout), [{}])
 
     def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None, options_mode=False):
         config = copy.deepcopy(self.config)

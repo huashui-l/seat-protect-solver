@@ -1197,7 +1197,7 @@ RichLnsDiagnostics improve_rich_lns(const Problem& problem, AssignmentState& sta
                 }
                 if (options.size() != component.size()) break;
                 if (std::any_of(options.begin(), options.end(), [](const auto& item) { return item.second.empty(); })) continue;
-                const auto choice = solve_rich_lns_master(state, workspace, component, options, root, config.lns_mip_time_limit, deadline);
+                const auto choice = solve_rich_lns_master(state, workspace, component, options, root, config.lns_mip_time_limit, deadline, &d.solver_errors);
                 ++d.search_nodes;
                 if (choice.empty()) continue;
                 const auto before = state.passenger_to_seat;
@@ -1259,6 +1259,7 @@ void write_rich_lns_diagnostics(std::ostream& output, const RichLnsDiagnostics& 
     output << "{\"enabled\":" << (d.enabled ? "true" : "false") << ",\"stopped_by_deadline\":" << (d.stopped_by_deadline ? "true" : "false")
         << ",\"components_tested\":" << d.components_tested << ",\"max_tested_component_size\":" << d.max_tested_component_size
         << ",\"options_generated\":" << d.options_generated << ",\"search_nodes\":" << d.search_nodes
+        << ",\"solver_errors\":" << d.solver_errors
         << ",\"accepted_rebuilds\":" << d.accepted_rebuilds << ",\"accepted_worsening\":" << d.accepted_worsening
         << ",\"stagnation_rounds\":" << d.stagnation_rounds << ",\"dynamic_reorders\":" << d.dynamic_reorders
         << ",\"ejection_chains_generated\":" << d.ejection_chains_generated << ",\"ejection_chains_accepted\":" << d.ejection_chains_accepted
@@ -1285,11 +1286,13 @@ void write_rich_lns_diagnostics(std::ostream& output, const RichLnsDiagnostics& 
 std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& state,
     const RichLnsWorkspace& workspace, const std::vector<int>& component,
     const std::map<int, std::vector<RichLnsOption>>& options, int root,
-    double local_time_limit, std::chrono::steady_clock::time_point deadline
+    double local_time_limit, std::chrono::steady_clock::time_point deadline, int* solver_errors
 ) {
     std::unique_ptr<void, decltype(&Highs_destroy)> solver(Highs_create(), Highs_destroy);
     void* highs = solver.get();
-    const auto check = [](HighsInt status) { if (status == kHighsStatusError) throw std::runtime_error("LNS MIP API error"); };
+    const auto check = [](HighsInt status, const char* operation = "model construction") {
+        if (status == kHighsStatusError) throw std::runtime_error(std::string("LNS MIP API error: ") + operation);
+    };
     check(Highs_setBoolOptionValue(highs, "output_flag", 0));
     check(Highs_setIntOptionValue(highs, "threads", 1));
     check(Highs_setIntOptionValue(highs, "random_seed", 0));
@@ -1321,9 +1324,13 @@ std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& sta
         columns.emplace_back(g, &option);
     }
     if (columns.empty()) return {};
-    check(Highs_run(highs));
+    const auto run_status = Highs_run(highs);
+    // Python reads the solution even when run() returns kError. An incomplete
+    // choice is discarded below; a complete choice still faces reconstruction
+    // and full legality checks in the caller. Do not abort the legal incumbent.
+    if (run_status == kHighsStatusError && solver_errors) ++*solver_errors;
     std::vector<double> solution(columns.size());
-    check(Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr));
+    check(Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr), "Highs_getSolution");
     std::map<int, std::vector<int>> choices;
     for (size_t i = 0; i < columns.size(); ++i) if (solution[i] > .5) choices[columns[i].first] = columns[i].second->assignment;
     if (choices.size() != component.size()) return {};
