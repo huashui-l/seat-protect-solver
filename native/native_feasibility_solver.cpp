@@ -816,6 +816,54 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
     return d;
 }
 
+std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& state,
+    const RichLnsWorkspace& workspace, const std::vector<int>& component,
+    const std::map<int, std::vector<RichLnsOption>>& options, int root,
+    double local_time_limit, std::chrono::steady_clock::time_point deadline
+) {
+    std::unique_ptr<void, decltype(&Highs_destroy)> solver(Highs_create(), Highs_destroy);
+    void* highs = solver.get();
+    const auto check = [](HighsInt status) { if (status == kHighsStatusError) throw std::runtime_error("LNS MIP API error"); };
+    check(Highs_setBoolOptionValue(highs, "output_flag", 0));
+    check(Highs_setIntOptionValue(highs, "threads", 1));
+    check(Highs_setIntOptionValue(highs, "random_seed", 0));
+    check(Highs_setDoubleOptionValue(highs, "mip_rel_gap", 0.0));
+    check(Highs_setDoubleOptionValue(highs, "time_limit", std::min(local_time_limit,
+        std::max(.01, std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count()))));
+    std::map<int, HighsInt> group_rows;
+    std::map<std::string, HighsInt> seat_rows;
+    HighsInt row = 0;
+    for (int g : component) {
+        group_rows[g] = row++;
+        check(Highs_addRow(highs, 1.0, 1.0, 0, nullptr, nullptr));
+        for (const auto& option : options.at(g)) for (int s : option.seats) seat_rows[state.problem.seats[s].id] = 0;
+    }
+    for (auto& seat : seat_rows) {
+        seat.second = row++;
+        check(Highs_addRow(highs, -Highs_getInfinity(highs), 1.0, 0, nullptr, nullptr));
+    }
+    std::vector<int> root_current;
+    for (int p : workspace.keys_by_group[root]) root_current.push_back(state.passenger_to_seat[p]);
+    std::vector<std::pair<int, const RichLnsOption*>> columns;
+    for (int g : component) for (const auto& option : options.at(g)) {
+        if (g == root && option.assignment == root_current) continue;
+        std::vector<HighsInt> rows{group_rows.at(g)};
+        for (int s : option.seats) rows.push_back(seat_rows.at(state.problem.seats[s].id));
+        std::vector<double> values(rows.size(), 1.0);
+        check(Highs_addCol(highs, -option.score, 0.0, 1.0, static_cast<HighsInt>(rows.size()), rows.data(), values.data()));
+        check(Highs_changeColIntegrality(highs, static_cast<HighsInt>(columns.size()), kHighsVarTypeInteger));
+        columns.emplace_back(g, &option);
+    }
+    if (columns.empty()) return {};
+    check(Highs_run(highs));
+    std::vector<double> solution(columns.size());
+    check(Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr));
+    std::map<int, std::vector<int>> choices;
+    for (size_t i = 0; i < columns.size(); ++i) if (solution[i] > .5) choices[columns[i].first] = columns[i].second->assignment;
+    if (choices.size() != component.size()) return {};
+    return choices;
+}
+
 void write_rich_protected_mip_diagnostics(std::ostream& output, const RichProtectedMipDiagnostics& d) {
     output << "{\"enabled\":" << (d.enabled ? "true" : "false")
         << ",\"protected_roots_enabled\":" << (d.protected_roots_enabled ? "true" : "false")

@@ -19,6 +19,43 @@ int main(int argc, char** argv) {
                 if (!state.assign_rich_pattern(static_cast<int>(entry.array[0].number), problem.seat_index.at(entry.array[1].string), {}, chosen))
                     throw std::runtime_error("pattern context initial assignment failed");
             }
+            if (const auto* calls = input->find("lns_master")) {
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+                full_cpp::RichLnsWorkspace workspace(state, deadline);
+                std::cout << "[";
+                bool first_call = true;
+                for (const auto& call : calls->array) {
+                    std::vector<int> component;
+                    std::map<int, std::vector<full_cpp::RichLnsOption>> options;
+                    for (const auto& group : call.at("component").array) component.push_back(static_cast<int>(group.number));
+                    for (int g : component) {
+                        auto& group_options = options[g];
+                        for (const auto& item : call.at("options").at(std::to_string(g)).array) {
+                            full_cpp::RichLnsOption option;
+                            option.score = item.array[0].number;
+                            for (const auto& seat : item.array[1].array) option.seats.insert(problem.seat_index.at(seat.string));
+                            for (const auto& seat : item.array[2].array) option.assignment.push_back(problem.seat_index.at(seat.string));
+                            group_options.push_back(std::move(option));
+                        }
+                    }
+                    const auto choices = full_cpp::solve_rich_lns_master(state, workspace, component, options,
+                        static_cast<int>(call.at("root").number), .75, deadline);
+                    if (!first_call) std::cout << ','; first_call = false;
+                    std::cout << '{'; bool first_group = true;
+                    for (const auto& choice : choices) {
+                        if (!first_group) std::cout << ','; first_group = false;
+                        std::cout << '"' << choice.first << "\":[";
+                        for (size_t i = 0; i < choice.second.size(); ++i) {
+                            if (i) std::cout << ',';
+                            std::cout << '"' << problem.seats[choice.second[i]].id << '"';
+                        }
+                        std::cout << ']';
+                    }
+                    std::cout << '}';
+                }
+                std::cout << "]\n";
+                return 0;
+            }
             if (const auto* calls = input->find("lns_matching")) {
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(input->at("deadline_seconds").number));

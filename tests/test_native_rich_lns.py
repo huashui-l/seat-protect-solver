@@ -6,6 +6,7 @@ import random
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +21,62 @@ ROOT = Path(__file__).resolve().parents[1]
 class NativeRichLnsTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_lns_local_master_matches_frozen_function(self):
+        case = self.synthetic([(30, {}), (30, {}), (10, {}), (10, {}), (20, {}), (20, {})])
+        initial = [[0, "1A"], [1, "1D"], [2, "1B"], [3, "1E"], [4, "1C"], [5, "1F"]]
+        tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+        lns = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "improve_with_multigroup_lns")
+        master = next(n for n in lns.body if isinstance(n, ast.FunctionDef) and n.name == "solve_pattern_master")
+        namespace = dict(rich.__dict__, context=SimpleNamespace(assigned_seats={p: seat for p, seat in initial}),
+                         keys_by_group={g: [2*g, 2*g+1] for g in range(3)}, local_mip_time_limit=.75,
+                         deadline=rich.time.perf_counter() + 120)
+        exec(compile(ast.Module(body=[master], type_ignores=[]), "frozen_lns_master", "exec"), namespace)
+        partner = {"1A": "1D", "1B": "1E", "1C": "1F", "2A": "2D", "2B": "2E"}
+        def option(score, seat): return [score, [seat, partner[seat]], [seat, partner[seat]]]
+        calls = [
+            dict(component=[0, 1], root=0, options={0: [option(100, "1A"), option(-5, "2A")], 1: [option(2, "1B")]}),
+            dict(component=[0, 1], root=0, options={0: [option(100, "1A")], 1: [option(2, "1B")]}),
+            dict(component=[0, 1], root=0, options={0: [option(3, "2A")], 1: [option(2, "2A")]}),
+            dict(component=[0, 1], root=0, options={0: [], 1: []}),
+            # Same physical seats, different passenger ordering: this must remain a column.
+            dict(component=[0, 1], root=0, options={0: [[-3, ["1A", "1D"], ["1D", "1A"]]], 1: [option(2, "1B")]}),
+            # Conflict on the second passenger's seat only.
+            dict(component=[0, 1], root=0, options={0: [option(3, "2A")], 1: [[2, ["2B", "2D"], ["2B", "2D"]]]}),
+        ]
+        rng = random.Random(20260923)
+        for _ in range(64):
+            component = rng.sample(range(3), 3)
+            calls.append(dict(component=component, root=component[0], options={
+                g: [option(rng.uniform(-40, 10), seat) for seat in rng.sample(["1A", "1B", "1C", "2A", "2B"], rng.randint(1, 5))]
+                for g in component}))
+        expected = []
+        for call in calls:
+            options = {g: [(score, frozenset(seats), tuple(assignment)) for score, seats, assignment in values]
+                       for g, values in call["options"].items()}
+            choice = namespace["solve_pattern_master"](tuple(call["component"]), options, call["root"])
+            expected.append({str(g): list(seats) for g, seats in choice.items()})
+        config = copy.deepcopy(self.config)
+        config["input_contract"] = {"seatmaps_by_direction": {"public-test": {"old": "old.json", "new": "new.json"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"pattern_context": dict(initial=initial, lns_master=calls)},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"), str(work / "replay.json")],
+                                 capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)
+        self.assertEqual(len(actual), len(expected))
+        for call, a, b in zip(calls, actual, expected):
+            with self.subTest(call=call): self.assertEqual(a, b)
+        self.assertEqual(actual[0], {"0": ["2A", "2D"], "1": ["1B", "1E"]})
+        self.assertEqual(actual[1:4], [{}, {}, {}])
+        self.assertEqual(actual[4], {"0": ["1D", "1A"], "1": ["1B", "1E"]})
+        self.assertEqual(actual[5], {})
 
     def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None):
         config = copy.deepcopy(self.config)

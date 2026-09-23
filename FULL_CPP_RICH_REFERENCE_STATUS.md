@@ -1102,9 +1102,30 @@ zero-weight ties and cached plus uncached queries after infant moves. Release
 build passed; full regression passed 145 tests and 18,702 subtests with 9 skips.
 Python candidate generation iterates a hash set; the historical hash seed has
 not been established. Candidate traversal equivalence remains unresolved and
-must not be inferred from matching parity. LNS candidate generation, local MIP,
+must not be inferred from matching parity. LNS candidate generation,
 search/late acceptance and production integration remain incomplete. No Formal24
 or profiling run was made.
+
+### LNS local pattern master prerequisite
+
+The native HiGHS local master preserves component/option column order, lexical
+seat rows, one pattern per group and unit seat capacity. It omits only the root's
+exact current passenger-to-seat tuple: a permutation within the same occupied
+seat set remains eligible. Scores are negated for minimization; threads, seed,
+gap and remaining-time cap follow the frozen Python function. No conditional SSR
+rows are added here; the later reconstruction and evaluator acceptance must
+perform their original checks. An incomplete selection returns no choice.
+
+Differential executes the frozen local-master AST on 70 two-passenger-group
+models: forced departure, no departure option, shared-seat infeasibility, empty
+columns, root permutation, second-passenger resource conflict and 64 seeded
+random models with varying component/column order. All choices matched. This
+master is available to native LNS but is not yet a production search stage.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+LNS tests passed 5 tests and 476 subtests. Full native/state-replay-enabled
+regression passed 146 tests and 18,772 subtests with 9 skips. `git diff --check`
+passed. No Formal24, profiling or 5-second compression run was made.
 
 ## Correctness
 
