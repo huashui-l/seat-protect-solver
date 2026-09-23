@@ -236,8 +236,21 @@ RichPatternResult run_rich_pattern_master(
         problem.rich.restricted_pattern_mip_tail_budget});
     const double remaining = std::chrono::duration<double>(deadline - master_started).count();
     result.master_time_limit = std::max(0.0, std::min(budget, remaining));
+    native_master::MasterSolveOptions master_options;
+    native_master::MasterSolveDiagnostics master_diagnostics;
+    master_options.diagnostics = &master_diagnostics;
+    master_options.attempts = std::max(1, problem.rich.restricted_pattern_mip_attempts);
+    if (problem.rich.enable_pattern_local_branching) {
+        master_options.local_branching_radius = std::max(1, problem.rich.pattern_local_branching_initial_radius);
+        master_options.local_branching_radius_growth = std::max(1, problem.rich.pattern_local_branching_radius_growth);
+        master_options.local_branching_max_radius = std::max(
+            master_options.local_branching_radius, problem.rich.pattern_local_branching_max_radius);
+    }
     if (result.master_time_limit > 0.0
-        && native_master::solve(master, master_output, result.master_time_limit, false, &selected) == 0) {
+        && native_master::solve(master, master_output, result.master_time_limit, false, &selected, &master_options) == 0) {
+        result.master_attempts = master_diagnostics.attempts;
+        if (!master_diagnostics.radius_history.empty())
+            result.master_last_radius = master_diagnostics.radius_history.back();
         std::unordered_map<uint64_t, const native_solver::PatternRecord*> by_id;
         for (const auto& pattern : master.patterns) by_id[pattern.id] = &pattern;
         std::vector<int> candidate = incumbent;

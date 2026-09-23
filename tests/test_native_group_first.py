@@ -107,6 +107,19 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertLess(result["rich_master_time_limit"], 5.0)
         self.assertGreater(result["rich_selected_pattern_count"], 0)
 
+    def test_restricted_master_branching_and_attempt_config(self):
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                result = self.run_case("caregiver_and_ssr", "group-first", algorithm={
+                    "restricted_pattern_mip_attempts": 1,
+                    "enable_pattern_local_branching": enabled,
+                    "pattern_local_branching_initial_radius": 1,
+                    "pattern_local_branching_max_radius": 1,
+                })
+                self.assertEqual(result["rich_master_attempts"], 1)
+                self.assertEqual(result["rich_master_last_radius"], 1 if enabled else -1)
+                self.assertAlmostEqual(result["rich_master_score"], result["rich_pattern_score"])
+
 
 if __name__ == "__main__":
     import unittest

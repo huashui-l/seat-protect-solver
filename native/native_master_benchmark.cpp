@@ -27,6 +27,10 @@ int main(int argc, char** argv) {
     }
 
     native_master::MasterSolveOptions options;
+    if (argc > 6) options.local_branching_radius = std::stoi(argv[6]);
+    if (argc > 7) options.attempts = std::stoi(argv[7]);
+    if (argc > 8) options.local_branching_radius_growth = std::stoi(argv[8]);
+    if (argc > 9) options.local_branching_max_radius = std::stoi(argv[9]);
     options.canonicalize_patterns = canonicalize;
     if (argc > 5 && std::string(argv[5]) != "-") {
         std::istringstream ids(argv[5]);

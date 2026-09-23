@@ -56,10 +56,25 @@ Restricted-master configuration is now read from the raw algorithm config:
 The provisional 0.5-second cap is removed. The current single master call uses
 max(base, nonnegative tail), clipped to remaining solver time. Disabled or zero
 budget calls preserve the VND incumbent while retaining generated pool diagnostics.
-Adaptive scaling, LNS unused-budget carry, repeated attempts, and local branching
-are not yet implemented. Native-enabled full-suite verification passed 58 tests
+Adaptive scaling and LNS unused-budget carry are not yet implemented.
+Native-enabled full-suite verification passed 58 tests
 and 44 subtests (10 skips); an additional remaining-time clipping regression and
 the affected group-first suite then passed (11 tests, 14 subtests).
+
+Restricted-master local branching and repeated solves now run natively on the
+same HiGHS model. The center remains the initial incumbent; configured radii
+grow per attempt up to the group-count/configured cap. Each solved assignment
+is excluded before the next attempt, and the best earlier assignment survives
+later infeasibility. The raw adapter reads the attempts/enabled/initial/growth/
+maximum settings. Existing master callers default to one unrestricted solve.
+Multi-attempt results suppress the last model's gap and dual bound because
+exclusion rows prevent interpreting them as bounds for the original pool.
+Constructed exchange tests cover radii 0/1/2, explicit centers, reordered columns,
+radius caps, exhaustion after exclusions, and disabled-path coefficient hashes.
+MSVC build and the native-enabled public suite passed: 65 tests, 53 subtests,
+10 skips. This does not prove the full Python restricted stage equivalent:
+its elite store, structured-global-value-block bypass, candidate context rebuild,
+and dynamic conflict rejection still need migration/semantic differential tests.
 
 ## Correctness
 

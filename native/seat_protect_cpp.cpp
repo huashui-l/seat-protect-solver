@@ -136,6 +136,8 @@ int main(int argc, char** argv) {
             << "\"rich_baby_pair_count\":" << result.rich_baby_pair_count << ','
             << "\"rich_master_score\":" << result.rich_master_score << ','
             << "\"rich_master_time_limit\":" << result.rich_master_time_limit << ','
+            << "\"rich_master_attempts\":" << result.rich_master_attempts << ','
+            << "\"rich_master_last_radius\":" << result.rich_master_last_radius << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;

@@ -229,9 +229,20 @@ int run_native_pattern_kernel(
 
 namespace native_master {
 
+struct MasterSolveDiagnostics {
+    int attempts = 0;
+    std::vector<int> radius_history;
+};
+
 struct MasterSolveOptions {
     bool canonicalize_patterns = true;
     std::vector<uint64_t> incumbent_pattern_ids;
+    // Negative radius preserves the unrestricted legacy master.
+    int local_branching_radius = -1;
+    int local_branching_radius_growth = 2;
+    int local_branching_max_radius = 0;
+    int attempts = 1;
+    MasterSolveDiagnostics* diagnostics = nullptr;
 };
 
 int read_problem(

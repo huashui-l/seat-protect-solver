@@ -16,6 +16,8 @@ struct RichPatternResult {
     int baby_pair_count = 0;
     double master_score = 0.0;
     double master_time_limit = 0.0;
+    int master_attempts = 0;
+    int master_last_radius = -1;
 };
 
 RichPatternResult run_rich_pattern_master(

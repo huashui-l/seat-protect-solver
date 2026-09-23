@@ -69,6 +69,11 @@ struct RichConstructionConfig {
     bool enable_restricted_pattern_mip = true;
     double restricted_pattern_mip_time_budget = 0.0;
     double restricted_pattern_mip_tail_budget = 0.10;
+    int restricted_pattern_mip_attempts = 3;
+    bool enable_pattern_local_branching = true;
+    int pattern_local_branching_initial_radius = 4;
+    int pattern_local_branching_radius_growth = 2;
+    int pattern_local_branching_max_radius = std::numeric_limits<int>::max();
     int candidate_cap = 48;
     int candidate_cap_retry = 64;
     int candidate_cap_full_retry = 128;

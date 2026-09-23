@@ -54,6 +54,7 @@ int solve(
     const auto started = std::chrono::steady_clock::now();
     const MasterSolveOptions effective_options = options
         ? *options : MasterSolveOptions{};
+    if (effective_options.diagnostics) *effective_options.diagnostics = {};
     MasterProblem ordered_problem = problem;
     if (effective_options.canonicalize_patterns) {
         std::sort(
@@ -94,9 +95,34 @@ int solve(
     row_count += ssr_count;
     const int baby_start = row_count;
     row_count += 3 * baby_count;
+    const int local_branching_row = effective_options.local_branching_radius >= 0
+        ? row_count++ : -1;
+    std::unordered_set<uint64_t> branching_center(
+        effective_options.incumbent_pattern_ids.begin(),
+        effective_options.incumbent_pattern_ids.end());
+    if (local_branching_row >= 0) {
+        if (branching_center.empty()) {
+            std::vector<bool> seen(group_count, false);
+            for (const auto& pattern : patterns) {
+                if (pattern.hard_keep && !seen[pattern.group]) {
+                    branching_center.insert(pattern.id);
+                    seen[pattern.group] = true;
+                }
+            }
+        }
+        std::vector<int> center_counts(group_count, 0);
+        for (const auto& pattern : patterns)
+            if (branching_center.count(pattern.id)) ++center_counts[pattern.group];
+        if (int(branching_center.size()) != group_count
+            || std::any_of(center_counts.begin(), center_counts.end(),
+                [](int count) { return count != 1; })) return 2;
+    }
 
     const double infinity = 1e30;
     std::vector<double> row_lower(row_count, -infinity), row_upper(row_count, infinity);
+    if (local_branching_row >= 0)
+        row_lower[local_branching_row] = group_count
+            - std::min(group_count, effective_options.local_branching_radius);
     for (int group = 0; group < group_count; ++group) row_lower[group] = row_upper[group] = 1.0;
     for (int seat = 0; seat < seat_count; ++seat) {
         row_upper[group_count + seat] = 1.0;
@@ -133,6 +159,8 @@ int solve(
         col_cost[index] = pattern.master_cost;
         integrality[index] = kHighsVarTypeInteger;
         columns[index][pattern.group] = 1.0;
+        if (local_branching_row >= 0 && branching_center.count(pattern.id))
+            columns[index][local_branching_row] = 1.0;
         for (int seat : pattern.seat_resources) columns[index][group_count + seat] += 1.0;
         for (const auto& item : pattern.ssr_all) columns[index][ssr_all_start + item.first] += item.second;
         for (const auto& item : pattern.ssr_flagged) {
@@ -268,6 +296,8 @@ int solve(
     double solver_objective = 0.0;
     double mip_gap = -1.0;
     double mip_dual_bound = 0.0;
+    int attempts = 0;
+    std::vector<int> radius_history;
     if (!skip_due_to_deadline) {
         highs = Highs_create();
         Highs_setBoolOptionValue(highs, "output_flag", 0);
@@ -283,31 +313,66 @@ int solve(
         );
         if (pass_status == kHighsStatusError) { Highs_destroy(highs); return 3; }
         Highs_setSolution(highs, warm_start.data(), nullptr, nullptr, nullptr);
-        Highs_run(highs);
-        const HighsInt model_status = Highs_getModelStatus(highs);
-        result_status = status_name(model_status);
-        std::vector<double> solution(column_count, 0.0);
-        Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr);
-        solver_objective = Highs_getObjectiveValue(highs);
-        Highs_getDoubleInfoValue(highs, "mip_gap", &mip_gap);
-        Highs_getDoubleInfoValue(highs, "mip_dual_bound", &mip_dual_bound);
-
-        selected.assign(group_count, -1);
-        for (int index = 0; index < pattern_count; ++index) {
-            if (solution[index] > 0.5) {
-                const int group = patterns[index].group;
-                selected[group] = selected[group] < 0 ? index : -2;
+        const int max_attempts = std::max(1, effective_options.attempts);
+        double best_objective = incumbent_objective;
+        used_fallback = true;
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
+            const double remaining = time_limit - std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - started).count();
+            if (remaining <= (max_attempts > 1 ? 0.01 : 0.0)) break;
+            if (local_branching_row >= 0) {
+                const int maximum_radius = effective_options.local_branching_max_radius > 0
+                    ? std::max(effective_options.local_branching_radius,
+                        effective_options.local_branching_max_radius) : group_count;
+                const int radius = static_cast<int>(std::min<long long>(
+                    std::min(group_count, maximum_radius),
+                    static_cast<long long>(effective_options.local_branching_radius)
+                        + static_cast<long long>(attempt)
+                        * std::max(1, effective_options.local_branching_radius_growth)));
+                Highs_changeRowBounds(highs, local_branching_row,
+                    double(group_count - radius), infinity);
+                radius_history.push_back(radius);
             }
-        }
-        used_fallback = std::find_if(
-            selected.begin(), selected.end(), [](int value) { return value < 0; }
-        ) != selected.end();
-        if (used_fallback) selected = incumbent;
-        if (!used_fallback
-            && selected_objective(selected) > incumbent_objective + 1e-7) {
-            selected = incumbent;
-            used_fallback = true;
-            incumbent_preserved_due_to_objective_regression = true;
+            Highs_setDoubleOptionValue(highs, "time_limit", remaining);
+            Highs_run(highs);
+            const HighsInt model_status = Highs_getModelStatus(highs);
+            result_status = status_name(model_status);
+            HighsInt primal_status = 0;
+            Highs_getIntInfoValue(highs, "primal_solution_status", &primal_status);
+            if (primal_status != 2) break;
+            std::vector<double> solution(column_count, 0.0);
+            Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr);
+            solver_objective = Highs_getObjectiveValue(highs);
+            Highs_getDoubleInfoValue(highs, "mip_gap", &mip_gap);
+            Highs_getDoubleInfoValue(highs, "mip_dual_bound", &mip_dual_bound);
+            std::vector<int> candidate(group_count, -1);
+            for (int index = 0; index < pattern_count; ++index) {
+                if (solution[index] > 0.5) {
+                    const int group = patterns[index].group;
+                    candidate[group] = candidate[group] < 0 ? index : -2;
+                }
+            }
+            if (std::any_of(candidate.begin(), candidate.end(),
+                [](int value) { return value < 0; })) break;
+            ++attempts;
+            const double objective = selected_objective(candidate);
+            if (objective <= best_objective + 1e-7) {
+                if (objective < best_objective - 1e-9 || max_attempts == 1) {
+                    best_objective = objective;
+                    selected = candidate;
+                }
+                used_fallback = false;
+            } else {
+                incumbent_preserved_due_to_objective_regression = true;
+            }
+            if (attempt + 1 < max_attempts) {
+                std::vector<HighsInt> indexes(candidate.begin(), candidate.end());
+                std::vector<double> values(indexes.size(), 1.0);
+                const HighsInt status = Highs_addRow(highs, -infinity,
+                    double(group_count - 1), HighsInt(indexes.size()),
+                    indexes.data(), values.data());
+                if (status == kHighsStatusError) { Highs_destroy(highs); return 3; }
+            }
         }
     }
     std::fill(infant_count.begin(), infant_count.end(), 0);
@@ -322,6 +387,10 @@ int solve(
         if (infant_count[pair.infant_seat] && occupied_count[pair.occupant_seat]) objective += pair.cost;
     }
     if (used_fallback) solver_objective = objective;
+    if (effective_options.diagnostics) {
+        effective_options.diagnostics->attempts = attempts;
+        effective_options.diagnostics->radius_history = radius_history;
+    }
     if (selected_pattern_ids) {
         selected_pattern_ids->clear();
         for (int index : selected) {
@@ -336,6 +405,13 @@ int solve(
     output << "{\n  \"status\":\"" << result_status << "\",\n";
     output << "  \"highs_version\":\"" << Highs_version() << "\",\n";
     output << "  \"patterns\":" << pattern_count << ",\n";
+    output << "  \"attempts\":" << attempts << ",\n";
+    output << "  \"radius_history\":[";
+    for (size_t i = 0; i < radius_history.size(); ++i) {
+        if (i) output << ',';
+        output << radius_history[i];
+    }
+    output << "],\n";
     output << "  \"canonicalized_pattern_order\":"
            << (effective_options.canonicalize_patterns ? "true" : "false")
            << ",\n";
@@ -353,10 +429,10 @@ int solve(
     output << "  \"objective_cost\":" << objective << ",\n";
     output << "  \"solver_objective_cost\":" << solver_objective << ",\n";
     output << "  \"mip_gap\":";
-    if (std::isfinite(mip_gap)) output << mip_gap;
+    if (effective_options.attempts <= 1 && std::isfinite(mip_gap)) output << mip_gap;
     else output << "null";
     output << ",\n  \"mip_dual_bound\":";
-    if (std::isfinite(mip_dual_bound)) output << mip_dual_bound;
+    if (effective_options.attempts <= 1 && std::isfinite(mip_dual_bound)) output << mip_dual_bound;
     else output << "null";
     output << ",\n";
     output << "  \"soft_score\":" << -objective << ",\n";
