@@ -10,11 +10,13 @@ int main(int argc, char** argv) {
     std::string input_path;
     std::string config_path;
     std::string output_path;
+    bool placement_domains = false;
     for (int index = 1; index < argc;) {
         const std::string option = argv[index++];
         if (option == "--input" && index < argc) input_path = argv[index++];
         else if (option == "--config" && index < argc) config_path = argv[index++];
         else if (option == "--output" && index < argc) output_path = argv[index++];
+        else if (option == "--placement-domains") placement_domains = true;
         else return 2;
     }
     if (input_path.empty() || config_path.empty()) return 2;
@@ -141,7 +143,25 @@ int main(int argc, char** argv) {
             }
             *output << "]}";
         }
-        *output << "]}\n";
+        *output << ']';
+        if (placement_domains) {
+            *output << ",\"placement_domains\":[";
+            for (int passenger = 0; passenger < static_cast<int>(problem.passengers.size()); ++passenger) {
+                if (passenger) *output << ',';
+                *output << '[';
+                bool first = true;
+                for (const auto& option : full_cpp::rich_placement_domain(problem, fixed_context, passenger)) {
+                    if (!first) *output << ',';
+                    first = false;
+                    *output << '[' << option.first << ',' << option.second << ','
+                            << full_cpp::evaluate_individual_score(problem, passenger, option.first).total()
+                            << ']';
+                }
+                *output << ']';
+            }
+            *output << ']';
+        }
+        *output << "}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

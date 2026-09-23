@@ -6,6 +6,7 @@
 #include <limits>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 namespace full_cpp {
 
@@ -175,6 +176,12 @@ Problem load_problem(
 );
 
 FixedSeatContext preprocess_fixed_seats(const Problem& problem);
+
+// (occupied seat, chosen single-empty seat or -1); both-empty resources
+// follow the problem topology. This is a static domain, not mutable legality.
+std::vector<std::pair<int, int>> rich_placement_domain(
+    const Problem& problem, const FixedSeatContext& fixed, int passenger
+);
 
 struct IndividualScoreComponents {
     double score_s = 0.0;

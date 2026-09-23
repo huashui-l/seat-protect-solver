@@ -76,6 +76,18 @@ MSVC build and the native-enabled public suite passed: 65 tests, 53 subtests,
 its elite store, structured-global-value-block bypass, candidate context rebuild,
 and dynamic conflict rejection still need migration/semantic differential tests.
 
+The raw pattern adapter now uses a native static placement domain matching
+Python `_placement_options` fixed/reserved-seat filtering. Movable passengers
+cannot occupy fixed or deterministically blocked seats; protection choices
+cannot block an occupied fixed seat. Both-empty precedence is preserved when
+both protection flags are present. The core probe's `--placement-domains`
+mode exposes occupied/block choices and individual scores for differential
+tests. All 13 public fixtures (175 passengers) match the Python candidate sets,
+blocked-seat sets, and individual coefficients (10 decimal places). MSVC and
+the native-enabled suite passed: 66 tests, 66 subtests, 10 skips. This is static
+domain parity on those fixtures; dynamic state semantics and structured search
+ordering/retention are not established by this test.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

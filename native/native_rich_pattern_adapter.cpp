@@ -131,6 +131,7 @@ RichPatternResult run_rich_pattern_master(
     // Keep every seat in the raw adapter so the incumbent can always be
     // represented; the native kernel still applies its own pattern limits.
     const int candidate_cap = seat_count;
+    const FixedSeatContext fixed = preprocess_fixed_seats(problem);
     for (int group_index = 0; group_index < group_count; ++group_index) {
         const Group& group = problem.groups[group_index];
         const int group_size = static_cast<int>(group.passengers.size());
@@ -144,7 +145,6 @@ RichPatternResult run_rich_pattern_master(
         }();
         input << "GROUP " << group.id << ' ' << group_size << " 1 16 "
               << beam_width << ' ' << pattern_limit << " 1 " << current_hint << '\n';
-        AssignmentState domain(problem);
         std::vector<int> incumbent_choices;
         for (int passenger : group.passengers) {
             const Passenger& item = problem.passengers[passenger];
@@ -152,20 +152,7 @@ RichPatternResult run_rich_pattern_master(
             const bool cared = item.need_cared || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
             const bool cross = rule != problem.ssr_rules.end() && rule->second.caregiver_allow_cross_aisle;
             input << "PASSENGER " << passenger << ' ' << adult(item) << ' ' << cared << ' ' << cross << ' ';
-            std::vector<std::tuple<int, int, double>> options;
-            for (int seat = 0; seat < seat_count; ++seat) {
-                std::vector<int> blocks;
-                if (item.need_single_empty && !item.need_both_empty) {
-                    blocks.assign(problem.seats[seat].same_block_neighbors.begin(),
-                                  problem.seats[seat].same_block_neighbors.end());
-                } else {
-                    blocks.push_back(-1);
-                }
-                for (int block : blocks) {
-                    if (!domain.can_assign(passenger, seat, block)) continue;
-                    options.emplace_back(seat, block, 0.0);
-                }
-            }
+            const auto options = rich_placement_domain(problem, fixed, passenger);
             if (options.empty()) return result;
             input << options.size() << '\n';
             int incumbent_choice = -1;

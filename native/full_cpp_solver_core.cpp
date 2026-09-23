@@ -529,6 +529,41 @@ FixedSeatContext preprocess_fixed_seats(const Problem& problem) {
     return context;
 }
 
+std::vector<std::pair<int, int>> rich_placement_domain(
+    const Problem& problem, const FixedSeatContext& fixed, int passenger_index
+) {
+    const Passenger& passenger = problem.passengers[passenger_index];
+    const SsrRule rule = ssr_rule(problem, passenger);
+    std::vector<std::pair<int, int>> options;
+    for (int index = 0; index < static_cast<int>(problem.seats.size()); ++index) {
+        const Seat& seat = problem.seats[index];
+        if (!passenger.fixed_seat.empty()) {
+            if (seat.id != passenger.fixed_seat) continue;
+        } else if (fixed.owner_by_seat[index] >= 0 || fixed.deterministic_blocked[index]) {
+            continue;
+        }
+        if ((!passenger.cabin.empty() && passenger.cabin != seat.cabin)
+            || (seat.exit_row && !rule.allow_exit_row)
+            || (rule.requires_bassinet && !seat.bassinet)
+            || (rule.requires_aisle && !seat.aisle)) continue;
+        if (passenger.need_both_empty) {
+            const auto& neighbors = problem.both_side_empty_allow_cross_aisle
+                ? seat.row_neighbors : seat.same_block_neighbors;
+            if (neighbors.empty()
+                || (problem.require_two_real_neighbors && neighbors.size() != 2)) continue;
+            if (std::any_of(neighbors.begin(), neighbors.end(),
+                [&](int neighbor) { return fixed.owner_by_seat[neighbor] >= 0; })) continue;
+            options.emplace_back(index, -1);
+        } else if (passenger.need_single_empty) {
+            for (int neighbor : seat.same_block_neighbors)
+                if (fixed.owner_by_seat[neighbor] < 0) options.emplace_back(index, neighbor);
+        } else {
+            options.emplace_back(index, -1);
+        }
+    }
+    return options;
+}
+
 AssignmentState::AssignmentState(const Problem& source, const FixedSeatContext* fixed)
     : problem(source),
       seat_to_passenger(source.seats.size(), -1),
