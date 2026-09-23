@@ -1088,6 +1088,24 @@ The protected/special wrapper differential passed 16 subtests; runtime schedule
 and raw CLI activation checks passed. Full native/state-replay-enabled regression
 passed 141 tests and 18,296 subtests with 9 skips. `git diff --check` passed.
 
+### LNS scoring and assignment matching prerequisite
+
+Native LNS workspace preserves assignment insertion order, seat-number-null
+eligibility and the initial infant positions across later context mutations.
+Ordinary groups use strict-improvement bitmask matching; special groups enumerate
+input-order permutations with released-resource feasibility and caregiver checks.
+This prerequisite is not yet wired into production LNS.
+
+Frozen-function differential covers eleven public fixtures, deadline expiry,
+null versus empty fixed-seat numbers, group-size floors, reversed key order,
+zero-weight ties and cached plus uncached queries after infant moves. Release
+build passed; full regression passed 145 tests and 18,702 subtests with 9 skips.
+Python candidate generation iterates a hash set; the historical hash seed has
+not been established. Candidate traversal equivalence remains unresolved and
+must not be inferred from matching parity. LNS candidate generation, local MIP,
+search/late acceptance and production integration remain incomplete. No Formal24
+or profiling run was made.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

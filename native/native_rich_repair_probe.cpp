@@ -19,6 +19,49 @@ int main(int argc, char** argv) {
                 if (!state.assign_rich_pattern(static_cast<int>(entry.array[0].number), problem.seat_index.at(entry.array[1].string), {}, chosen))
                     throw std::runtime_error("pattern context initial assignment failed");
             }
+            if (const auto* calls = input->find("lns_matching")) {
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(input->at("deadline_seconds").number));
+                full_cpp::RichLnsWorkspace workspace(state, deadline);
+                std::cout << std::setprecision(17) << "{\"eligible\":[";
+                bool first = true;
+                for (int g : workspace.eligible_groups) { if (!first) std::cout << ','; first = false; std::cout << problem.groups[g].id; }
+                std::cout << "],\"keys\":[";
+                for (size_t g = 0; g < workspace.keys_by_group.size(); ++g) {
+                    if (g) std::cout << ','; std::cout << '[';
+                    for (size_t i = 0; i < workspace.keys_by_group[g].size(); ++i) { if (i) std::cout << ','; std::cout << workspace.keys_by_group[g][i]; }
+                    std::cout << ']';
+                }
+                std::cout << "],\"calls\":["; first = true;
+                for (const auto& call : calls->array) {
+                    if (const auto* moves = call.find("moves")) {
+                        for (const auto& move : moves->array) state.remove(static_cast<int>(move.array[0].number));
+                        for (const auto& move : moves->array)
+                            if (!state.assign_rich_pattern(static_cast<int>(move.array[0].number), problem.seat_index.at(move.array[1].string), {}))
+                                throw std::runtime_error("LNS matching move failed");
+                    }
+                    std::vector<int> seats; std::set<int> released;
+                    for (const auto& seat : call.at("seats").array) seats.push_back(problem.seat_index.at(seat.string));
+                    for (const auto& seat : call.at("released").array) released.insert(problem.seat_index.at(seat.string));
+                    const int g = static_cast<int>(call.at("group_index").number);
+                    const auto result = workspace.best_group_assignment(g, seats, released);
+                    if (!first) std::cout << ','; first = false;
+                    std::cout << "{\"score\":";
+                    if (std::isfinite(result.score)) std::cout << result.score; else std::cout << "null";
+                    std::cout << ",\"assignment\":[";
+                    for (size_t i = 0; i < result.seats.size(); ++i) { if (i) std::cout << ','; std::cout << '"' << problem.seats[result.seats[i]].id << '"'; }
+                    std::cout << "],\"compact\":" << workspace.compact_score(seats)
+                        << ",\"stopped\":" << (workspace.stopped_by_deadline ? "true" : "false") << ",\"scores\":[";
+                    for (size_t i = 0; i < call.at("scores").array.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& item = call.at("scores").array[i];
+                        std::cout << workspace.passenger_score(static_cast<int>(item.array[0].number), problem.seat_index.at(item.array[1].string));
+                    }
+                    std::cout << "]}";
+                }
+                std::cout << "]}\n";
+                return 0;
+            }
             std::vector<std::pair<int, full_cpp::RichElitePattern>> patterns;
             for (const auto& item : input->at("patterns").array) {
                 full_cpp::RichElitePattern pattern;

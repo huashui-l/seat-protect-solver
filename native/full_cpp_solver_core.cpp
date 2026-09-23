@@ -218,6 +218,7 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = values->find("bassinet")) problem.bassinet_value = item->number_or(problem.bassinet_value);
     }
     if (const Value* algorithm = config.find("algorithm")) {
+        if (const Value* item = algorithm->find("multigroup_pattern_group_size_limit")) problem.rich.multigroup_pattern_group_size_limit = std::max(2, static_cast<int>(item->number_or(6)));
         if (const Value* item = algorithm->find("enable_protected_multigroup_pattern_mip")) problem.rich.protected_multigroup_enabled = item->bool_or(false);
         if (const Value* item = algorithm->find("protected_multigroup_max_passes")) problem.rich.protected_multigroup_max_passes = std::max(1, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("protected_multigroup_min_pass_gain")) problem.rich.protected_multigroup_min_pass_gain = std::max(0.0, item->number_or(1.0));
@@ -341,6 +342,8 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
             if (const Value* fixed = raw.find("newSeat")) {
                 passenger.fixed_seat = optional_string(*fixed, "seatNum");
                 passenger.has_new_seat = fixed->is_object() && !fixed->object.empty();
+                const auto* fixed_number = fixed->find("seatNum");
+                passenger.new_seat_num_is_none = !fixed_number || fixed_number->is_null();
             }
             if (const Value* rules = raw.find("optionRule"); rules && rules->is_array()) {
                 for (const Value& rule : rules->array) {
@@ -2406,6 +2409,135 @@ void AssignmentState::restore(AssignmentSnapshot snapshot) {
     owner_group_by_seat = std::move(snapshot.owner_group_by_seat);
     seat_ssr_passenger = std::move(snapshot.seat_ssr_passenger);
     assignment_order = std::move(snapshot.assignment_order);
+}
+
+RichLnsWorkspace::RichLnsWorkspace(const AssignmentState& state, std::chrono::steady_clock::time_point deadline)
+    : keys_by_group(state.problem.groups.size()), state_(state), deadline_(deadline) {
+    const auto& problem = state.problem;
+    for (int p : state.assignment_order) {
+        keys_by_group[problem.passengers[p].group].push_back(p);
+        if (problem.passengers[p].ssr == "BSCT") infants_.emplace_back(problem.passengers[p].group, state.passenger_to_seat[p]);
+    }
+    for (int g = 0; g < static_cast<int>(keys_by_group.size()); ++g) {
+        const auto& keys = keys_by_group[g];
+        if (keys.empty() || keys.size() > static_cast<size_t>(problem.rich.multigroup_pattern_group_size_limit)) continue;
+        if (std::all_of(keys.begin(), keys.end(), [&](int p) {
+            const auto& passenger = problem.passengers[p];
+            return passenger.new_seat_num_is_none && !passenger.need_both_empty && !passenger.need_single_empty;
+        })) eligible_groups.insert(g);
+    }
+}
+
+double RichLnsWorkspace::passenger_score(int p, int s) {
+    const auto& problem = state_.problem;
+    const auto individual_key = std::make_pair(p, s);
+    auto individual = individual_cache_.find(individual_key);
+    if (individual == individual_cache_.end()) {
+        std::vector<int> isolated(problem.passengers.size(), -1); isolated[p] = s;
+        individual = individual_cache_.emplace(individual_key,
+            evaluate_rich_group_score(problem, isolated, problem.passengers[p].group).total()).first;
+    }
+    const auto baby_key = std::make_pair(problem.passengers[p].group, s);
+    auto baby = baby_cache_.find(baby_key);
+    if (baby == baby_cache_.end()) {
+        double value = 0.0;
+        for (const auto& infant : infants_) {
+            if (infant.first == baby_key.first || infant.second == s) continue;
+            const auto& a = problem.seats[infant.second]; const auto& b = problem.seats[s];
+            if (a.cabin != b.cabin) continue;
+            const double distance = 1.0 + std::abs(a.x - b.x);
+            if (a.row == b.row && a.subrow == b.subrow) value += problem.weight_b / distance;
+            else if (std::abs(a.row - b.row) == 1) value += problem.weight_b * problem.baby_front_back_factor / distance;
+        }
+        baby = baby_cache_.emplace(baby_key, value).first;
+    }
+    return individual->second + baby->second;
+}
+
+double RichLnsWorkspace::compact_score(const std::vector<int>& seats) {
+    auto key = seats;
+    const auto& problem = state_.problem;
+    std::sort(key.begin(), key.end(), [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; });
+    const auto found = compact_cache_.find(key);
+    if (found != compact_cache_.end()) return found->second;
+    double value = 0.0;
+    if (seats.size() > 1) {
+        double x = 0.0, y = 0.0, dx = 0.0, dy = 0.0;
+        for (int s : seats) { x += problem.seats[s].x; y += problem.seats[s].y; }
+        x /= seats.size(); y /= seats.size();
+        for (int s : seats) { dx = std::max(dx, std::abs(problem.seats[s].x - x)); dy = std::max(dy, std::abs(problem.seats[s].y - y)); }
+        value = problem.weight_c * (problem.group_centroid_x_factor * dx + problem.group_centroid_y_factor * dy);
+    }
+    compact_cache_[std::move(key)] = value;
+    return value;
+}
+
+RichLnsAssignment RichLnsWorkspace::best_matching(const std::vector<int>& keys, const std::vector<int>& seats) {
+    const auto popcount = [](size_t value) { int count = 0; while (value) { value &= value - 1; ++count; } return count; };
+    const size_t count = size_t{1} << keys.size();
+    std::vector<double> dp(count, -std::numeric_limits<double>::infinity());
+    std::vector<int> parent(count, -1);
+    dp[0] = 0.0;
+    for (size_t mask = 0; mask < count; ++mask) {
+        if (mask % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) { stopped_by_deadline = true; return {}; }
+        const int p = popcount(mask);
+        if (p >= static_cast<int>(keys.size()) || dp[mask] == -std::numeric_limits<double>::infinity()) continue;
+        for (size_t j = 0; j < seats.size(); ++j) {
+            const size_t bit = size_t{1} << j;
+            if (mask & bit) continue;
+            const size_t next = mask | bit;
+            const double value = dp[mask] + passenger_score(keys[p], seats[j]);
+            if (value > dp[next]) { dp[next] = value; parent[next] = static_cast<int>(j); }
+        }
+    }
+    RichLnsAssignment result; result.score = dp.back(); result.seats.resize(keys.size());
+    size_t mask = count - 1;
+    while (mask) {
+        const int j = parent[mask]; const size_t previous = mask ^ (size_t{1} << j);
+        result.seats[popcount(previous)] = seats[j]; mask = previous;
+    }
+    return result;
+}
+
+RichLnsAssignment RichLnsWorkspace::best_group_assignment(int group_index, const std::vector<int>& seats,
+    const std::set<int>& released_seats
+) {
+    const auto& problem = state_.problem;
+    const auto& keys = keys_by_group[group_index];
+    const auto needs_care = [&](int p) { return problem.passengers[p].need_cared || ssr_rule(problem, problem.passengers[p]).requires_caregiver; };
+    if (std::all_of(keys.begin(), keys.end(), [&](int p) { return problem.passengers[p].ssr.empty() && !needs_care(p); }))
+        return best_matching(keys, seats);
+    RichLnsAssignment result;
+    std::vector<size_t> permutation(seats.size());
+    for (size_t i = 0; i < seats.size(); ++i) permutation[i] = i;
+    size_t index = 0;
+    do {
+        if (index % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) { stopped_by_deadline = true; break; }
+        ++index;
+        bool feasible = true;
+        for (size_t i = 0; i < keys.size(); ++i)
+            if (!state_.rich_seat_feasible(keys[i], seats[permutation[i]], -1, -1, released_seats)) { feasible = false; break; }
+        if (!feasible) continue;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (!needs_care(keys[i])) continue;
+            const auto rule = ssr_rule(problem, problem.passengers[keys[i]]);
+            const auto& seat = problem.seats[seats[permutation[i]]];
+            const auto& neighbors = rule.caregiver_allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+            bool caregiver = false;
+            for (size_t j = 0; j < keys.size(); ++j)
+                if (j != i && problem.passengers[keys[j]].ssr.empty()
+                    && std::find(neighbors.begin(), neighbors.end(), seats[permutation[j]]) != neighbors.end()) caregiver = true;
+            if (!caregiver) { feasible = false; break; }
+        }
+        if (!feasible) continue;
+        double score = 0.0;
+        for (size_t i = 0; i < keys.size(); ++i) score += passenger_score(keys[i], seats[permutation[i]]);
+        if (score > result.score) {
+            result.score = score; result.seats.clear();
+            for (size_t j : permutation) result.seats.push_back(seats[j]);
+        }
+    } while (std::next_permutation(permutation.begin(), permutation.end()));
+    return result;
 }
 
 void RichEliteStore::capture(const AssignmentState& state, const std::string& source) {

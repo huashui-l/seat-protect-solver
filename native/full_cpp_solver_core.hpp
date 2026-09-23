@@ -47,6 +47,7 @@ struct Passenger {
     std::string old_seat;
     std::string fixed_seat;
     bool has_new_seat = false;
+    bool new_seat_num_is_none = true;
     double old_seat_value = std::numeric_limits<double>::quiet_NaN();
     bool has_near_toilet_preference = false;
     bool prefer_near_toilet = true;
@@ -78,6 +79,7 @@ struct RichConstructionConfig {
     int protected_multigroup_component_limit = 30, protected_multigroup_options_per_group = 20;
     int protected_multigroup_max_passes = 3;
     double protected_multigroup_min_pass_gain = 1.0;
+    int multigroup_pattern_group_size_limit = 6;
     bool protected_dynamic_relocation_enabled = true;
     double protected_dynamic_relocation_seconds = 0.08;
     int protected_dynamic_relocation_columns = 6;
@@ -480,6 +482,30 @@ struct RichCandidateCache {
 
 RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state,
     const std::vector<double>* frozen_owner_regrets = nullptr);
+
+struct RichLnsAssignment {
+    double score = -std::numeric_limits<double>::infinity();
+    std::vector<int> seats;
+};
+
+class RichLnsWorkspace {
+public:
+    RichLnsWorkspace(const AssignmentState& state, std::chrono::steady_clock::time_point deadline);
+    double passenger_score(int passenger, int seat);
+    double compact_score(const std::vector<int>& seats);
+    RichLnsAssignment best_matching(const std::vector<int>& passengers, const std::vector<int>& seats);
+    RichLnsAssignment best_group_assignment(int group_index, const std::vector<int>& seats,
+                                            const std::set<int>& released_seats);
+    std::vector<std::vector<int>> keys_by_group;
+    std::set<int> eligible_groups;
+    bool stopped_by_deadline = false;
+private:
+    const AssignmentState& state_;
+    std::chrono::steady_clock::time_point deadline_;
+    std::vector<std::pair<int, int>> infants_;
+    std::map<std::pair<int, int>, double> individual_cache_, baby_cache_;
+    std::map<std::vector<int>, double> compact_cache_;
+};
 
 Problem load_problem(
     const std::string& case_path,
