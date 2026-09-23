@@ -18,8 +18,10 @@ configuration-driven DFS/Beam limits, bounded direct repair, VND 1-opt/2-swap/
 3-cycle moves, and bounded two-group bitmask rebuild. These stages require a
 complete legal incumbent, use the shared deadline, and accept only strict score
 improvements. They are implementation progress, not a Rich quality-parity gate;
-the Python relocation-chain repair, caregiver rebuild, pattern stages, LNS, and
-restricted/protected master semantics remain outstanding.
+the full Python caregiver joint rebuild, pattern stages, LNS, and
+restricted/protected master semantics remain outstanding. Native repair now
+uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
+caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
 
 ## Correctness
 
