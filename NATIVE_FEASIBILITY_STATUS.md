@@ -13,7 +13,8 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS**. This is not yet `FULL-CPP-CORRECT
 The raw Rich production path now contains native construction/repair, VND,
 structured and special pricing, protected MIP, conflict LNS, restricted MIP,
 native validation/serialization, and the enabled outer cabin decomposition.
-The first full 60-second Formal24 attempt still failed its quality gate: one
-HiGHS LNS solve error aborted the run and one completed case regressed Python.
-The LNS error is now contained and counted; the next full gate is required.
+The latest full 60-second Formal24 run (`54f827c`) is complete/legal and
+evaluator-consistent on 24/24 cases, but quality still fails: 20 improve,
+0 tie, 4 regress against frozen Python. LNS solver errors are contained and
+counted. Detailed results and the timed DFS boundary are in the Rich status ledger.
 No profiling or 5-second compression is authorized yet.

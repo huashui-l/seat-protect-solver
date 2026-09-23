@@ -26,7 +26,10 @@ Source of truth: frozen Heuristic V1R configuration and `run_heuristic_v1r.py --
 
 ## Raw Rich migration path
 
-On `feat/full-cpp-rich-m1`, the raw `seat_protect_cpp.exe` path now runs native
+On `feat/full-cpp-rich-m1`, the raw `seat_protect_cpp.exe` path first applies
+the frozen cabin decomposition (when enabled), with per-cabin topology, budgets
+and independent trajectories, then merges and validates the result. Each cabin
+runs native
 Q0/Q1/Q2A fallbacks and an independent Rich construction/repair trajectory,
 followed by VND, structured patterns, protected MIP, special pricing, LNS and
 Rich restricted MIP/local branching. The restricted stage consumes the complete

@@ -47,7 +47,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | final validation | independent evaluator | native feasibility validator plus external Python audit | PARTIAL_CPP | external | ACTIVE |
 | serialization | Python benchmark output | raw-native assignment JSON and legacy solver-ready JSON | FULL_CPP | yes | ACTIVE |
 
-## Audit conclusion
+## Historical import audit conclusion
 
 The previously timed executable is a native pattern-generator plus native restricted-master pipeline over a Python-prepared placement domain. It is not a full C++ seat-protection solver. In particular, raw input parsing, topology construction, placement-domain legality, fixed-seat preprocessing, individual score coefficients, complete-incumbent construction, repair, and optional V1R memory reconstruction are not all native.
 
@@ -55,4 +55,21 @@ Therefore the historically valid statement is:
 
 > PARTIAL NATIVE VERSION MET THE 5S RELEASE BUDGET; FULL C++ COVERAGE WAS NOT TESTED.
 
-The migration must preserve the existing `HEADER_V2` route as a differential oracle while moving the raw-input-to-option boundary and every Rich `ACTIVE` stage into C++. Current Rich active-stage coverage is not 100%; `FULL-CPP-CORRECTNESS` remains FAIL.
+The migration must preserve the existing `HEADER_V2` route as a differential oracle while moving the raw-input-to-option boundary and every Rich `ACTIVE` stage into C++. Current raw Rich implementation and per-case acceptance are recorded below; `FULL-CPP-CORRECTNESS` remains unpassed because the quality gate fails.
+
+## Current integration audit (supersedes historical pending statuses above)
+
+All ACTIVE behaviors in the table have native implementations and production
+consumers, including outer cabin decomposition discovered during full-pipeline
+audit. Core/state, construction/repair, VND, pricing/elite, protected MIP, LNS
+and restricted MIP are integrated through the preserved Rich state and shared
+global deadline. `seat_protect_cpp.cpp` adds per-cabin budgets/topology and
+merged final validation/scoring. `make_problem` shares parsing semantics between
+file input and filtered in-memory cabin input.
+
+Implementation inventory is complete; universal trajectory equivalence and the
+final 24/24 quality gate are not. `54f827c` passes 24/24 complete/legal/evaluator
+checks but has four Python score regressions. A timed DFS boundary is reproduced
+on reverse:50_normal; LNS hash-set ordering and incomplete reference repair
+states remain documented limitations. Do not interpret historical PARTIAL_CPP
+rows or native component existence as evidence of a passed quality gate.

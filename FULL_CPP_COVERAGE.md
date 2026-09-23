@@ -17,14 +17,27 @@ This file is a gate ledger, not a declaration of completion.
 | mutable assignment state | yes | indexed native state operations, snapshots, rollback, resource ownership, and Rich stages |
 | complete per-passenger legal domain | yes for feasibility | native domains include cabin, fixed seat, SSR eligibility, exit/bassinet/aisle, and protection topology; caregiver and conditional SSR interactions are native joint constraints |
 | complete feasible construction without supplied incumbent | yes | native Q0 plus Rich construction/repair and enabled cabin decomposition |
-| RR/Beam pattern generation | yes | native and active |
-| restricted master | yes | native and active |
-| optional production memory | no | current reconstruction callback is Python |
-| native score from raw assignment | yes | individual distance/value/preferences, group compactness, and BSCT contribution match the external evaluator; Formal24 max error `3.183231456205249e-12` |
-| native final raw-semantic validation | feasibility version | checks completeness, uniqueness, static eligibility, fixed seats, protection-resource matching, caregiver adjacency, and conditional SSR isolation; Python evaluator remains the external audit |
-| serialization | yes | native JSON |
+| Rich construction/repair | yes | fixed/anchored/SSR/caregiver, candidate expansion, DFS/Beam and relocation rollback; public Python checkpoints |
+| complete VND | yes | 1-opt, swap, cycle, matching and caregiver rebuild on preserved Rich state |
+| structured/special patterns | yes | native geometry/pricing DFS and synchronous elite recording |
+| protected MIP/dynamic relocation | yes | native multi-pass model and native reconstruction |
+| conflict LNS | yes | native options, local master, late acceptance and best-state restoration; lexical set order boundary documented |
+| restricted MIP/local branching | yes | full elite store; incumbent start, radius/no-good/conditional cuts |
+| outer cabin decomposition | yes | native per-cabin topology, budget allocation, stages and merged audit |
+| optional historical V1R memory | separate path | Python callback remains in V1R orchestration; raw Rich does not call it |
+| final validation/scoring/serialization | yes | latest raw Rich Formal24: 24/24 complete/legal/evaluator-consistent; total score error zero |
 
-For the raw feasibility CLI, Python on the production hot path is zero. Full Rich active-stage coverage is not yet 100%, so this is not `FULL-CPP-CORRECTNESS PASS` and is not eligible for formal profiling or 5-second compression.
+The raw `seat_protect_cpp.exe` call closure uses JSON parsing, native problem
+construction, native stages and HiGHS; no Python invocation, IPC callback or
+`.native_v2` input occurs. This is a source/build-closure audit, not a runtime
+callback counter. Historical RR/master objects remain linked for separate
+adapter/probe uses but raw Rich no longer invokes their solver path.
+
+Latest frozen acceptance `54f827c` is **quality FAIL**: 20 improve, 0 tie,
+4 regress versus Python 60s, worst -4.554324. Native completeness and scoring
+pass 24/24; this does not grant FULL-CPP-CORRECTNESS or authorize profiling.
+See `FULL_CPP_RICH_REFERENCE_STATUS.md` for per-case deltas and known semantic,
+clock and tie-order boundaries. Sections below are historical evidence.
 
 ## Native feasible-construction Gate
 
@@ -34,7 +47,7 @@ The frozen raw-native Formal24 result is in `outputs/research/native_feasibility
 
 `tests/test_full_cpp_core_parity.py` runs the native raw-core probe over all 24 official cases. It compares every indexed passenger and group field plus every seat's immutable attributes, row/subrow position, coordinates, and exact neighbor lists against the Python reference. It also compares Python/C++ rejection on five invalid fixed-seat cases and exercises native state assign/remove/save/restore on every valid case. Current result: `2/2` tests passed, `24/24` valid cases matched with state round trips, and `5/5` invalid cases were rejected by both implementations.
 
-This closes the standalone raw problem/topology/fixed-preprocessing semantics and establishes the mutable state foundation, not the end-to-end gate: complete legality/domain generation, scoring, construction/repair, Rich improvement stages, internal validation, and raw-result serialization remain to be migrated and integrated.
+At this historical checkpoint only the raw problem/state foundation had been verified. The current native stage inventory and remaining quality gate are listed above.
 
 ## Preprocessed-input regression (not the full-C++ Gate)
 

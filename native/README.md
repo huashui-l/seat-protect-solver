@@ -11,6 +11,8 @@ The raw JSON feasibility CLI consists of:
 - `native_feasibility_solver.cpp/.hpp`
 - `native_group_constructor.cpp/.hpp`
 - `native_json.hpp`
+- `native_rich_construction.cpp`
+- `native_rich_pattern_adapter.cpp/.hpp`
 
 `native_state_replay.cpp` is a build-time public-fixture differential probe for
 high-volume `AssignmentState` legality and save/restore replay tests.
@@ -50,9 +52,12 @@ The RR and restricted-master pipeline consists of:
 - `native_solver_pipeline.cpp`
 - `native_pool_exporter.cpp`
 
-The remaining C++ files are build-time probes or benchmark utilities. Full C++
-coverage of all Rich Python active stages remains incomplete; see the root gate
-documents and the historical roadmap linked above.
+The raw `group-first` path also runs the complete Rich stage sequence and
+outer cabin decomposition. Detailed diagnostics are nested under
+`cabin_decomposition.cabins.<cabin>.result` for multiple cabins; single-cabin
+output keeps its existing fields. All named ACTIVE stages are native, but
+Formal24 quality parity still fails (four regressions at `54f827c`). See the
+root gate documents for component evidence and acceptance boundaries.
 
 ## Build
 

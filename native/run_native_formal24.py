@@ -42,6 +42,18 @@ def paired_python_quality(rows: list[dict], tolerance: float = 1e-8) -> dict:
     }
 
 
+def construction_statistic(result: dict, key: str):
+    """Sum actual cabin counters; absence at merged level is not zero work."""
+    decomposition = result.get("cabin_decomposition")
+    if decomposition:
+        values = [construction_statistic(run["result"], key)
+                  for run in decomposition["cabins"].values()]
+        if key == "from_scratch_complete":
+            return bool(values) and all(values)
+        return sum(values)
+    return result.get(key, False if key == "from_scratch_complete" else 0)
+
+
 def read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
@@ -253,21 +265,21 @@ def main() -> None:
             "delta_vs_baseline": external_score - float(baseline["external_score"]),
             "selected_incumbent": result.get("selected_incumbent", ""),
             "fallback_reason": result.get("fallback_reason", ""),
-            "dfs_nodes": int(result.get("dfs_nodes", 0)),
-            "beam_nodes": int(result.get("beam_nodes", 0)),
-            "dfs_groups": int(result.get("dfs_groups", 0)),
-            "beam_groups": int(result.get("beam_groups", 0)),
-            "groups_improved": int(result.get("groups_improved", 0)),
+            "dfs_nodes": int(construction_statistic(result, "dfs_nodes")),
+            "beam_nodes": int(construction_statistic(result, "beam_nodes")),
+            "dfs_groups": int(construction_statistic(result, "dfs_groups")),
+            "beam_groups": int(construction_statistic(result, "beam_groups")),
+            "groups_improved": int(construction_statistic(result, "groups_improved")),
             "q1_selected_incumbent": result.get("q1_selected_incumbent", ""),
             "q1_score": float(result.get("q1_score", 0.0)),
             "from_scratch_score": float(result.get("from_scratch_score", 0.0)),
-            "from_scratch_complete": bool(result.get("from_scratch_complete", False)),
-            "from_scratch_dfs_nodes": int(result.get("from_scratch_dfs_nodes", 0)),
-            "from_scratch_beam_nodes": int(result.get("from_scratch_beam_nodes", 0)),
-            "from_scratch_dfs_groups": int(result.get("from_scratch_dfs_groups", 0)),
-            "from_scratch_beam_groups": int(result.get("from_scratch_beam_groups", 0)),
-            "recovery_attempts": int(result.get("recovery_attempts", 0)),
-            "recovery_succeeded": int(result.get("recovery_succeeded", 0)),
+            "from_scratch_complete": bool(construction_statistic(result, "from_scratch_complete")),
+            "from_scratch_dfs_nodes": int(construction_statistic(result, "from_scratch_dfs_nodes")),
+            "from_scratch_beam_nodes": int(construction_statistic(result, "from_scratch_beam_nodes")),
+            "from_scratch_dfs_groups": int(construction_statistic(result, "from_scratch_dfs_groups")),
+            "from_scratch_beam_groups": int(construction_statistic(result, "from_scratch_beam_groups")),
+            "recovery_attempts": int(construction_statistic(result, "recovery_attempts")),
+            "recovery_succeeded": int(construction_statistic(result, "recovery_succeeded")),
             "score_detail": {key: detail[key] for key in (*COMPONENTS, "total_soft_score")},
             "native_wall_seconds": float(result["wall_seconds"]),
             "process_wall_seconds": process_wall,

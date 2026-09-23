@@ -1,9 +1,18 @@
 import unittest
 
-from native.run_native_formal24 import paired_python_quality
+from native.run_native_formal24 import paired_python_quality, construction_statistic
 
 
 class NativeFormal24MetricTests(unittest.TestCase):
+    def test_cabin_statistics_sum_counts_but_require_all_complete(self):
+        result = {"cabin_decomposition": {"cabins": {
+            "Business": {"result": {"dfs_nodes": 12, "from_scratch_complete": True}},
+            "Economy": {"result": {"dfs_nodes": 50, "from_scratch_complete": False}},
+        }}}
+        self.assertEqual(construction_statistic(result, "dfs_nodes"), 62)
+        self.assertFalse(construction_statistic(result, "from_scratch_complete"))
+        self.assertEqual(construction_statistic({"dfs_nodes": 7}, "dfs_nodes"), 7)
+
     def test_positive_mean_cannot_hide_one_regression(self):
         result = paired_python_quality([
             {"case_id": "improved", "delta_vs_python": 100.0},

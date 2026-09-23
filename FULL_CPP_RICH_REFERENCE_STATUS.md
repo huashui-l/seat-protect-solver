@@ -11,16 +11,13 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in pro
 
 ## Migration
 
-The raw-native feasibility path now includes parsing, indexed problem/topology, fixed preprocessing, native legal domains and joint hard constraints, complete-incumbent construction, native feasibility validation, scoring, and serialization. Rich construction ordering, DFS/Beam, repair, VND/LNS/pattern stages, and Rich master semantics remain partial or Python-only. The raw feasibility production path has zero Python callbacks, but Rich active-stage native coverage is not yet 100%.
-
-The M1/M2 migration branch now also contains a native Rich construction entry,
-configuration-driven DFS/Beam limits, bounded direct repair, VND 1-opt/2-swap/
-3-cycle moves, bounded two-group bitmask rebuild and caregiver joint rebuild. These stages require a
-complete legal incumbent, use the shared deadline, and accept only strict score
-improvements. They are implementation progress, not a Rich quality-parity gate;
-pattern stages, LNS, and restricted/protected master semantics remain outstanding. Native repair now
-uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
-caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
+The raw Rich path now implements the full single-cabin stage inventory plus
+native outer cabin decomposition. Current 60-second quality parity **FAILS**:
+20 improve / 0 tie / 4 regress against the frozen Python result. Complete/legal
+and evaluator gates pass 24/24, including complete Rich candidates in every case.
+No profiling or 5-second compression is permitted. The detailed sections below
+record historical component checkpoints; their earlier pending-work statements
+are superseded by the latest acceptance checkpoint.
 
 Construction and repair candidates are kept separate from the selected legal
 Q0/Q1/Q2A fallback. Only a complete, legal, strictly better candidate replaces
@@ -1305,6 +1302,89 @@ ACTIVE orchestration requirement, despite the completed single-cabin stages.
 It must be migrated and tested before another full parity run. No profiling,
 5-second compression, parameter tuning or reference change is justified.
 
+### Cabin orchestration and current 60-second acceptance checkpoint
+
+`bebcc60` adds the frozen outer `run_allocation` behavior: homogeneous group
+validation, increasing target-seat-count cabin order, proportional/minimum first
+budgets, last-cabin remaining time, filtered old/new topology, per-cabin stage
+activation and independent solving, merged native scoring and legality. Nested
+per-cabin diagnostics are authoritative; merged stages do not have one timestamp.
+Public replay calls the unchanged Python outer function at actual native budget
+timestamps and compares filtering, budgets, stage budgets and merged scoring.
+Single-cabin, disabled decomposition and mixed-group rejection are covered.
+Release /O2 and 164 tests / 37,230 subtests passed, with 9 skips.
+
+The `bebcc60` 24-case run was complete/legal/evaluator-consistent but failed
+quality (19/0/5). Its source and artifacts remain retained separately.
+Two large regressions exposed an integration defect: Q0/Q1/Q2A consumed the
+construction window before Rich began. `54f827c` starts the Rich stage clock
+after fallback preparation while retaining the original global deadline.
+The actual origin is serialized as `rich_allocation_start`; the frozen Python
+schedule replay checks this offset. Budget/runtime tests passed 8 tests and
+271 subtests after this change. No solver configuration was tuned.
+
+The latest single frozen run is
+`outputs/research/full_cpp_rich_60s_54f827c/summary.json`, binary SHA-256
+`f9f0aa9509c319275e9aae2343b5a755e6c0e1940537c1b2fb925032f443b811`.
+It reports 24/24 complete/legal, zero unassigned and native/external violations,
+24/24 evaluator consistent, total-score error zero and individual-score maximum
+error 2.84e-13. All 24 Rich candidates are complete. Two LNS solver errors were
+contained through the reference incomplete-choice behavior. Same configured
+60-second budget: 20 improve / 0 tie / 4 regress, mean delta +11.154328, minimum
+-4.554324; the harness exits 1. No per-case best-of-runs union is used.
+
+| Case | F_cpp - F_python_60s |
+| --- | ---: |
+| forward:100_edge | +2.633333333 |
+| forward:100_normal | +3.810775862 |
+| forward:100_stress | +3.600000000 |
+| forward:150_edge | +26.536271930 |
+| forward:150_normal | +19.192393509 |
+| forward:150_stress | +17.266666667 |
+| forward:50_edge | +0.583333333 |
+| forward:50_normal | +15.200000000 |
+| forward:50_stress | +1.600000000 |
+| forward:full_edge | +59.718809524 |
+| forward:full_normal | -3.850000000 |
+| forward:full_stress | +11.086071429 |
+| reverse:100_edge | -2.882142857 |
+| reverse:100_normal | +7.220000000 |
+| reverse:100_stress | +2.816124322 |
+| reverse:150_edge | +42.178037767 |
+| reverse:150_normal | +0.362142857 |
+| reverse:150_stress | +36.407508452 |
+| reverse:50_edge | +0.800000000 |
+| reverse:50_normal | -1.200000000 |
+| reverse:50_stress | +5.220000000 |
+| reverse:full_edge | -4.554323673 |
+| reverse:full_normal | +3.677616995 |
+| reverse:full_stress | +20.281260504 |
+
+Process wall mean/median/max: 41.021/51.908/60.177 seconds. Maximum native
+solver wall: 59.794 seconds. A configured 60-second budget is not a claim that
+every full process invocation finished within 60 seconds.
+CG integer, exact LP and safe certified LP bound counts remain 0 identity-bound
+cases; their gaps are unavailable. Frozen-union mean gap 0.965789% is a separate
+feasible-reference metric, not a CG or LP certificate.
+
+Remaining quality diagnosis: reverse:50_normal's Business cabin reproduces a
+wall-clock DFS boundary. Frozen 0.02-second Python DFS gives construction -13.35
+and VND -11.7; nonbinding Python DFS reaches the node cap and gives -12.9 before
+and after VND, matching native. Nonbinding full construction/VND differential
+also passes on that cabin. This explains one regression without proving the
+other three; changing limits, injecting old allocations or selecting best reruns
+would change the frozen protocol and is not a migration fix. LNS lexical set
+traversal and known reference repair-state defects remain explicit boundaries.
+
+The original v3 summary's top-level construction counters incorrectly show zero
+for multi-cabin results; actual counters are preserved inside each cabin result.
+The harness now sums cabin counts and requires all cabins for complete flags;
+a directed aggregation test passes. Original benchmark artifacts are unchanged.
+Latest complete regression after the clock and aggregation corrections passed
+165 tests and 37,230 subtests, with 9 skips, in 376.40 seconds. Release /O2
+build passed with the two pre-existing C4244 conversion warnings.
+`git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
@@ -1318,7 +1398,9 @@ It must be migrated and tested before another full parity run. No profiling,
 
 ## Quality parity
 
-Not yet eligible. The feasibility solver's mean/median gap is `188.235% / 182.872%`, recorded only to expose the expected quality deficit. Rich active stages have not yet been migrated, so this result must not be compared as Rich-quality parity.
+Latest frozen implementation `54f827c`: **FAIL**, 20 improve / 0 tie / 4 regress.
+Mean delta +11.154328 does not satisfy the per-case nonregression requirement.
+See the acceptance checkpoint above for each case and diagnostic boundaries.
 
 ## Timing and profile
 
@@ -1326,4 +1408,8 @@ The earlier 1.668-second native-core smoke remains a solver-ready `.native_v2` t
 
 ## Required answer
 
-Current Full C++ does **not** yet inherit all proven valuable 20s+ Rich Python search capability. The raw feasibility path now has zero runtime Python callbacks, but 100% Rich active-stage native coverage remains unmet.
+All named single-cabin ACTIVE stages and enabled outer cabin orchestration now
+have native implementations. Full C++ Rich parity is not certified: four frozen
+Python regressions remain, including a reproduced wall-clock DFS trajectory
+boundary. Production Python callbacks and `.native_v2` dependencies are zero
+in the raw CLI call chain; the historical V1R callback path is separate.
