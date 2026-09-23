@@ -979,6 +979,43 @@ warnings. Full native/state-replay-enabled regression passed 133 tests and 17,33
 subtests with 9 skips. Duplicate identities skip scoring before insertion, as in
 Python. `git diff --check` passed.
 
+### Protected pattern conflicts and context reconstruction
+
+`rich_patterns_have_conditional_ssr_conflict` reproduces Python's two-pattern
+row/subrow profiles: only SSR passengers activate isolation flags, and an active
+location limits every SSR type to one passenger, including duplicate types already
+inside one pattern. Row and subrow activation remain distinct.
+
+`rebuild_rich_pattern_component` copies the actual context, releases selected
+groups, visits group IDs in sorted order and stably puts caregiver-independent
+passengers first. The dedicated pattern placement path preserves Python's complete
+proposed-seat exclusion set and chosen single-side protection fallback. Successful
+rebuilds return a snapshot; failure leaves the original context intact. A rebuilt
+context is not automatically accepted: the caller must still run the frozen
+independent hard validation and strict full-score acceptance.
+
+The shared Rich seat-feasibility check also now checks **all** SSR type counts
+when a location becomes active. Previously it checked only the incoming
+passenger's type, missing activation by a third, different-type passenger when two
+unflagged passengers of another type were already present. This is a verified
+migration correction, not a new constraint.
+
+Frozen-function tests cover eleven public fixtures with deterministic candidate
+pairs and 891 component selections, comparing complete assignment/protection,
+resource ownership, SSR map and insertion-order state on success, and rejection
+without source-state mutation on failure. Explicit cases cover third-type
+activation, row versus subrow isolation, ignored non-SSR flags, and fallback from
+a chosen protection seat that belongs to the proposed group allocation. The
+focused suite passed 3 tests and 899 subtests.
+
+Root/component selection, the protected integer model and strict acceptance,
+production integration, LNS and Rich restricted MIP remain open. No full-stage
+or Formal24 quality gate is claimed, and no profiling run was performed.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+Full native/state-replay-enabled regression passed 136 tests and 18,230 subtests
+with 9 skips. `git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

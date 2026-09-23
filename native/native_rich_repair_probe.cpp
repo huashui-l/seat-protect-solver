@@ -12,6 +12,78 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* input = replay.find("pattern_context")) {
+            full_cpp::AssignmentState state(problem);
+            for (const auto& entry : input->at("initial").array) {
+                const int chosen = entry.array.size() > 2 ? problem.seat_index.at(entry.array[2].string) : -1;
+                if (!state.assign_rich_pattern(static_cast<int>(entry.array[0].number), problem.seat_index.at(entry.array[1].string), {}, chosen))
+                    throw std::runtime_error("pattern context initial assignment failed");
+            }
+            std::vector<std::pair<int, full_cpp::RichElitePattern>> patterns;
+            for (const auto& item : input->at("patterns").array) {
+                full_cpp::RichElitePattern pattern;
+                for (const auto& entry : item.at("assignments").array)
+                    pattern.assignments.emplace_back(static_cast<int>(entry.array[0].number), entry.array[1].string);
+                for (const auto& entry : item.at("blocked_by_host").array) {
+                    std::vector<std::string> blocked;
+                    for (const auto& seat : entry.array[1].array) blocked.push_back(seat.string);
+                    pattern.blocked_by_host.emplace_back(static_cast<int>(entry.array[0].number), blocked);
+                }
+                patterns.emplace_back(static_cast<int>(item.at("group_id").number), std::move(pattern));
+            }
+            std::cout << "{\"conflicts\":[";
+            bool first = true;
+            for (const auto& pair : input->at("pairs").array) {
+                const auto& left = patterns.at(static_cast<int>(pair.array[0].number));
+                const auto& right = patterns.at(static_cast<int>(pair.array[1].number));
+                if (!first) std::cout << ','; first = false;
+                std::cout << (full_cpp::rich_patterns_have_conditional_ssr_conflict(problem, left.first, left.second, right.first, right.second) ? "true" : "false");
+            }
+            const auto write_snapshot = [&](const full_cpp::AssignmentSnapshot& snapshot) {
+                const auto ints = [&](const auto& values) {
+                    std::cout << '[';
+                    for (size_t i = 0; i < values.size(); ++i) { if (i) std::cout << ','; std::cout << values[i]; }
+                    std::cout << ']';
+                };
+                std::cout << "{\"assignments\":[";
+                for (size_t i = 0; i < snapshot.passenger_to_seat.size(); ++i) {
+                    if (i) std::cout << ',';
+                    if (snapshot.passenger_to_seat[i] < 0) std::cout << "null";
+                    else std::cout << '"' << problem.seats[snapshot.passenger_to_seat[i]].id << '"';
+                }
+                std::cout << "],\"blocked\":[";
+                for (size_t p = 0; p < snapshot.assigned_blocked.size(); ++p) {
+                    if (p) std::cout << ',';
+                    std::cout << '[';
+                    for (size_t j = 0; j < snapshot.assigned_blocked[p].size(); ++j) {
+                        if (j) std::cout << ',';
+                        std::cout << '"' << problem.seats[snapshot.assigned_blocked[p][j]].id << '"';
+                    }
+                    std::cout << ']';
+                }
+                std::cout << "],\"blocked_count\":"; ints(snapshot.blocked_count);
+                std::cout << ",\"seat_to_passenger\":"; ints(snapshot.seat_to_passenger);
+                std::cout << ",\"owner_group_by_seat\":"; ints(snapshot.owner_group_by_seat);
+                std::cout << ",\"seat_ssr_passenger\":"; ints(snapshot.seat_ssr_passenger);
+                std::cout << ",\"assignment_order\":"; ints(snapshot.assignment_order);
+                std::cout << '}';
+            };
+            std::cout << "],\"rebuilt\":["; first = true;
+            for (const auto& indexes : input->at("components").array) {
+                std::map<int, full_cpp::RichElitePattern> choices;
+                for (const auto& index : indexes.array) {
+                    const auto& pattern = patterns.at(static_cast<int>(index.number));
+                    choices[pattern.first] = pattern.second;
+                }
+                full_cpp::AssignmentSnapshot rebuilt;
+                const bool okay = full_cpp::rebuild_rich_pattern_component(state, choices, rebuilt);
+                if (!first) std::cout << ','; first = false;
+                if (okay) write_snapshot(rebuilt); else std::cout << "null";
+            }
+            std::cout << "],\"initial\":"; write_snapshot(state.save());
+            std::cout << "}\n";
+            return 0;
+        }
         if (const auto* calls = replay.find("dynamic_relocation")) {
             full_cpp::AssignmentState state(problem);
             for (const auto& entry : replay.at("assignments").array)

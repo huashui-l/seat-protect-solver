@@ -2245,10 +2245,12 @@ bool AssignmentState::can_assign(int passenger_index, int seat_index, int chosen
     return rich_seat_feasible(passenger_index, seat_index, chosen_block, excluded_seat);
 }
 
-bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, int chosen_block, int excluded_seat) const {
+bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, int chosen_block, int excluded_seat,
+    const std::set<int>& excluded_seats) const {
+    const auto excluded = [&](int seat) { return seat == excluded_seat || excluded_seats.count(seat) != 0; };
     if (passenger_index < 0 || passenger_index >= static_cast<int>(problem.passengers.size())
         || seat_index < 0 || seat_index >= static_cast<int>(problem.seats.size())) return false;
-    if ((seat_to_passenger[seat_index] >= 0 && seat_index != excluded_seat) || blocked_count[seat_index] > 0) return false;
+    if ((seat_to_passenger[seat_index] >= 0 && !excluded(seat_index)) || blocked_count[seat_index] > 0) return false;
     const Passenger& passenger = problem.passengers[passenger_index];
     const Seat& seat = problem.seats[seat_index];
     if (!passenger.cabin.empty() && passenger.cabin != seat.cabin) return false;
@@ -2262,13 +2264,13 @@ bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, in
             ? seat.row_neighbors : seat.same_block_neighbors;
         if (problem.require_two_real_neighbors && neighbors.size() != 2) return false;
         for (int neighbor : neighbors) {
-            if ((seat_to_passenger[neighbor] >= 0 && neighbor != excluded_seat) || blocked_count[neighbor] > 0) return false;
+            if ((seat_to_passenger[neighbor] >= 0 && !excluded(neighbor)) || blocked_count[neighbor] > 0) return false;
         }
     }
     if (passenger.need_single_empty) {
         bool available = false;
         for (int neighbor : seat.same_block_neighbors) {
-            if ((seat_to_passenger[neighbor] < 0 || neighbor == excluded_seat) && blocked_count[neighbor] == 0
+            if ((seat_to_passenger[neighbor] < 0 || excluded(neighbor)) && blocked_count[neighbor] == 0
                 && (chosen_block < 0 || chosen_block == neighbor)) available = true;
         }
         if (!available) return false;
@@ -2278,19 +2280,19 @@ bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, in
         for (bool by_row : {true, false}) {
             bool active = by_row ? passenger.same_row_no_other_ssr
                                  : passenger.same_subrow_no_other_ssr;
-            int same_ssr = 0;
+            std::map<std::string, int> counts{{passenger.ssr, 1}};
             for (int other_seat = 0;
                  other_seat < static_cast<int>(seat_ssr_passenger.size()); ++other_seat) {
                 const int other_index = seat_ssr_passenger[other_seat];
-                if (other_index < 0 || other_seat == excluded_seat) continue;
+                if (other_index < 0 || excluded(other_seat)) continue;
                 const Seat& other = problem.seats[other_seat];
                 if (other.row != seat.row || (!by_row && other.subrow != seat.subrow)) continue;
                 const Passenger& other_passenger = problem.passengers[other_index];
                 active = active || (by_row ? other_passenger.same_row_no_other_ssr
                                            : other_passenger.same_subrow_no_other_ssr);
-                same_ssr += other_passenger.ssr == passenger.ssr;
+                ++counts[other_passenger.ssr];
             }
-            if (active && same_ssr > 0) return false;
+            if (active && std::any_of(counts.begin(), counts.end(), [](const auto& entry) { return entry.second > 1; })) return false;
         }
     }
     return true;
@@ -2322,6 +2324,40 @@ bool AssignmentState::assign(int passenger_index, int seat_index, int chosen_blo
             ? seat.row_neighbors : seat.same_block_neighbors;
         for (int neighbor : neighbors) {
             if (neighbor == excluded_seat || seat_to_passenger[neighbor] >= 0) continue;
+            ++blocked_count[neighbor];
+            assigned_blocked[passenger_index].push_back(neighbor);
+        }
+    } else if (passenger.need_single_empty) {
+        ++blocked_count[single_block];
+        assigned_blocked[passenger_index].push_back(single_block);
+    }
+    return true;
+}
+
+bool AssignmentState::assign_rich_pattern(int passenger_index, int seat_index,
+    const std::set<int>& excluded_seats, int chosen_block
+) {
+    if (!rich_seat_feasible(passenger_index, seat_index, -1, -1, excluded_seats)) return false;
+    const auto& passenger = problem.passengers[passenger_index];
+    const auto& seat = problem.seats[seat_index];
+    int single_block = -1;
+    if (passenger.need_single_empty && !passenger.need_both_empty) {
+        const auto available = [&](int s) {
+            return s >= 0 && seat_to_passenger[s] < 0 && blocked_count[s] == 0 && !excluded_seats.count(s);
+        };
+        if (available(chosen_block)) single_block = chosen_block;
+        else for (int neighbor : seat.same_block_neighbors) if (available(neighbor)) { single_block = neighbor; break; }
+        if (single_block < 0) return false;
+    }
+    seat_to_passenger[seat_index] = passenger_index;
+    passenger_to_seat[passenger_index] = seat_index;
+    assignment_order.push_back(passenger_index);
+    owner_group_by_seat[seat_index] = passenger.group;
+    if (!passenger.ssr.empty()) seat_ssr_passenger[seat_index] = passenger_index;
+    if (passenger.need_both_empty) {
+        const auto& neighbors = problem.both_side_empty_allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+        for (int neighbor : neighbors) {
+            if (seat_to_passenger[neighbor] >= 0 || excluded_seats.count(neighbor)) continue;
             ++blocked_count[neighbor];
             assigned_blocked[passenger_index].push_back(neighbor);
         }
@@ -2397,6 +2433,68 @@ void RichEliteStore::record_candidate(int group_id, RichElitePattern pattern,
         for (int seat : state.assigned_blocked[p])
             owners[state.problem.seats[seat].id] = state.problem.passengers[p].group_id;
     record(group_id, std::move(pattern), owners, conflict_diversity_active);
+}
+
+bool rich_patterns_have_conditional_ssr_conflict(const Problem& problem,
+    int left_group_id, const RichElitePattern& left, int right_group_id, const RichElitePattern& right
+) {
+    for (bool by_row : {true, false}) {
+        std::map<std::pair<std::pair<int, int>, std::string>, int> counts;
+        std::set<std::pair<int, int>> active;
+        const auto profile = [&](int gid, const RichElitePattern& pattern) {
+            const auto group = std::find_if(problem.groups.begin(), problem.groups.end(), [&](const Group& g) { return g.id == gid; });
+            for (const auto& entry : pattern.assignments) {
+                const auto p = std::find_if(group->passengers.begin(), group->passengers.end(),
+                    [&](int index) { return problem.passengers[index].hostnum == entry.first; });
+                const auto& passenger = problem.passengers[*p];
+                if (passenger.ssr.empty()) continue;
+                const auto& seat = problem.seats[problem.seat_index.at(entry.second)];
+                const auto location = std::make_pair(seat.row, by_row ? -1 : seat.subrow);
+                ++counts[{location, passenger.ssr}];
+                if (by_row ? passenger.same_row_no_other_ssr : passenger.same_subrow_no_other_ssr) active.insert(location);
+            }
+        };
+        profile(left_group_id, left); profile(right_group_id, right);
+        for (const auto& entry : counts) if (entry.second > 1 && active.count(entry.first.first)) return true;
+    }
+    return false;
+}
+
+bool rebuild_rich_pattern_component(const AssignmentState& state,
+    const std::map<int, RichElitePattern>& choices, AssignmentSnapshot& rebuilt
+) {
+    const auto& problem = state.problem;
+    AssignmentState candidate(problem);
+    candidate.restore(state.save());
+    for (const auto& group : problem.groups) if (choices.count(group.id))
+        for (int p : group.passengers) candidate.remove(p);
+    for (const auto& choice : choices) {
+        const auto group = std::find_if(problem.groups.begin(), problem.groups.end(), [&](const Group& g) { return g.id == choice.first; });
+        std::vector<std::pair<int, int>> proposed;
+        std::set<int> seats;
+        for (const auto& entry : choice.second.assignments) {
+            const auto p = std::find_if(group->passengers.begin(), group->passengers.end(),
+                [&](int index) { return problem.passengers[index].hostnum == entry.first; });
+            const int seat = problem.seat_index.at(entry.second);
+            proposed.emplace_back(*p, seat); seats.insert(seat);
+        }
+        const auto requires_care = [&](int p) {
+            return problem.passengers[p].need_cared || ssr_rule(problem, problem.passengers[p]).requires_caregiver;
+        };
+        std::stable_sort(proposed.begin(), proposed.end(), [&](const auto& a, const auto& b) { return requires_care(a.first) < requires_care(b.first); });
+        for (const auto& entry : proposed) {
+            const auto& passenger = problem.passengers[entry.first];
+            int chosen = -1;
+            for (const auto& blocked : choice.second.blocked_by_host)
+                if (passenger.need_single_empty && blocked.first == passenger.hostnum && !blocked.second.empty()) {
+                    chosen = problem.seat_index.at(blocked.second.front()); break;
+                }
+            auto excluded = seats; excluded.erase(entry.second);
+            if (!candidate.assign_rich_pattern(entry.first, entry.second, excluded, chosen)) return false;
+        }
+    }
+    rebuilt = candidate.save();
+    return true;
 }
 
 static void normalize_rich_elite_pattern(RichElitePattern& pattern) {

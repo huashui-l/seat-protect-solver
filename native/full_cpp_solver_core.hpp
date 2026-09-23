@@ -449,8 +449,10 @@ public:
     bool can_assign(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1) const;
     // Python is_seat_feasible: does not enforce fixed-seat identity or require
     // the passenger to be unassigned; used for construction owner regret.
-    bool rich_seat_feasible(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1) const;
+    bool rich_seat_feasible(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1,
+                           const std::set<int>& excluded_seats = {}) const;
     bool assign(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1);
+    bool assign_rich_pattern(int passenger, int seat, const std::set<int>& excluded_seats, int chosen_block = -1);
     void remove(int passenger);
     AssignmentSnapshot save() const;
     void restore(AssignmentSnapshot snapshot);
@@ -557,6 +559,11 @@ void write_rich_elite_store(std::ostream& output, const RichEliteStore& store);
 struct RichDynamicRelocationDiagnostics {
     int calls = 0, patterns = 0;
 };
+
+bool rich_patterns_have_conditional_ssr_conflict(const Problem& problem,
+    int left_group_id, const RichElitePattern& left, int right_group_id, const RichElitePattern& right);
+bool rebuild_rich_pattern_component(const AssignmentState& state,
+    const std::map<int, RichElitePattern>& choices, AssignmentSnapshot& rebuilt);
 RichDynamicRelocationDiagnostics add_rich_dynamic_relocation_patterns(
     const Problem& problem, const AssignmentState& state, int group_index,
     const std::set<int>& outside_resources, std::chrono::steady_clock::time_point deadline,
