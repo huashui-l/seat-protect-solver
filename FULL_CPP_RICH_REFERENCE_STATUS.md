@@ -413,6 +413,33 @@ Final Release rebuild passed; the native/state-replay-enabled full suite passed
 98 tests, 13,190 subtests and 9 skips. Only the two existing conversion warnings
 remain. No Formal24 checkpoint or profiling was run.
 
+The stateful VND prefix now additionally implements Python's ordinary related-group
+rebuild: groups sorted by compactness, candidate-linked partners preferred before
+row-center distance, configured partner/candidate caps, partitions over at most 12
+occupied seats, strict-update bitmask matching, ascending mask enumeration and
+first accepted group-pair restart. Matching backtracking preserves Python's reverse
+passenger insertion order. Successful/failed commits use real state; ordinary
+failed commits restore placements and reinsert touched passengers in Python order.
+
+AssignmentState and its snapshots now retain assignment insertion order. VND
+uses this order for initial group seat lists and the post-cycle `keys_by_group`,
+which affects stable partner order and matching ties. The 12,000-operation replay
+now checks assignment order as well as occupancy and snapshot restoration. VND
+replay additionally compares the final Python assignment-dictionary order.
+
+The oracle executes the actual frozen function through ordinary group rebuild,
+stopping before `global_baby_score` and caregiver rebuilding. Its 24 scenarios
+match exact assignment/resource state and search counters; accepted group rebuilds
+are explicitly required by the public coverage test (four observed). The original
+24 move/swap/cycle-only scenarios remain. This extended prefix still runs through
+the probe, not production replacement; caregiver reconstruction, later phases and
+full stateful production integration remain required. No full-VND quality or
+Formal24 parity claim is attached to this checkpoint.
+Final Release rebuild and the full native/state-replay-enabled suite passed:
+100 tests, 13,214 subtests, 9 skips, including assignment-order checks throughout
+the 12,000-operation replay and both VND prefix variants. The two pre-existing
+conversion warnings remain. No Formal24 or profiling run was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

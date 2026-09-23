@@ -135,14 +135,14 @@ RichConstructionDiagnostics construct_rich_assignment(
 
 struct RichOrdinaryVndDiagnostics {
     int passes = 0, evaluated_moves = 0, accepted_moves = 0;
-    int one_opt = 0, swaps = 0, cycles = 0;
+    int one_opt = 0, swaps = 0, cycles = 0, group_rebuilds = 0;
     double score_improvement = 0.0;
     bool stopped_by_deadline = false;
 };
 
 RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
     AssignmentState& state, const std::vector<std::vector<int>>& rankings,
-    std::chrono::steady_clock::time_point deadline);
+    std::chrono::steady_clock::time_point deadline, bool include_group_rebuild = false);
 
 void improve_rich_vnd_m2(
     const Problem& problem,

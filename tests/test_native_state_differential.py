@@ -36,6 +36,7 @@ class NativeStateDifferentialTests(unittest.TestCase):
         passenger_to_seat = [-1] * passenger_count
         seat_to_passenger = [-1] * seat_count
         owner_group_by_seat = [-1] * seat_count
+        assignment_order = {}
         saved = None
         for _ in range(12_000):
             roll = rng.randrange(100)
@@ -52,6 +53,7 @@ class NativeStateDifferentialTests(unittest.TestCase):
                 operations.append({"op": "assign", "passenger": passenger, "seat": seat})
                 result = int(legal)
                 if legal:
+                    assignment_order[passenger] = seat
                     passenger_to_seat[passenger] = seat
                     seat_to_passenger[seat] = passenger
                     owner_group_by_seat[seat] = passenger_groups[passenger]
@@ -61,6 +63,7 @@ class NativeStateDifferentialTests(unittest.TestCase):
                 result = -1
                 seat = passenger_to_seat[passenger]
                 if seat >= 0:
+                    del assignment_order[passenger]
                     passenger_to_seat[passenger] = -1
                     seat_to_passenger[seat] = -1
                     owner_group_by_seat[seat] = -1
@@ -69,7 +72,7 @@ class NativeStateDifferentialTests(unittest.TestCase):
                 result = -1
                 saved = (
                     passenger_to_seat.copy(), seat_to_passenger.copy(),
-                    owner_group_by_seat.copy(),
+                    owner_group_by_seat.copy(), assignment_order.copy(),
                 )
             else:
                 operations.append({"op": "restore"})
@@ -79,9 +82,10 @@ class NativeStateDifferentialTests(unittest.TestCase):
                         saved[0].copy(), saved[1].copy()
                     )
                     owner_group_by_seat = saved[2].copy()
+                    assignment_order = saved[3].copy()
             expected.append((
                 result, passenger_to_seat.copy(), seat_to_passenger.copy(),
-                owner_group_by_seat.copy(),
+                owner_group_by_seat.copy(), list(assignment_order),
             ))
 
         base_config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
@@ -123,6 +127,7 @@ class NativeStateDifferentialTests(unittest.TestCase):
                 self.assertEqual(wanted[2], actual["seat_to_passenger"])
                 self.assertEqual([0] * seat_count, actual["blocked_count"])
                 self.assertEqual(wanted[3], actual["owner_group_by_seat"])
+                self.assertEqual(wanted[4], actual["assignment_order"])
                 self.assertEqual([-1] * seat_count, actual["seat_ssr_passenger"])
 
 

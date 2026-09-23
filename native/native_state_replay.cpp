@@ -73,6 +73,8 @@ int main(int argc, char** argv) {
             write_vector(std::cout, state.owner_group_by_seat);
             std::cout << ",\"seat_ssr_passenger\":";
             write_vector(std::cout, state.seat_ssr_passenger);
+            std::cout << ",\"assignment_order\":";
+            write_vector(std::cout, state.assignment_order);
             std::cout << '}';
         }
         std::cout << "]}\n";

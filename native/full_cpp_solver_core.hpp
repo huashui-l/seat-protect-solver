@@ -203,6 +203,7 @@ struct AssignmentSnapshot {
     std::vector<std::vector<int>> assigned_blocked;
     std::vector<int> owner_group_by_seat;
     std::vector<int> seat_ssr_passenger;
+    std::vector<int> assignment_order;
 };
 
 class AssignmentState {
@@ -228,6 +229,7 @@ public:
     std::vector<std::vector<int>> assigned_blocked;
     std::vector<int> owner_group_by_seat;
     std::vector<int> seat_ssr_passenger;
+    std::vector<int> assignment_order;
 };
 
 struct RichCandidateCache {

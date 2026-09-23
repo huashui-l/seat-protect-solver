@@ -92,7 +92,8 @@ int main(int argc, char** argv) {
         int paired_passes = 0;
         if (const auto* vnd_mode = replay.find("vnd_prefix"); vnd_mode && vnd_mode->bool_or()) {
             vnd = full_cpp::improve_rich_ordinary_vnd(state, rankings,
-                std::chrono::steady_clock::now() + std::chrono::seconds(60));
+                std::chrono::steady_clock::now() + std::chrono::seconds(60),
+                replay.find("vnd_group_rebuild") && replay.at("vnd_group_rebuild").bool_or());
         } else if (pipeline) {
             const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             const auto combined = full_cpp::construct_rich_assignment(problem, state, cache,
@@ -207,13 +208,18 @@ int main(int argc, char** argv) {
             emit_score("construction_score", construction_score);
             emit_score("repair_score", full_cpp::evaluate_score_components(problem, state.passenger_to_seat));
         }
-        std::cout << ",\"vnd\":{\"passes\":" << vnd.passes
+        std::cout << ",\"assignment_order\":[";
+        for (size_t i = 0; i < state.assignment_order.size(); ++i) {
+            if (i) std::cout << ',';
+            std::cout << state.assignment_order[i];
+        }
+        std::cout << "],\"vnd\":{\"passes\":" << vnd.passes
             << ",\"evaluated_moves\":" << vnd.evaluated_moves
             << ",\"accepted_moves\":" << vnd.accepted_moves
             << ",\"score_improvement\":" << vnd.score_improvement
             << ",\"stopped_by_deadline\":" << (vnd.stopped_by_deadline ? "true" : "false")
             << ",\"one_opt\":" << vnd.one_opt << ",\"swaps\":" << vnd.swaps
-            << ",\"cycles\":" << vnd.cycles << "}}\n";
+            << ",\"cycles\":" << vnd.cycles << ",\"group_rebuilds\":" << vnd.group_rebuilds << "}}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

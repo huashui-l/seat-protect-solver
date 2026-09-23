@@ -670,7 +670,7 @@ RichConstructionDiagnostics construct_rich_assignment(
 
 RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
     AssignmentState& state, const std::vector<std::vector<int>>& rankings,
-    std::chrono::steady_clock::time_point deadline
+    std::chrono::steady_clock::time_point deadline, bool include_group_rebuild
 ) {
     RichOrdinaryVndDiagnostics diagnostics;
     const auto expired = [&]() { return std::chrono::steady_clock::now() >= deadline; };
@@ -718,7 +718,7 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
         return value;
     };
     std::vector<std::vector<int>> group_seats(problem.groups.size());
-    for (int p = 0; p < n; ++p) if (state.passenger_to_seat[p] >= 0)
+    for (int p : state.assignment_order)
         group_seats[problem.passengers[p].group].push_back(state.passenger_to_seat[p]);
     const auto compact = [&](const std::vector<int>& seats) {
         if (seats.size() <= 1) return 0.0;
@@ -744,6 +744,7 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
                 const auto replacement = group.second.find(seat);
                 if (replacement != group.second.end()) seat = replacement->second;
             }
+            if (passengers.size() == 2 && replacements.size() == 1) seats = group_seats[group.first];
             delta += compact(seats) - compact(group_seats[group.first]);
             updated[group.first] = std::move(seats);
         }
@@ -751,7 +752,10 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
         const auto snapshot = state.save();
         for (int p : passengers) state.remove(p);
         for (size_t i = 0; i < passengers.size(); ++i) if (!state.assign(passengers[i], targets[i])) {
-            state.restore(snapshot); return false;
+            state.restore(snapshot);
+            for (int moved : passengers) state.remove(moved);
+            for (int moved : passengers) state.assign(moved, snapshot.passenger_to_seat[moved]);
+            return false;
         }
         for (auto& group : updated) group_seats[group.first] = std::move(group.second);
         ++diagnostics.accepted_moves;
@@ -796,6 +800,126 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
                     if (accepted) { ++diagnostics.cycles; break; }
                 }
                 if (accepted) break;
+            }
+            if (accepted) break;
+        }
+        if (!accepted) break;
+    }
+    if (!include_group_rebuild) return diagnostics;
+    std::vector<std::vector<int>> keys_by_group(problem.groups.size());
+    std::vector<int> group_order, rebuild_groups;
+    for (int p : state.assignment_order) {
+        const int g = problem.passengers[p].group;
+        if (keys_by_group[g].empty()) group_order.push_back(g);
+        keys_by_group[g].push_back(p);
+    }
+    for (int g : group_order)
+        if (std::all_of(keys_by_group[g].begin(), keys_by_group[g].end(),
+                [&](int p) { return movable_set[p]; })) rebuild_groups.push_back(g);
+    const int partner_cap = std::max(2, problem.rich.local_search_related_group_cap);
+    const int related_cap = std::max(cycle_cap, problem.rich.local_search_related_candidate_cap);
+    const auto popcount = [](unsigned mask) {
+        int count = 0;
+        while (mask) { mask &= mask - 1; ++count; }
+        return count;
+    };
+    const auto matching = [&](const std::vector<int>& keys, const std::vector<int>& seats) {
+        const unsigned count = 1u << keys.size();
+        std::vector<double> dp(count, -std::numeric_limits<double>::infinity());
+        std::vector<int> parent(count, -1);
+        dp[0] = 0.0;
+        for (unsigned mask = 0; mask < count; ++mask) {
+            const int index = popcount(mask);
+            if (index >= static_cast<int>(keys.size()) || !std::isfinite(dp[mask])) continue;
+            for (int j = 0; j < static_cast<int>(seats.size()); ++j) {
+                if (mask & (1u << j)) continue;
+                const unsigned next = mask | (1u << j);
+                const double value = dp[mask] + passenger_score(keys[index], seats[j]);
+                if (value > dp[next]) { dp[next] = value; parent[next] = j; }
+            }
+        }
+        std::vector<std::pair<int, int>> placement;
+        unsigned mask = count - 1;
+        while (mask) {
+            const int j = parent[mask];
+            const unsigned previous = mask ^ (1u << j);
+            placement.emplace_back(keys[popcount(previous)], seats[j]);
+            mask = previous;
+        }
+        return std::make_pair(dp.back(), placement);
+    };
+    const auto center = [&](int g) {
+        double sum = 0.0;
+        for (int p : keys_by_group[g]) sum += problem.seats[state.passenger_to_seat[p]].row;
+        return sum / keys_by_group[g].size();
+    };
+    while (!expired()) {
+        bool accepted = false;
+        std::stable_sort(rebuild_groups.begin(), rebuild_groups.end(), [&](int left, int right) {
+            return compact(group_seats[left]) < compact(group_seats[right]);
+        });
+        for (int first : rebuild_groups) {
+            if (expired()) break;
+            std::vector<bool> preferred(problem.groups.size(), false);
+            for (int p : keys_by_group[first])
+                for (int i = 0; i < std::min(related_cap, static_cast<int>(rankings[p].size())); ++i) {
+                    const int owner = state.seat_to_passenger[rankings[p][i]];
+                    if (owner >= 0 && problem.passengers[owner].group != first) preferred[problem.passengers[owner].group] = true;
+                }
+            std::vector<int> partners;
+            for (int g : rebuild_groups) if (g != first) partners.push_back(g);
+            const double first_center = center(first);
+            std::stable_sort(partners.begin(), partners.end(), [&](int left, int right) {
+                return std::make_pair(!preferred[left], std::abs(first_center - center(left)))
+                    < std::make_pair(!preferred[right], std::abs(first_center - center(right)));
+            });
+            if (partners.size() > static_cast<size_t>(partner_cap)) partners.resize(partner_cap);
+            for (int second : partners) {
+                auto keys = keys_by_group[first];
+                keys.insert(keys.end(), keys_by_group[second].begin(), keys_by_group[second].end());
+                if (keys.size() > 12) continue;
+                std::vector<int> seats;
+                double current = 0.0;
+                for (int p : keys) { seats.push_back(state.passenger_to_seat[p]); current += passenger_score(p, seats.back()); }
+                current += compact(group_seats[first]);
+                current += compact(group_seats[second]);
+                double best = current;
+                std::vector<std::pair<int, int>> best_placement;
+                for (unsigned mask = 1; mask < (1u << keys.size()) - 1; ++mask) {
+                    if (expired()) break;
+                    if (popcount(mask) != static_cast<int>(keys_by_group[first].size())) continue;
+                    std::vector<int> left, right;
+                    for (size_t i = 0; i < seats.size(); ++i) ((mask & (1u << i)) ? left : right).push_back(seats[i]);
+                    const auto left_match = matching(keys_by_group[first], left);
+                    const auto right_match = matching(keys_by_group[second], right);
+                    const double value = left_match.first + right_match.first + compact(left) + compact(right);
+                    ++diagnostics.evaluated_moves;
+                    if (value > best + problem.rich.local_search_epsilon) {
+                        best = value;
+                        best_placement = left_match.second;
+                        best_placement.insert(best_placement.end(), right_match.second.begin(), right_match.second.end());
+                    }
+                }
+                if (best_placement.empty()) continue;
+                const auto snapshot = state.save();
+                for (int p : keys) state.remove(p);
+                bool committed = true;
+                for (const auto& item : best_placement) if (!state.assign(item.first, item.second)) { committed = false; break; }
+                if (!committed) {
+                    state.restore(snapshot);
+                    for (int p : keys) state.remove(p);
+                    for (int p : keys) state.assign(p, snapshot.passenger_to_seat[p]);
+                    continue;
+                }
+                for (int g : {first, second}) {
+                    group_seats[g].clear();
+                    for (int p : keys_by_group[g]) group_seats[g].push_back(state.passenger_to_seat[p]);
+                }
+                ++diagnostics.accepted_moves;
+                ++diagnostics.group_rebuilds;
+                diagnostics.score_improvement += best - current;
+                accepted = true;
+                break;
             }
             if (accepted) break;
         }

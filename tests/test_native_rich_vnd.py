@@ -8,12 +8,16 @@ from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
 
 
-def python_vnd_prefix():
+def python_vnd_prefix(include_group_rebuild=False):
     tree = ast.parse((Path(__file__).resolve().parents[1] / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
     function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
                     and n.name == "improve_assignment_with_safe_neighborhoods")
-    stop = next(i for i, n in enumerate(function.body) if isinstance(n, ast.AnnAssign)
-                and isinstance(n.target, ast.Name) and n.target.id == "keys_by_group")
+    if include_group_rebuild:
+        stop = next(i for i, n in enumerate(function.body) if isinstance(n, ast.FunctionDef)
+                    and n.name == "global_baby_score")
+    else:
+        stop = next(i for i, n in enumerate(function.body) if isinstance(n, ast.AnnAssign)
+                    and isinstance(n.target, ast.Name) and n.target.id == "keys_by_group")
     function.body = function.body[:stop] + ast.parse("return diagnostics").body
     namespace = dict(rich.__dict__)
     exec(compile(ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[])),
@@ -28,7 +32,7 @@ class NativeRichVndTests(unittest.TestCase):
 
     def test_public_states_match_python_ordinary_vnd(self):
         prefix = construction_prefix()
-        swaps = cycles = 0
+        swaps = cycles = rebuilds = 0
         for case in self.cases[:11]:
             passengers = [(g["groupId"], p) for g in case["groupsData"] for p in g["psrs"]]
             seats = [s["seatId"] for s in case["newSeatmapData"]["seats"]]
@@ -51,8 +55,11 @@ class NativeRichVndTests(unittest.TestCase):
                     result = self.replay(case, initial, [seats[::-1] if reverse else seats] * len(passengers), vnd_algorithm={})
                     swaps += result["vnd"]["swaps"]
                     cycles += result["vnd"]["cycles"]
+                    rebuilds += result["vnd"]["group_rebuilds"]
         self.assertGreater(swaps, 0)
         self.assertGreater(cycles, 0)
+        if isinstance(self, NativeRichVndGroupTests):
+            self.assertGreater(rebuilds, 0)
 
     def test_cap_minimum_epsilon_and_preference_rules(self):
         case = self.synthetic([(301, {}), (302, {}), (303, {})])
@@ -70,3 +77,9 @@ class NativeRichVndTests(unittest.TestCase):
                     self.assertGreater(result["vnd"]["one_opt"], 0)
                 else:
                     self.assertEqual(result["vnd"]["accepted_moves"], 0)
+
+
+class NativeRichVndGroupTests(NativeRichVndTests):
+    def replay(self, *args, **kwargs):
+        kwargs["vnd_group_rebuild"] = True
+        return repair_tests.NativeRichRepairTests.replay(self, *args, **kwargs)

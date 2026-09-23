@@ -21,7 +21,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |
 | protection exchange | protected multi-group pattern MIP | none | PYTHON_ONLY | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
-| group matching | exact bitmask matching | bounded two-group bitmask matching over the current occupied seat union | PARTIAL_CPP | no | ACTIVE |
+| group matching | exact bitmask matching | stateful Python-ordered related-group partitions and bitmask matching differential passed; production still uses earlier approximation | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
 | 1-opt / 2-swap | VND | stateful Python-ordered move/swap prefix differential passed; production still uses earlier approximate VND | PARTIAL_CPP | no | ACTIVE |
 | 3-cycle | VND explicit cycle | stateful Python-ordered cycle prefix differential passed; production integration pending | PARTIAL_CPP | no | ACTIVE |

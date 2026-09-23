@@ -890,6 +890,7 @@ AssignmentState::AssignmentState(const Problem& source, const FixedSeatContext* 
         if (!source.passengers[passenger].ssr.empty()) seat_ssr_passenger[seat] = passenger;
     }
     for (int passenger = 0; passenger < static_cast<int>(source.passengers.size()); ++passenger) {
+        if (passenger_to_seat[passenger] >= 0) assignment_order.push_back(passenger);
         const Passenger& item = source.passengers[passenger];
         if (!item.need_both_empty || passenger_to_seat[passenger] < 0) continue;
         const Seat& seat = source.seats[passenger_to_seat[passenger]];
@@ -983,6 +984,7 @@ bool AssignmentState::assign(int passenger_index, int seat_index, int chosen_blo
     }
     seat_to_passenger[seat_index] = passenger_index;
     passenger_to_seat[passenger_index] = seat_index;
+    assignment_order.push_back(passenger_index);
     owner_group_by_seat[seat_index] = passenger.group;
     if (!passenger.ssr.empty()) seat_ssr_passenger[seat_index] = passenger_index;
     if (passenger.need_both_empty) {
@@ -1010,13 +1012,14 @@ void AssignmentState::remove(int passenger_index) {
     assigned_blocked[passenger_index].clear();
     seat_to_passenger[seat] = -1;
     passenger_to_seat[passenger_index] = -1;
+    assignment_order.erase(std::remove(assignment_order.begin(), assignment_order.end(), passenger_index), assignment_order.end());
     owner_group_by_seat[seat] = -1;
     seat_ssr_passenger[seat] = -1;
 }
 
 AssignmentSnapshot AssignmentState::save() const {
     return {seat_to_passenger, passenger_to_seat, blocked_count, assigned_blocked,
-            owner_group_by_seat, seat_ssr_passenger};
+            owner_group_by_seat, seat_ssr_passenger, assignment_order};
 }
 
 void AssignmentState::restore(AssignmentSnapshot snapshot) {
@@ -1026,6 +1029,7 @@ void AssignmentState::restore(AssignmentSnapshot snapshot) {
     assigned_blocked = std::move(snapshot.assigned_blocked);
     owner_group_by_seat = std::move(snapshot.owner_group_by_seat);
     seat_ssr_passenger = std::move(snapshot.seat_ssr_passenger);
+    assignment_order = std::move(snapshot.assignment_order);
 }
 
 void RichEliteStore::capture(const AssignmentState& state, const std::string& source) {
