@@ -44,7 +44,7 @@ class NativeRichPipelineTests(unittest.TestCase):
         cls.cases = materialize_cases()
         cls.prefix = staticmethod(construction_prefix())
 
-    def replay(self, case, algorithm):
+    def replay(self, case, algorithm, vnd=False):
         config = copy.deepcopy(self.config)
         # Generous nonbinding stage times isolate order/state/node semantics.
         # Real clock scheduling has a separate Python differential oracle.
@@ -86,21 +86,39 @@ class NativeRichPipelineTests(unittest.TestCase):
             repair = rich.repair_unassigned_by_local_relocation(
                 expected["groups"], context, expected["passenger_sorted_seats"], config)
             captures["capture_stage_patterns"]("repair")
+            expected_vnd = None
+            if vnd and len(context.assigned_seats) == len(passengers):
+                expected_vnd = rich.improve_assignment_with_safe_neighborhoods(
+                    case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"], case["groupsData"],
+                    expected["groups"], context, expected["passenger_sorted_seats"], config["weights"], config,
+                    rich.time.perf_counter() + 60.0)
+                captures["capture_stage_patterns"]("vnd")
             expected_elites = json.loads(json.dumps({str(g): list(patterns.values())
                 for g, patterns in captures["elite_pattern_store"].items()}))
             repaired = checkpoint()
+            expected_order = [passengers.index(key) for key in context.assigned_seats]
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             for name, data in {
                 "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
                 "config.json": config, "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
-                "replay.json": {"assignments": [], "construction_pipeline": True},
+                "replay.json": {"assignments": [], "construction_pipeline": True, "pipeline_vnd": vnd},
             }.items():
                 (work / name).write_text(json.dumps(data), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
                                   str(work / "replay.json")], capture_output=True, text=True, timeout=180)
         self.assertEqual(run.returncode, 0, run.stderr)
         actual = json.loads(run.stdout)
+        self.assertEqual(actual["assignment_order"], expected_order)
+        if expected_vnd is not None:
+            for key in ("passes", "evaluated_moves", "accepted_moves", "stopped_by_deadline"):
+                self.assertEqual(actual["vnd"][key], expected_vnd[key], key)
+            self.assertAlmostEqual(actual["vnd"]["score_improvement"], expected_vnd["score_improvement"], places=8)
+        elif vnd:
+            # The production contract keeps an incomplete Rich candidate out of
+            # quality stages while retaining its separately selected fallback.
+            self.assertEqual(actual["vnd"]["evaluated_moves"], 0)
+            self.assertEqual(actual["vnd"]["accepted_moves"], 0)
         self.assertEqual([m["group_id"] for m in actual["construction_repair_queue"]],
                          [m["group_id"] for m in queue])
         for native, reference in zip(actual["construction_repair_queue"], queue):
@@ -137,3 +155,8 @@ class NativeRichPipelineTests(unittest.TestCase):
             for case in self.cases[:11]:
                 with self.subTest(case=case["id"], algorithm=algorithm):
                     self.replay(case, algorithm)
+
+    def test_combined_construction_repair_and_production_vnd_match_python(self):
+        for case in self.cases[:11]:
+            with self.subTest(case=case["id"]):
+                self.replay(case, {}, vnd=True)

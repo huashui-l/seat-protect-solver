@@ -1,4 +1,5 @@
 #include "native_group_constructor.hpp"
+#include "native_feasibility_solver.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -108,6 +109,18 @@ int main(int argc, char** argv) {
             full_cpp::repair_rich_assignment(problem, state, cache.rankings,
                 std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
             captures.capture(state, "repair");
+            if (const auto* mode = replay.find("pipeline_vnd"); mode && mode->bool_or()) {
+                diagnostics.rich_state = state.save();
+                diagnostics.rich_rankings = cache.rankings;
+                diagnostics.rich_candidate_complete = full_cpp::validate_complete_assignment(problem, state.passenger_to_seat) == 0;
+                diagnostics.passenger_to_seat = state.passenger_to_seat;
+                diagnostics.group_construction_score = full_cpp::evaluate_soft_score(problem, state.passenger_to_seat);
+                diagnostics.rich_elite_store = captures;
+                vnd = full_cpp::improve_rich_vnd_m2(problem,
+                    std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+                state.restore(diagnostics.rich_state);
+                captures = diagnostics.rich_elite_store;
+            }
         } else if (const auto* rescue_mode = replay.find("paired_rescue"); rescue_mode && rescue_mode->bool_or()) {
             auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             cache.rankings = rankings;

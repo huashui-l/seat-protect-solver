@@ -30,6 +30,12 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                                  case["groupsData"], config["weights"], config)
                 result = self.run_case(case["id"], "group-first", algorithm=variant)
                 elites = result["rich_m1_elite_store"]
+                final_elites = result["rich_elite_store"]
+                self.assertEqual(set(final_elites), set(elites))
+                for patterns in final_elites.values():
+                    for pattern in patterns:
+                        self.assertTrue(pattern["pinned"])
+                        self.assertIn(pattern["source"], {"construction", "repair", "vnd"})
                 if result["rich_candidate_complete"]:
                     self.assertEqual(set(elites), {str(g["groupId"]) for g in case["groupsData"]})
                 if variant.get("final_repair_time_limit") == 0.0:
@@ -81,4 +87,6 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 if variant.get("final_repair_time_limit") == 0.0:
                     self.assertFalse(result["rich_candidate_complete"])
                     self.assertEqual(result["rich_repair_attempted"], 0)
+                    self.assertEqual(result["rich_vnd_seconds"], 0.0)
+                    self.assertEqual(final_elites, elites)
                     self.assertGreater(timings["vnd"]["effective_budget"], timings["vnd"]["base_budget"])

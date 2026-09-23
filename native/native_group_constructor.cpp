@@ -975,6 +975,8 @@ GroupConstructionResult construct_rich_m1(
         problem.rich_stage_budgets.stages.at("repair"), repair_window.effective_budget,
         repair_started, repair_finished, repair_window.deadline,
         schedule.carry(), schedule.pricing_reserve()};
+    result.rich_state = state.save();
+    result.rich_rankings = cache.rankings;
     result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
     result.rich_candidate_complete = validate_complete_assignment(problem, state.passenger_to_seat) == 0;
     // Q0/Q1/Q2A stay independent fallbacks, never the construction stage input.
@@ -988,227 +990,36 @@ GroupConstructionResult construct_rich_m1(
     return result;
 }
 
-void improve_rich_vnd_m2(
-    const Problem& problem, std::vector<int>& assignment,
-    std::chrono::steady_clock::time_point deadline,
+RichOrdinaryVndDiagnostics improve_rich_vnd_m2(
+    const Problem& problem, std::chrono::steady_clock::time_point deadline,
     GroupConstructionResult& diagnostics
 ) {
     const auto started = std::chrono::steady_clock::now();
-    if (validate_complete_assignment(problem, assignment) != 0) return;
-    double current_score = evaluate_soft_score(problem, assignment);
-    const int passenger_count = static_cast<int>(assignment.size());
-    const int seat_count = static_cast<int>(problem.seats.size());
-    const int seat_cap = std::max(1, problem.rich.local_search_candidate_cap);
-    std::set<int> active_caregivers;
-    for (const Group& group : problem.groups) {
-        for (int cared : group.passengers) {
-            const Passenger& cared_item = problem.passengers[cared];
-            const auto rule = problem.ssr_rules.find(cared_item.ssr);
-            if (!cared_item.need_cared &&
-                (rule == problem.ssr_rules.end() || !rule->second.requires_caregiver)) continue;
-            const int cared_seat = assignment[cared];
-            if (cared_seat < 0) continue;
-            const bool cross = rule != problem.ssr_rules.end()
-                && rule->second.caregiver_allow_cross_aisle;
-            const auto& neighbors = cross ? problem.seats[cared_seat].row_neighbors
-                                           : problem.seats[cared_seat].same_block_neighbors;
-            for (int candidate : group.passengers) {
-                const Passenger& item = problem.passengers[candidate];
-                if (candidate != cared && item.ssr.empty() && !item.need_cared
-                    && !item.need_both_empty && !item.need_single_empty
-                    && std::find(neighbors.begin(), neighbors.end(), assignment[candidate])
-                        != neighbors.end()) active_caregivers.insert(candidate);
-            }
-        }
+    if (!diagnostics.rich_candidate_complete) return {};
+    AssignmentState state(problem);
+    state.restore(diagnostics.rich_state);
+    const auto vnd = improve_rich_ordinary_vnd(state, diagnostics.rich_rankings, deadline, true, true);
+    diagnostics.rich_state = state.save();
+    diagnostics.rich_elite_store.capture(state, "vnd");
+    diagnostics.rich_vnd_one_opt_moves = vnd.one_opt;
+    diagnostics.rich_vnd_two_swap_moves = vnd.swaps;
+    diagnostics.rich_vnd_three_cycle_moves = vnd.cycles;
+    diagnostics.rich_vnd_group_rebuild_moves = vnd.group_rebuilds;
+    diagnostics.rich_vnd_caregiver_rebuild_moves = vnd.caregiver_rebuilds;
+    diagnostics.rich_vnd_score = evaluate_soft_score(problem, state.passenger_to_seat);
+    // Continue the actual Rich trajectory even when repair lost to a fallback.
+    // Selection is separate from stage state and must remain complete/legal/better.
+    if (validate_complete_assignment(problem, state.passenger_to_seat) == 0
+        && diagnostics.rich_vnd_score > diagnostics.group_construction_score + kTolerance) {
+        diagnostics.passenger_to_seat = state.passenger_to_seat;
+        diagnostics.selected_components = evaluate_score_components(problem, state.passenger_to_seat);
+        diagnostics.group_construction_score = diagnostics.rich_vnd_score;
+        diagnostics.score_delta = diagnostics.rich_vnd_score - diagnostics.q0_score;
+        diagnostics.selected_incumbent = "rich-m2-vnd";
     }
-    std::vector<int> movable;
-    for (int passenger = 0; passenger < passenger_count; ++passenger) {
-        const Passenger& item = problem.passengers[passenger];
-        if (item.fixed_seat.empty() && item.ssr.empty() && !item.need_cared
-            && !item.need_both_empty && !item.need_single_empty
-            && !active_caregivers.count(passenger)) movable.push_back(passenger);
-    }
-    bool improved = true;
-    while (improved && std::chrono::steady_clock::now() < deadline) {
-        improved = false;
-        // Python's first-improvement 1-opt analogue. Candidate seats are
-        // ordered by individual score and capped by the frozen config.
-        for (int passenger : movable) {
-            if (improved) break;
-            const int old_seat = assignment[passenger];
-            std::vector<int> seats(seat_count);
-            std::iota(seats.begin(), seats.end(), 0);
-            std::stable_sort(seats.begin(), seats.end(), [&](int left, int right) {
-                const double ls = evaluate_individual_score(problem, passenger, left).total();
-                const double rs = evaluate_individual_score(problem, passenger, right).total();
-                if (std::abs(ls - rs) > kTolerance) return ls > rs;
-                return problem.seats[left].id < problem.seats[right].id;
-            });
-            if (seats.size() > static_cast<size_t>(seat_cap)) seats.resize(seat_cap);
-            for (int seat : seats) {
-                if (seat == old_seat) continue;
-                assignment[passenger] = seat;
-                if (validate_complete_assignment(problem, assignment) == 0) {
-                    const double score = evaluate_soft_score(problem, assignment);
-                    if (score > current_score + kTolerance) {
-                        current_score = score;
-                        ++diagnostics.rich_vnd_one_opt_moves;
-                        improved = true;
-                        break;
-                    }
-                }
-                assignment[passenger] = old_seat;
-                if (std::chrono::steady_clock::now() >= deadline) break;
-            }
-            if (!improved) assignment[passenger] = old_seat;
-        }
-        if (improved) continue;
-
-        for (size_t left = 0; left < movable.size() && !improved; ++left) {
-            for (size_t right = left + 1; right < movable.size() && !improved; ++right) {
-                const int left_passenger = movable[left];
-                const int right_passenger = movable[right];
-                std::swap(assignment[left_passenger], assignment[right_passenger]);
-                if (validate_complete_assignment(problem, assignment) == 0) {
-                    const double score = evaluate_soft_score(problem, assignment);
-                    if (score > current_score + kTolerance) {
-                        current_score = score;
-                        ++diagnostics.rich_vnd_two_swap_moves;
-                        improved = true;
-                    }
-                }
-                if (!improved) std::swap(assignment[left_passenger], assignment[right_passenger]);
-                if (std::chrono::steady_clock::now() >= deadline) break;
-            }
-        }
-        if (improved) continue;
-
-        const int cycle_cap = std::max(1, problem.rich.local_search_cycle_candidate_cap);
-        for (size_t a = 0; a < movable.size() && !improved; ++a) {
-            for (size_t b = a + 1; b < movable.size() && !improved; ++b) {
-                for (size_t c = b + 1; c < movable.size() && !improved; ++c) {
-                    const int pa = movable[a], pb = movable[b], pc = movable[c];
-                    const int sa = assignment[pa], sb = assignment[pb], sc = assignment[pc];
-                    assignment[pa] = sb; assignment[pb] = sc; assignment[pc] = sa;
-                    if (validate_complete_assignment(problem, assignment) == 0) {
-                        const double score = evaluate_soft_score(problem, assignment);
-                        if (score > current_score + kTolerance) {
-                            current_score = score;
-                            ++diagnostics.rich_vnd_three_cycle_moves;
-                            improved = true;
-                        }
-                    }
-                    if (!improved) {
-                        assignment[pa] = sa; assignment[pb] = sb; assignment[pc] = sc;
-                    }
-                    if (std::chrono::steady_clock::now() >= deadline) break;
-                    if (c - b >= cycle_cap) break;
-                }
-                if (b - a >= cycle_cap) break;
-            }
-        }
-    }
-    // Exact two-group matching over the currently occupied seat union. This
-    // is the bounded native equivalent of Python's small group rebuild stage.
-    std::vector<int> rebuild_groups;
-    for (int group_index = 0; group_index < static_cast<int>(problem.groups.size()); ++group_index) {
-        bool group_movable = !problem.groups[group_index].passengers.empty();
-        for (int passenger : problem.groups[group_index].passengers) {
-            const Passenger& item = problem.passengers[passenger];
-            group_movable = group_movable && item.fixed_seat.empty()
-                && item.ssr.empty() && !item.need_cared
-                && !item.need_both_empty && !item.need_single_empty
-                && !active_caregivers.count(passenger);
-        }
-        if (group_movable) rebuild_groups.push_back(group_index);
-    }
-    const int group_cap = std::max(2, problem.rich.local_search_related_group_cap);
-    if (static_cast<int>(rebuild_groups.size()) > group_cap) rebuild_groups.resize(group_cap);
-    for (size_t first = 0; first < rebuild_groups.size()
-         && std::chrono::steady_clock::now() < deadline; ++first) {
-        const Group& left_group = problem.groups[rebuild_groups[first]];
-        for (size_t second = first + 1; second < rebuild_groups.size()
-             && std::chrono::steady_clock::now() < deadline; ++second) {
-            const Group& right_group = problem.groups[rebuild_groups[second]];
-            const int total = static_cast<int>(left_group.passengers.size()
-                + right_group.passengers.size());
-            if (total == 0 || total > 12) continue;
-            std::vector<int> union_seats;
-            for (int passenger : left_group.passengers) union_seats.push_back(assignment[passenger]);
-            for (int passenger : right_group.passengers) union_seats.push_back(assignment[passenger]);
-            if (std::find(union_seats.begin(), union_seats.end(), -1) != union_seats.end()) continue;
-            const int left_size = static_cast<int>(left_group.passengers.size());
-            const unsigned mask_limit = 1u << total;
-            double best_value = current_score;
-            std::vector<int> best_assignment;
-            const auto popcount = [](unsigned value) {
-                int count = 0;
-                while (value) { value &= value - 1; ++count; }
-                return count;
-            };
-            auto match_group = [&](const std::vector<int>& passengers,
-                                   const std::vector<int>& seats) {
-                const int n = static_cast<int>(passengers.size());
-                const size_t state_count = size_t(1) << n;
-                std::vector<double> dp(state_count, -std::numeric_limits<double>::infinity());
-                std::vector<int> parent(state_count, -1);
-                dp[0] = 0.0;
-                for (unsigned mask = 0; mask < (1u << n); ++mask) {
-                    const int index = popcount(static_cast<unsigned>(mask));
-                    if (index >= n || !std::isfinite(dp[mask])) continue;
-                    for (int seat_index = 0; seat_index < n; ++seat_index) {
-                        if (mask & (1u << seat_index)) continue;
-                        const unsigned next = mask | (1u << seat_index);
-                        const double value = dp[mask]
-                            + evaluate_individual_score(problem, passengers[index], seats[seat_index]).total();
-                        if (value > dp[next]) {
-                            dp[next] = value;
-                            parent[next] = seat_index;
-                        }
-                    }
-                }
-                std::vector<int> chosen(n, -1);
-                unsigned mask = (1u << n) - 1u;
-                for (int index = n - 1; index >= 0; --index) {
-                    const int seat_index = parent[mask];
-                    if (seat_index < 0) return std::vector<int>();
-                    chosen[index] = seats[seat_index];
-                    mask ^= 1u << seat_index;
-                }
-                return chosen;
-            };
-            for (unsigned mask = 1; mask < mask_limit - 1; ++mask) {
-                if (popcount(static_cast<unsigned>(mask)) != left_size) continue;
-                std::vector<int> left_seats, right_seats;
-                for (int index = 0; index < total; ++index) {
-                    (mask & (1u << index) ? left_seats : right_seats).push_back(union_seats[index]);
-                }
-                std::vector<int> left_match = match_group(left_group.passengers, left_seats);
-                std::vector<int> right_match = match_group(right_group.passengers, right_seats);
-                if (left_match.empty() || right_match.empty()) continue;
-                std::vector<int> candidate = assignment;
-                for (size_t index = 0; index < left_match.size(); ++index) candidate[left_group.passengers[index]] = left_match[index];
-                for (size_t index = 0; index < right_match.size(); ++index) candidate[right_group.passengers[index]] = right_match[index];
-                if (validate_complete_assignment(problem, candidate) != 0) continue;
-                const double value = evaluate_soft_score(problem, candidate);
-                if (value > best_value + kTolerance) {
-                    best_value = value;
-                    best_assignment = std::move(candidate);
-                }
-            }
-            if (!best_assignment.empty()) {
-                assignment = std::move(best_assignment);
-                current_score = best_value;
-                ++diagnostics.rich_vnd_group_rebuild_moves;
-                improved = true;
-                break;
-            }
-        }
-        if (improved) break;
-    }
-    diagnostics.rich_vnd_score = current_score;
     diagnostics.rich_vnd_seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - started).count();
+    return vnd;
 }
 
 }  // namespace full_cpp

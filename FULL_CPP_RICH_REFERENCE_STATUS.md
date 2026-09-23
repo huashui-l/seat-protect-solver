@@ -15,18 +15,19 @@ The raw-native feasibility path now includes parsing, indexed problem/topology, 
 
 The M1/M2 migration branch now also contains a native Rich construction entry,
 configuration-driven DFS/Beam limits, bounded direct repair, VND 1-opt/2-swap/
-3-cycle moves, and bounded two-group bitmask rebuild. These stages require a
+3-cycle moves, bounded two-group bitmask rebuild and caregiver joint rebuild. These stages require a
 complete legal incumbent, use the shared deadline, and accept only strict score
 improvements. They are implementation progress, not a Rich quality-parity gate;
-the full Python caregiver joint rebuild, pattern stages, LNS, and
-restricted/protected master semantics remain outstanding. Native repair now
+pattern stages, LNS, and restricted/protected master semantics remain outstanding. Native repair now
 uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
 caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
 
 Construction and repair candidates are kept separate from the selected legal
 Q0/Q1/Q2A fallback. Only a complete, legal, strictly better candidate replaces
 that fallback. Construction assigned/unassigned counts remain the pre-repair
-checkpoint; a legal fallback remains eligible for VND. Earlier Q2A snapshot
+checkpoint. VND continues the actual complete/legal Rich repair state, including
+its insertion order, protection blocks and frozen candidate rankings, even when
+repair loses to the fallback; incomplete Rich candidates skip VND. Earlier Q2A snapshot
 repair wiring established this boundary; the independent Rich remaining-passenger
 constructor below now supplies the candidate state instead. Repair disable,
 equal-score retention and worse-candidate rejection remain covered by public
@@ -462,6 +463,36 @@ Release /O2 build passed with the two existing conversion warnings. The full
 native/state-replay-enabled suite passed 103 tests and 13,238 subtests, with 9
 skips. The subsequently expanded BLND/BSCT acceptance test separately passed both
 subtests. The full suite includes the 12,000-operation state differential.
+
+The production VND entry now replaces the superseded array-only approximation
+with the fully differential-tested stateful function. M1 retains its actual repair
+snapshot and construction candidate rankings. M2 searches that Rich trajectory,
+then selects it only if complete/legal and strictly better than the independently
+retained Q0/Q1/Q2A/M1 incumbent. A tied candidate does not relabel the fallback as
+`rich-m2-vnd`. Incomplete Rich repair states skip quality search.
+
+VND capture uses the resulting real protection resources and assignment order.
+The CLI retains `rich_m1_elite_store` as the construction/repair checkpoint and
+adds `rich_elite_store` after VND, plus the caregiver-rebuild count. Existing
+`rich_vnd_score` now describes the Rich candidate after VND, not the independently
+selected fallback; when Rich repair is incomplete VND is skipped and its counters,
+score and duration retain their zero defaults. Tail RR remains the earlier
+adapter and is not claimed to be the frozen ACTIVE structured/master pipeline.
+
+The combined oracle now executes construction, repair and the shared production
+VND entry with frozen rankings and compares assignments, protection blocks,
+insertion order, component scores, VND counters and all elite records. Ten of
+its eleven public fixtures produce complete repair states and match the full
+Python VND; the remaining protection-heavy fixture verifies the incomplete-state
+skip contract. The original 33 construction/repair scenarios also check insertion
+order. A raw-CLI regression verifies that Rich VND still improves a repair state
+that lost to the fallback, while equal final scores preserve the fallback identity.
+These checkpoints do not establish Formal24 60-second quality parity.
+
+The production integration Release /O2 rebuild passed (two existing conversion
+warnings). Full native/state-replay-enabled regression passed 105 tests and 13,251
+subtests, with 9 skips, including the 12,000-operation state differential and
+raw-CLI independent evaluator checks. `git diff --check` passed.
 
 ## Correctness
 

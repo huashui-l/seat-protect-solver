@@ -109,6 +109,18 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                     self.assertEqual(result["rich_repair_repaired"], result["rich_construction_unassigned"])
                     self.assertTrue(result["rich_candidate_complete"])
 
+    def test_vnd_continues_rich_state_when_repair_loses_to_fallback(self):
+        result = self.run_case("shrink_small_blockers", "group-first", algorithm={
+            "enable_restricted_pattern_mip": False,
+        })
+        self.assertTrue(result["rich_candidate_complete"])
+        self.assertLess(result["rich_repair_score"], result["rich_m1_selected_score"] - 1e-8)
+        self.assertGreater(result["rich_vnd_score"], result["rich_repair_score"] + 1e-8)
+        self.assertAlmostEqual(result["native_score"], result["rich_m1_selected_score"])
+        self.assertNotEqual(result["selected_incumbent"], "rich-m2-vnd")
+        self.assertTrue(any(pattern["source"] == "vnd"
+                            for patterns in result["rich_elite_store"].values() for pattern in patterns))
+
     def test_rich_construction_uses_beam_after_dfs_failure_independently_of_q2a(self):
         result = self.run_case("identity_keep_seats", "group-first", algorithm={
             "small_group_dfs_node_limit": 1,

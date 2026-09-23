@@ -13,7 +13,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | hard legality | evaluator and allocator checks | native feasibility model and final validator cover cabin/fixed/SSR/caregiver/protection/resource isolation | FULL_CPP | indirect | ACTIVE |
 | fixed seats | precheck and assignment | native fixed/reserved preprocessor applied to independent Rich construction; full snapshot parity remains under audit | PARTIAL_CPP | indirect | ACTIVE |
 | candidate ordering/domain | native Python domain and ranking | native static domains, cached owner regret/cost ranking and remaining-group/passenger ordering with Python stage differentials | PARTIAL_CPP | indirect | ACTIVE |
-| SSR/caregiver | construction, rescue, rebuild | native paired construction, fixed-neighbor rescue, bounded paired plans, care-group joint rescue and relocation repair; VND caregiver rebuild still pending | PARTIAL_CPP | indirect | ACTIVE |
+| SSR/caregiver | construction, rescue, rebuild | native paired construction, fixed-neighbor rescue, bounded paired plans, care-group joint rescue and relocation repair; stateful VND caregiver rebuild integrated; full pipeline quality gate pending | PARTIAL_CPP | indirect | ACTIVE |
 | initial construction | anchored, SSR-first, DFS/Beam | independent fixed-state anchored/paired/rescue/remaining construction with DFS/Beam; 33 public combined construction/repair checkpoint differentials passed; adaptive construction/repair/VND windows integrated; full timing parity pending; Q0/Q1/Q2A remain fallbacks | PARTIAL_CPP | supplied artifact | ACTIVE |
 | small DFS | construction DFS | native remaining-stage DFS with retry caps, node/time bounds and fixed-care validation; fixture differential passed | PARTIAL_CPP | no | ACTIVE |
 | beam search | construction Beam | native remaining-stage Beam with skips, compactness ranking, dominance and transactional commit; separate RR pattern Beam remains | PARTIAL_CPP | yes | ACTIVE |
@@ -21,15 +21,15 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |
 | protection exchange | protected multi-group pattern MIP | none | PYTHON_ONLY | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
-| group matching | exact bitmask matching | stateful Python-ordered related-group partitions and bitmask matching differential passed; production still uses earlier approximation | PARTIAL_CPP | no | ACTIVE |
+| group matching | exact bitmask matching | stateful Python-ordered related-group partitions and bitmask matching integrated in production; combined stage differential passed | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
-| 1-opt / 2-swap | VND | stateful Python-ordered move/swap prefix differential passed; production still uses earlier approximate VND | PARTIAL_CPP | no | ACTIVE |
-| 3-cycle | VND explicit cycle | stateful Python-ordered cycle prefix differential passed; production integration pending | PARTIAL_CPP | no | ACTIVE |
-| caregiver rebuild | VND joint rebuild | stateful joint permutations, caregiver adjacency, global infant effects and ordered commits match full Python VND replay; production integration pending | PARTIAL_CPP | no | ACTIVE |
+| 1-opt / 2-swap | VND | stateful Python-ordered move/swap integrated in production with frozen rankings and actual repair state; combined stage differential passed | PARTIAL_CPP | no | ACTIVE |
+| 3-cycle | VND explicit cycle | stateful Python-ordered cycle integrated in production; combined stage differential passed | PARTIAL_CPP | no | ACTIVE |
+| caregiver rebuild | VND joint rebuild | stateful joint permutations, caregiver adjacency, global infant effects and ordered commits integrated in production; full-function and combined stage differentials passed | PARTIAL_CPP | no | ACTIVE |
 | RR/search generation | separate orchestration | native task/Beam/commit/deadline | FULL_CPP | yes | Rich INACTIVE |
 | simulated annealing | none active | none | DEAD/UNUSED | no | Rich INACTIVE |
 | structured pattern handling | elite store, structured/special pricing | raw native Problem adapter, seat/protection resources, SSR location encoding, stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |
-| elite pattern store | `record_elite_pattern`, `_elite_pattern_eviction_candidate`, stage capture | native identity/resource/conflict handling, replacement, pinning and stable eviction with direct Python replay; construction/repair capture and affected-group scores integrated; VND capture and consumers pending | PARTIAL_CPP | no | ACTIVE |
+| elite pattern store | `record_elite_pattern`, `_elite_pattern_eviction_candidate`, stage capture | native identity/resource/conflict handling, replacement, pinning and stable eviction with direct Python replay; construction/repair/VND capture and affected-group scores integrated; conflict-diversity activation and pattern consumers pending | PARTIAL_CPP | no | ACTIVE |
 | restricted/protected master | Python HiGHS stages | native RR restricted master; raw M3 adapter invokes it with native patterns | PARTIAL_CPP | yes | ACTIVE, semantics differ |
 | final validation | independent evaluator | native feasibility validator plus external Python audit | PARTIAL_CPP | external | ACTIVE |
 | serialization | Python benchmark output | raw-native assignment JSON and legacy solver-ready JSON | FULL_CPP | yes | ACTIVE |

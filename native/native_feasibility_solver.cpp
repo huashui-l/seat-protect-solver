@@ -159,7 +159,7 @@ FeasibilityResult solve_feasibility_mip(
                 const double vnd_started = elapsed();
                 const auto vnd_window = schedule.begin("vnd", vnd_started);
                 improve_rich_vnd_m2(
-                    problem, group_result.passenger_to_seat, at(vnd_window.deadline), group_result
+                    problem, at(vnd_window.deadline), group_result
                 );
                 const double vnd_finished = elapsed();
                 schedule.finish("vnd", vnd_window, vnd_finished);
@@ -167,16 +167,6 @@ FeasibilityResult solve_feasibility_mip(
                     budgets.stages.at("vnd"), vnd_window.effective_budget,
                     vnd_started, vnd_finished, vnd_window.deadline,
                     schedule.carry(), schedule.pricing_reserve()};
-                group_result.group_construction_score =
-                    evaluate_soft_score(problem, group_result.passenger_to_seat);
-                group_result.selected_components = evaluate_score_components(
-                    problem, group_result.passenger_to_seat
-                );
-                if (group_result.group_construction_score > group_result.q0_score + 1e-9) {
-                    group_result.selected_incumbent = "rich-m2-vnd";
-                    group_result.score_delta = group_result.group_construction_score
-                        - group_result.q0_score;
-                }
                 const RichPatternResult pattern_result = run_rich_pattern_master(
                     problem, group_result.passenger_to_seat,
                     search_deadline
@@ -200,6 +190,7 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.score_delta = pattern_result.score - group_result.q0_score;
                 }
             }
+            result.rich_elite_store = group_result.rich_elite_store;
             result.rich_construction_repair_queue = group_result.rich_construction_repair_queue;
             result.rich_stage_timing = group_result.rich_stage_timing;
             result.passenger_to_seat = group_result.passenger_to_seat;
@@ -229,6 +220,7 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_vnd_two_swap_moves = group_result.rich_vnd_two_swap_moves;
             result.rich_vnd_three_cycle_moves = group_result.rich_vnd_three_cycle_moves;
             result.rich_vnd_group_rebuild_moves = group_result.rich_vnd_group_rebuild_moves;
+            result.rich_vnd_caregiver_rebuild_moves = group_result.rich_vnd_caregiver_rebuild_moves;
             result.rich_vnd_score = group_result.rich_vnd_score;
             result.rich_vnd_seconds = group_result.rich_vnd_seconds;
             result.rich_repair_attempted = group_result.rich_repair_attempted;

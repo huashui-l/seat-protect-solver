@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
             << "\"rich_vnd_two_swap_moves\":" << result.rich_vnd_two_swap_moves << ','
             << "\"rich_vnd_three_cycle_moves\":" << result.rich_vnd_three_cycle_moves << ','
             << "\"rich_vnd_group_rebuild_moves\":" << result.rich_vnd_group_rebuild_moves << ','
+            << "\"rich_vnd_caregiver_rebuild_moves\":" << result.rich_vnd_caregiver_rebuild_moves << ','
             << "\"rich_vnd_score\":" << result.rich_vnd_score << ','
             << "\"rich_vnd_seconds\":" << result.rich_vnd_seconds << ','
             << "\"rich_repair_attempted\":" << result.rich_repair_attempted << ','
@@ -177,6 +178,8 @@ int main(int argc, char** argv) {
         }
         *output << "},\"rich_m1_elite_store\":";
         full_cpp::write_rich_elite_store(*output, result.rich_m1_elite_store);
+        *output << ",\"rich_elite_store\":";
+        full_cpp::write_rich_elite_store(*output, result.rich_elite_store);
         *output << ",\"rich_construction_repair_queue\":";
         full_cpp::write_rich_repair_queue(*output, result.rich_construction_repair_queue, 20);
         int extreme = 0;
