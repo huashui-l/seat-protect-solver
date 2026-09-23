@@ -61,6 +61,32 @@ struct SsrRule {
     bool requires_bassinet = false;
 };
 
+struct RichConstructionConfig {
+    double construction_time_budget = 16.51276595744681;
+    double repair_time_budget = 3.175531914893617;
+    double scoring_time_reserve = 0.25;
+    double stage3_time_budget = 20.0;
+    int candidate_cap = 48;
+    int candidate_cap_retry = 64;
+    int candidate_cap_full_retry = 128;
+    int beam_width_small = 24;
+    int beam_moves_small = 20;
+    int beam_width_medium = 40;
+    int beam_moves_medium = 20;
+    int beam_width_large = 96;
+    int beam_moves_large = 28;
+    bool small_group_dfs_enabled = true;
+    int small_group_dfs_max_size = 4;
+    long long small_group_dfs_node_limit = 20000;
+    double small_group_dfs_time_limit = 0.02;
+    double old_seat_reservation_pressure = 1.0;
+    int paired_rescue_option_cap = 12;
+    int paired_joint_rebuild_candidate_cap = 80;
+    long long paired_joint_rebuild_node_limit = 50000;
+    int final_repair_node_limit = 20000;
+    double final_repair_time_limit = 2.0;
+};
+
 struct Problem {
     std::string case_id;
     std::string direction;
@@ -91,6 +117,7 @@ struct Problem {
     double group_centroid_x_factor = 1.0;
     double group_centroid_y_factor = 1.0;
     double baby_front_back_factor = 1.0;
+    RichConstructionConfig rich;
 };
 
 struct FixedSeatContext {

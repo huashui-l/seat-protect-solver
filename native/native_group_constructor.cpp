@@ -13,9 +13,6 @@
 namespace full_cpp {
 namespace {
 
-constexpr int kDfsMaxGroupSize = 4;
-constexpr long long kDfsNodeLimit = 20000;
-constexpr int kCandidateCap = 48;
 constexpr double kTolerance = 1e-9;
 
 double group_placement_score(
@@ -166,7 +163,10 @@ std::vector<int> seat_candidates(
         if (std::abs(left_score - right_score) > kTolerance) return left_score > right_score;
         return problem.seats[left].id < problem.seats[right].id;
     });
-    if (seats.size() > kCandidateCap) seats.resize(kCandidateCap);
+    const int candidate_cap = std::max(1, problem.rich.candidate_cap);
+    if (seats.size() > static_cast<size_t>(candidate_cap)) {
+        seats.resize(static_cast<size_t>(candidate_cap));
+    }
     const int current = incumbent[passenger];
     if (current >= 0 && std::find(seats.begin(), seats.end(), current) == seats.end()
         && state.can_assign(passenger, current)) seats.push_back(current);
@@ -283,7 +283,7 @@ SearchResult search_dfs(
 ) {
     SearchResult result;
     auto visit = [&](auto&& self, int depth) -> void {
-        if (result.nodes >= kDfsNodeLimit
+        if (result.nodes >= problem.rich.small_group_dfs_node_limit
             || std::chrono::steady_clock::now() >= deadline) return;
         ++result.nodes;
         if (depth == static_cast<int>(order.size())) {
@@ -298,7 +298,7 @@ SearchResult search_dfs(
                 const AssignmentSnapshot saved = state.save();
                 if (state.assign(passenger, seat, block)) self(self, depth + 1);
                 state.restore(saved);
-                if (result.nodes >= kDfsNodeLimit
+                if (result.nodes >= problem.rich.small_group_dfs_node_limit
                     || std::chrono::steady_clock::now() >= deadline) return;
             }
         }
@@ -322,8 +322,10 @@ SearchResult search_beam(
     const std::vector<int>* forbidden = nullptr
 ) {
     const int size = static_cast<int>(order.size());
-    const int width = size <= 2 ? 24 : size <= 5 ? 40 : 96;
-    const int move_limit = size <= 5 ? 20 : 28;
+    const int width = size <= 2 ? problem.rich.beam_width_small
+        : size <= 5 ? problem.rich.beam_width_medium : problem.rich.beam_width_large;
+    const int move_limit = size <= 5 ? problem.rich.beam_moves_medium
+        : problem.rich.beam_moves_large;
     SearchResult result;
     std::vector<BeamState> beam{{state.save(), state.passenger_to_seat, 0.0}};
     for (int passenger : order) {
@@ -487,7 +489,8 @@ SearchResult search_partial_group(
         consider_candidate(problem, state, result, &group, forbidden);
         return result;
     }
-    if (static_cast<int>(order.size()) <= kDfsMaxGroupSize) {
+    if (problem.rich.small_group_dfs_enabled
+        && static_cast<int>(order.size()) <= problem.rich.small_group_dfs_max_size) {
         return search_dfs(
             problem, incumbent, state, order, deadline, &group, forbidden
         );
@@ -559,7 +562,8 @@ GroupConstructionResult construct_group_aware(
         AssignmentState base = state_without_group(problem, current, group_index);
         const std::vector<int> order = passenger_order(problem, group, base);
         SearchResult candidate;
-        if (static_cast<int>(group.passengers.size()) <= kDfsMaxGroupSize) {
+        if (problem.rich.small_group_dfs_enabled
+            && static_cast<int>(group.passengers.size()) <= problem.rich.small_group_dfs_max_size) {
             ++result.dfs_groups;
             candidate = search_dfs(problem, current, base, order, deadline);
             result.dfs_nodes += candidate.nodes;
@@ -619,7 +623,7 @@ GroupConstructionResult construct_group_first(
         for (int passenger : group.passengers) {
             remaining += state.passenger_to_seat[passenger] < 0;
         }
-        if (remaining <= kDfsMaxGroupSize) {
+        if (remaining <= problem.rich.small_group_dfs_max_size) {
             ++result.from_scratch_dfs_groups;
             result.from_scratch_dfs_nodes += search.nodes;
         } else {
@@ -713,6 +717,71 @@ GroupConstructionResult construct_group_first(
     } else if (complete && result.fallback_reason.empty()) {
         result.fallback_reason = "q2a_invalid";
     }
+    return result;
+}
+
+GroupConstructionResult construct_rich_m1(
+    const Problem& problem, const std::vector<int>& q0_assignment,
+    const GroupConstructionResult& q2a_result,
+    std::chrono::steady_clock::time_point global_deadline
+) {
+    (void)q0_assignment;
+    const auto started = std::chrono::steady_clock::now();
+    GroupConstructionResult result = q2a_result;
+    result.rich_construction_score = evaluate_soft_score(problem, q2a_result.passenger_to_seat);
+    result.rich_construction_assigned = 0;
+    for (int seat : q2a_result.passenger_to_seat) result.rich_construction_assigned += seat >= 0;
+    result.rich_construction_unassigned = static_cast<int>(problem.passengers.size())
+        - result.rich_construction_assigned;
+    result.rich_candidate_complete = result.rich_construction_unassigned == 0
+        && validate_complete_assignment(problem, q2a_result.passenger_to_seat) == 0;
+
+    // M1 keeps Q0/Q1/Q2A as the audited fallback, then performs the native
+    // construction/repair pass against the same shared deadline.
+    if (!result.rich_candidate_complete && std::chrono::steady_clock::now() < global_deadline) {
+        AssignmentState state = fixed_initial_state(problem);
+        bool rebuilt = true;
+        for (int passenger = 0; passenger < static_cast<int>(q2a_result.passenger_to_seat.size()); ++passenger) {
+            const int seat = q2a_result.passenger_to_seat[passenger];
+            if (seat < 0 || state.passenger_to_seat[passenger] >= 0) continue;
+            if (!state.assign(passenger, seat)) { rebuilt = false; break; }
+        }
+        if (rebuilt) {
+            for (int passenger = 0; passenger < static_cast<int>(problem.passengers.size()); ++passenger) {
+                if (state.passenger_to_seat[passenger] >= 0) continue;
+                ++result.rich_repair_attempted;
+                const std::vector<int> empty_incumbent(problem.passengers.size(), -1);
+                for (int seat : seat_candidates(problem, state, empty_incumbent, passenger)) {
+                    for (int block : block_choices(problem, state, passenger, seat)) {
+                        ++result.rich_repair_nodes;
+                        if (state.assign(passenger, seat, block)) {
+                            ++result.rich_repair_repaired;
+                            break;
+                        }
+                    }
+                    if (state.passenger_to_seat[passenger] >= 0) break;
+                    if (std::chrono::steady_clock::now() >= global_deadline) break;
+                }
+                if (state.passenger_to_seat[passenger] < 0) ++result.rich_repair_unresolved;
+                if (std::chrono::steady_clock::now() >= global_deadline) break;
+            }
+            if (validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
+                result.passenger_to_seat = state.passenger_to_seat;
+                result.rich_candidate_complete = true;
+                result.rich_construction_assigned = static_cast<int>(problem.passengers.size());
+                result.rich_construction_unassigned = 0;
+                result.rich_repair_score = evaluate_soft_score(problem, result.passenger_to_seat);
+                result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
+                result.group_construction_score = result.rich_repair_score;
+                result.selected_incumbent = "rich-m1";
+            }
+        }
+    }
+    result.rich_construction_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - started).count();
+    result.rich_repair_seconds = result.rich_construction_seconds;
+    result.rich_construction_carry_seconds = std::max(0.0,
+        problem.rich.construction_time_budget - result.rich_construction_seconds);
     return result;
 }
 

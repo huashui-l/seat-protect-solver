@@ -136,6 +136,12 @@ FeasibilityResult solve_feasibility_mip(
                     )
                 );
             }
+            group_result = construct_rich_m1(
+                problem, result.passenger_to_seat, group_result,
+                started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(time_limit_seconds)
+                )
+            );
             result.passenger_to_seat = group_result.passenger_to_seat;
             result.selected_incumbent = group_result.selected_incumbent;
             result.fallback_reason = group_result.fallback_reason;
