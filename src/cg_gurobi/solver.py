@@ -42,8 +42,27 @@ def _cfg(config: Mapping[str, Any]) -> Dict[str, Any]:
     c.setdefault("dive_pricing_rounds", 2)
     c.setdefault("warm_start", "heuristic")   # heuristic | greedy | none
     c.setdefault("heuristic_seconds", 5.0)
+    c.setdefault("dual_smoothing_alpha", 0.0)      # 0 关闭；Wentges 平滑系数
+    c.setdefault("pricing_early_stop", False)       # 非认证轮：找到足够负的列即停
+    c.setdefault("early_stop_fraction", 0.3)
+    c.setdefault("early_stop_floor", 0.5)
     c.setdefault("log", True)
     return c
+
+
+def _blend_duals(center, current, alpha: float):
+    """π = α·center + (1-α)·current，逐族逐键线性混合。"""
+    from .pricing import Duals
+
+    def blend(a: Dict, b: Dict) -> Dict:
+        keys = set(a) | set(b)
+        return {k: alpha * a.get(k, 0.0) + (1.0 - alpha) * b.get(k, 0.0) for k in keys}
+
+    return Duals(
+        convexity=blend(center.convexity, current.convexity), seat=blend(center.seat, current.seat),
+        ssr_activation=blend(center.ssr_activation, current.ssr_activation),
+        ssr_count=blend(center.ssr_count, current.ssr_count), baby=blend(center.baby, current.baby),
+    )
 
 
 def _log(enabled: bool, msg: str) -> None:
@@ -138,6 +157,11 @@ def solve_single_cabin(
     infeasible_certified = False
     it = 0
     escalation = 1.0
+    alpha = float(cfg["dual_smoothing_alpha"])
+    center = None
+    center_cost = math.inf
+    last_rc: Dict[int, float] = {}
+    mispricing_rounds = 0
     while True:
         it += 1
         if time.perf_counter() >= deadline:
@@ -159,17 +183,50 @@ def solve_single_cabin(
         lbs: Dict[int, float] = {}
         phase_one = master.phase_one
         per_group_limit = min(per_group * workers * escalation, max(float(cfg["pricing_time_limit"]), remaining * 0.5))
-        outcomes = list(executor.map(
-            lambda g: pricers[g.gid].price(duals, phase_one=phase_one, time_limit=per_group_limit),
-            inst.groups,
-        ))
+        # 对偶平滑（Wentges）：只用于发现列；认证与下界一律用原始对偶
+        if alpha > 0.0 and not phase_one:
+            if center is None or lp_cost < center_cost - 1e-9:
+                center, center_cost = duals, lp_cost
+            pricing_duals = _blend_duals(center, duals, alpha) if center is not duals else duals
+        else:
+            pricing_duals = duals
+        smoothed = pricing_duals is not duals
+        use_early = bool(cfg["pricing_early_stop"]) and not phase_one and escalation == 1.0
+
+        def _price(g):
+            stop = None
+            if use_early:
+                prev = last_rc.get(g.gid)
+                if prev is not None and prev < -TOL:
+                    stop = min(-float(cfg["early_stop_floor"]), float(cfg["early_stop_fraction"]) * prev)
+            return pricers[g.gid].price(pricing_duals, phase_one=phase_one, time_limit=per_group_limit,
+                                        early_stop=stop)
+
+        outcomes = list(executor.map(_price, inst.groups))
         for out in outcomes:
-            lbs[out.gid] = out.lower_bound
-            if not out.certified:
-                all_certified = False
             for col in out.columns:
                 if reduced_cost(col, duals, phase_one) < -TOL:
                     new_cols.append(col)
+        if smoothed and not new_cols:
+            # 平滑对偶下无负列（mispricing）：用原始对偶重定价并认证
+            mispricing_rounds += 1
+            outcomes = list(executor.map(
+                lambda g: pricers[g.gid].price(duals, phase_one=phase_one, time_limit=per_group_limit), inst.groups))
+            for out in outcomes:
+                for col in out.columns:
+                    if reduced_cost(col, duals, phase_one) < -TOL:
+                        new_cols.append(col)
+            smoothed = False
+        for out in outcomes:
+            last_rc[out.gid] = out.best_reduced_cost if math.isfinite(out.best_reduced_cost) else 0.0
+            if smoothed:
+                # 平滑对偶下的下界不是原始对偶下的下界
+                lbs[out.gid] = -math.inf
+                all_certified = False
+            else:
+                lbs[out.gid] = out.lower_bound
+                if not out.certified:
+                    all_certified = False
         priced_all = len(outcomes) == len(inst.groups)
         added = master.add_columns(new_cols)
         record = {
@@ -212,6 +269,7 @@ def solve_single_cabin(
         "build_seconds": build_seconds,
         "warm_start_columns": warm_columns,
         "warm_start_mode": warm_mode,
+        "mispricing_rounds": mispricing_rounds,
         "dive": dive_stats if 'dive_stats' in dir() else None,
         "heuristic_score": heuristic_score,
         "pricing_workers": workers,

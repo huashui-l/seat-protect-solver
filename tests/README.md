@@ -5,6 +5,7 @@
   `test_general_validation_smoke.py`, and the
   case-contract test in `test_general_validation_cases.py`. Tests explicitly
   marked as requiring excluded benchmark data are skipped with that reason.
+- **Gurobi required:** `test_cg_gurobi.py` (新列生成的穷举对照、公开算例与证明最优复现；无 `gurobipy` 时整体跳过).
 - **Native build required:** `test_native_smoke.py`. Set
   `SEAT_PROTECT_NATIVE_EXE` to the executable built from this checkout.
 - **Formal24/manual:** `test_full_cpp_core_parity.py` and the frozen gate in

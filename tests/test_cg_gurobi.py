@@ -115,6 +115,11 @@ class PublicFixtureTests(unittest.TestCase):
         "caregiver_and_ssr": -8.198590225563912,
         "full_resource_protection_heavy": -30.8,
     }
+    # 旧实现经分支定价证明的整数最优值；新实现须以 proven_optimal 复现
+    LEGACY_PROVEN_INTEGER = {
+        "full_resource_shrink": -116.79,
+        "dense_full_resource_special_chain": -122.025,
+    }
 
     def test_all_valid_cases_complete_and_consistent(self):
         from src.cg_gurobi import solve
@@ -137,6 +142,10 @@ class PublicFixtureTests(unittest.TestCase):
                 if ref is not None:
                     self.assertTrue(result["lp_bound_certified"])
                     self.assertAlmostEqual(ref, result["lp_bound"], places=6)
+                ref_int = self.LEGACY_PROVEN_INTEGER.get(case["id"])
+                if ref_int is not None:
+                    self.assertTrue(result["proven_optimal"])
+                    self.assertAlmostEqual(ref_int, result["total_score"], places=6)
 
     def test_invalid_cases_are_rejected(self):
         from src.cg_gurobi import solve

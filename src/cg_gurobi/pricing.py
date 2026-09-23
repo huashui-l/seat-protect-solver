@@ -260,7 +260,10 @@ class GroupPricer:
     def _remember_start(self) -> None:
         self._last_start = [(v, v.X) for v in self.model.getVars()]
 
-    def price(self, duals: Duals, *, phase_one: bool, time_limit: float, use_cutoff: bool = True) -> PricingOutcome:
+    def price(self, duals: Duals, *, phase_one: bool, time_limit: float, use_cutoff: bool = True,
+              early_stop: Optional[float] = None) -> PricingOutcome:
+        """``early_stop``：找到约化成本 <= early_stop 的列即停（Gurobi BestObjStop）。
+        早停返回的下界仍取 ObjBound，不冒充证书。"""
         inst, g, m = self.inst, self.group, self.model
         started = time.perf_counter()
         obj = gp.LinExpr()
@@ -291,6 +294,7 @@ class GroupPricer:
         # 只需要约化成本 < -TOL 的列：以 -TOL 为 Cutoff，Gurobi 若报 CUTOFF
         # 即证明该组不存在负列（下界 -TOL），无需求出真实最小值。
         m.Params.Cutoff = -TOL if use_cutoff else GRB.INFINITY
+        m.Params.BestObjStop = float(early_stop) if early_stop is not None else -GRB.INFINITY
         if self._last_start:
             for var, value in self._last_start:
                 var.Start = value
@@ -301,6 +305,7 @@ class GroupPricer:
             return PricingOutcome(g.gid, "infeasible", math.inf, [], math.inf, seconds)
         if status == GRB.CUTOFF:
             return PricingOutcome(g.gid, "optimal", -TOL, [], math.inf, seconds, m.NodeCount)
+        early_stopped = status == GRB.USER_OBJ_LIMIT
         if m.SolCount == 0:
             lb = float(m.ObjBound) if status == GRB.TIME_LIMIT and math.isfinite(m.ObjBound) else -math.inf
             return PricingOutcome(g.gid, "time_limit" if status == GRB.TIME_LIMIT else "error", lb, [], math.inf, seconds, m.NodeCount)
@@ -318,6 +323,9 @@ class GroupPricer:
                 columns.append(col)
         columns.sort(key=lambda c: reduced_cost(c, duals, phase_one))
         best_rc = float(m.ObjVal)
+        if early_stopped:
+            lb = float(m.ObjBound) if math.isfinite(m.ObjBound) else -math.inf
+            return PricingOutcome(g.gid, "early_stop", lb, columns, best_rc, seconds, m.NodeCount)
         if status == GRB.OPTIMAL:
             # 自审计：MIP 目标必须等于按主问题系数重算的约化成本
             best = self._extract_column(use_pool=False) if m.SolCount else None

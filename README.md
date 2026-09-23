@@ -175,6 +175,10 @@ MP2固定一个同行组，在该组各旅客所属舱位的完整座位—保�
 
 `full`表示真实旅客座位与保护空座合计达到两机型共同容量184，不一定有184名真实旅客。正式case允许不出现10人组；10人大组由独立测试覆盖。生成数据覆盖CHD、WCHR、BLND、BSCT、UM、EXST和CBBG七类SSR。正式数据未进入本协作仓库，本段只保留输入契约说明。
 
+## 6.5 Gurobi 直接定价列生成（2026-09-24 起）
+
+旧的 HiGHS 列生成已归档到 `archive/legacy_column_generation/`（其定价证书层的缺陷见 `reports/audit-2026-09-23/列生成正确性审计.md`）。新的精确路线是 `src/cg_gurobi/`：按同行组直接定价的 Dantzig–Wolfe 列生成 + 分支定价，只依赖本文档第 6 节模型和独立评估器语义，用法与证书口径见 `src/cg_gurobi/README.md`。
+
 ## 7. 项目结构
 
 ```text
