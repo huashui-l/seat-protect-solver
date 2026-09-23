@@ -10,6 +10,31 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
 
+    def test_raw_cli_records_structured_patterns_and_honors_disable(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                result = self.run_case("identity_keep_seats", "group-first", algorithm={
+                    "adaptive_stage_budgets": False, "construction_time_budget": 0.2,
+                    "repair_time_budget": 0.1, "vnd_time_budget": 0.05,
+                    "structured_pattern_time_budget": 0.15, "structured_pattern_dfs_per_group": 0.005,
+                    "structured_pattern_min_group_size": 1, "enable_structured_pattern_generation": enabled,
+                })
+                self.assertTrue(result["rich_candidate_complete"])
+                self.assertIn("pattern_generation", result["rich_stage_timing"])
+                stats = result["rich_structured_pattern_generation"]
+                self.assertEqual(stats["enabled"], enabled)
+                self.assertEqual(stats["patterns_generated"], sum(stats["tier_counts"].values()))
+                structured = [p for patterns in result["rich_elite_store"].values() for p in patterns
+                              if p["source"].startswith("structured_")]
+                if enabled:
+                    self.assertGreater(stats["groups_attempted"], 0)
+                    self.assertGreater(stats["patterns_generated"], 0)
+                    self.assertTrue(structured)
+                else:
+                    self.assertEqual(stats["groups_attempted"], 0)
+                    self.assertEqual(stats["patterns_generated"], 0)
+                    self.assertEqual(structured, [])
+
     def test_production_windows_match_python_at_actual_stage_times(self):
         oracle = python_budget_prefix()
         variants = [
@@ -65,6 +90,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 self.assertAlmostEqual(result["rich_search_deadline"], search_limit)
                 timings = result["rich_stage_timing"]
                 stages = ["construction", "repair", "vnd"]
+                if result["rich_candidate_complete"]: stages.append("pattern_generation")
                 self.assertEqual(set(timings), set(stages))
                 replay = dict(allocation_start=0.0, search_deadline_limit=search_limit,
                               construction_unassigned=result["rich_construction_unassigned"],

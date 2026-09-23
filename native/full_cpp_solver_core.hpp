@@ -390,6 +390,7 @@ struct RichStructuredDiagnostics {
 RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& problem,
     const std::vector<int>& assignment, std::chrono::steady_clock::time_point deadline,
     const std::function<void(int, const RichTieredPattern&, double, bool)>& recorder);
+void write_rich_structured_diagnostics(std::ostream& output, const RichStructuredDiagnostics& diagnostics);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

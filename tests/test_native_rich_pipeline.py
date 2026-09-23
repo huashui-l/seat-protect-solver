@@ -12,7 +12,7 @@ from unittest.mock import patch
 from src import heuristic_seat_allocator as rich
 from src.allocation_evaluator import IncrementalSoftScorer
 from tests.general_validation_case_factory import materialize_cases
-from tests.test_native_rich_elite import python_capture_namespace
+from tests.test_native_rich_elite import python_capture_namespace, python_conflict_activation
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,7 +44,7 @@ class NativeRichPipelineTests(unittest.TestCase):
         cls.cases = materialize_cases()
         cls.prefix = staticmethod(construction_prefix())
 
-    def replay(self, case, algorithm, vnd=False):
+    def replay(self, case, algorithm, vnd=False, structured=False):
         config = copy.deepcopy(self.config)
         # Generous nonbinding stage times isolate order/state/node semantics.
         # Real clock scheduling has a separate Python differential oracle.
@@ -55,6 +55,9 @@ class NativeRichPipelineTests(unittest.TestCase):
                                    stage3_time_budget=60.0,
                                    final_repair_time_limit=60.0)
         config["algorithm"].update(algorithm)
+        if structured:
+            config["algorithm"]["structured_pattern_dfs_per_group"] = 60.0
+            config.setdefault("column_generation", {})["dfs_node_limit"] = 100
         config["input_contract"] = {"seatmaps_by_direction": {
             "public-test": {"old": "old.json", "new": "new.json"}}}
         global_names = ("_SEAT_NEIGHBORS", "_SEAT_ROW_NEIGHBORS", "_SEAT_SUBROW",
@@ -93,6 +96,14 @@ class NativeRichPipelineTests(unittest.TestCase):
                     expected["groups"], context, expected["passenger_sorted_seats"], config["weights"], config,
                     rich.time.perf_counter() + 60.0)
                 captures["capture_stage_patterns"]("vnd")
+            expected_structured = None
+            if structured and len(context.assigned_seats) == len(passengers):
+                captures["conflict_diversity_active"] = python_conflict_activation(case, config, metrics)
+                expected_structured = rich.generate_structured_group_patterns(
+                    case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"], case["groupsData"],
+                    context, scorer, config["weights"], config, rich.time.perf_counter() + 60.0,
+                    captures["record_elite_pattern"])
+                expected_structured.pop("seconds")
             expected_elites = json.loads(json.dumps({str(g): list(patterns.values())
                 for g, patterns in captures["elite_pattern_store"].items()}))
             repaired = checkpoint()
@@ -102,13 +113,27 @@ class NativeRichPipelineTests(unittest.TestCase):
             for name, data in {
                 "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
                 "config.json": config, "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
-                "replay.json": {"assignments": [], "construction_pipeline": True, "pipeline_vnd": vnd},
+                "replay.json": {"assignments": [], "construction_pipeline": True, "pipeline_vnd": vnd,
+                                "pipeline_structured": structured, "structured_alternate_selected": structured},
             }.items():
                 (work / name).write_text(json.dumps(data), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
                                   str(work / "replay.json")], capture_output=True, text=True, timeout=180)
         self.assertEqual(run.returncode, 0, run.stderr)
         actual = json.loads(run.stdout)
+        if expected_structured is not None:
+            native_structured = actual["structured"]
+            native_structured.pop("seconds")
+            native_queue = native_structured.pop("repair_queue")
+            expected_queue = expected_structured.pop("repair_queue")
+            self.assertEqual(len(native_queue), len(expected_queue))
+            for a, b in zip(native_queue, expected_queue):
+                self.assertEqual(a.keys(), b.keys())
+                for key in a: self.assertAlmostEqual(a[key], b[key], places=8)
+            self.assertEqual(native_structured, expected_structured)
+        elif structured:
+            self.assertFalse(actual["structured"]["enabled"])
+            self.assertEqual(actual["structured"]["patterns_generated"], 0)
         self.assertEqual(actual["assignment_order"], expected_order)
         if expected_vnd is not None:
             for key in ("passes", "evaluated_moves", "accepted_moves", "stopped_by_deadline"):
@@ -160,3 +185,9 @@ class NativeRichPipelineTests(unittest.TestCase):
         for case in self.cases[:11]:
             with self.subTest(case=case["id"]):
                 self.replay(case, {}, vnd=True)
+
+    def test_combined_pipeline_structured_elites_match_python(self):
+        for case in self.cases[:11]:
+            with self.subTest(case=case["id"]):
+                self.replay(case, {}, vnd=True, structured=True)
+        self.replay(self.cases[0], {"stage3_time_budget": 0.0, "final_repair_time_limit": 0.0}, vnd=True, structured=True)

@@ -883,6 +883,39 @@ native/state-replay-enabled regression passed 129 tests and 16,138 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for this structured orchestration checkpoint.
 
+Structured generation is now connected to the production scheduler after VND,
+through `generate_rich_patterns_m3`. The wrapper restores the preserved Rich
+snapshot and records candidates synchronously into the existing elite store with
+construction-frozen conflict-diversity activation, current resource ownership,
+protection resources, source and pinning. It does not substitute the separately
+selected fallback assignment. Incomplete Rich candidates skip this quality stage.
+The scheduler accounts for the pattern-generation base budget, VND carry, global
+deadline and actual completion; diagnostics are exported as
+`rich_structured_pattern_generation`, and `rich_elite_store` now includes this stage.
+
+The combined construction/repair/VND/structured differential compares final elite
+contents/order, state, scores and structured diagnostics across eleven public
+fixtures, plus an incomplete-candidate skip. The probe deliberately changes the
+separate selected-assignment field before invoking the production wrapper, proving
+that saved Rich state drives generation and conflict ownership. Runtime schedule
+replay now checks pattern-generation windows at actual native stage times. Raw CLI
+tests require generated/retained structured candidates when enabled and no such
+candidates when disabled, with external legality/scoring audit in both cases.
+The focused pipeline/runtime/group-first suites passed 23 tests and 80 subtests.
+
+The migration map now marks the implemented structured layers and DFS prerequisites
+`FULL_CPP` at component scope. This does not close M3: special dual pricing still
+requires its restricted LP/orchestration. Protected multi-group MIP, dynamic
+relocation, conflict LNS/local branching, Rich restricted MIP and final full-stage
+diagnostic/quality acceptance remain required. The legacy RR master still consumes
+its own patterns; it is not the completed Rich pattern-master consumer.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 131 tests and 16,151 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for this production structured integration.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

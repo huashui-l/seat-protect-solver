@@ -9,6 +9,7 @@
 namespace full_cpp {
 
 struct GroupConstructionResult {
+    RichStructuredDiagnostics rich_structured;
     RichEliteStore rich_elite_store;
     bool rich_conflict_diversity_active = false;
     AssignmentSnapshot rich_state;
@@ -153,5 +154,8 @@ RichOrdinaryVndDiagnostics improve_rich_vnd_m2(
     std::chrono::steady_clock::time_point deadline,
     GroupConstructionResult& diagnostics
 );
+
+void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock::time_point deadline,
+    GroupConstructionResult& diagnostics);
 
 }  // namespace full_cpp

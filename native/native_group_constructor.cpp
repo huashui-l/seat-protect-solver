@@ -1023,4 +1023,25 @@ RichOrdinaryVndDiagnostics improve_rich_vnd_m2(
     return vnd;
 }
 
+void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock::time_point deadline,
+    GroupConstructionResult& diagnostics
+) {
+    if (!diagnostics.rich_candidate_complete) return;
+    AssignmentState state(problem);
+    state.restore(diagnostics.rich_state);
+    diagnostics.rich_structured = generate_rich_structured_patterns(problem, state.passenger_to_seat, deadline,
+        [&](int g, const RichTieredPattern& candidate, double score, bool pinned) {
+            RichElitePattern pattern;
+            pattern.local_score = score; pattern.source = "structured_" + candidate.source; pattern.pinned = pinned;
+            for (const auto& entry : candidate.pattern.assignments)
+                pattern.assignments.emplace_back(problem.passengers[entry.first].hostnum, problem.seats[entry.second].id);
+            std::map<int, std::vector<std::string>> blocked;
+            for (const auto& entry : candidate.pattern.blocked_by)
+                blocked[problem.passengers[entry.second].hostnum].push_back(problem.seats[entry.first].id);
+            pattern.blocked_by_host.assign(blocked.begin(), blocked.end());
+            diagnostics.rich_elite_store.record_candidate(problem.groups[g].id, std::move(pattern), state,
+                diagnostics.rich_conflict_diversity_active);
+        });
+}
+
 }  // namespace full_cpp

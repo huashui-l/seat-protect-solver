@@ -167,6 +167,17 @@ FeasibilityResult solve_feasibility_mip(
                     budgets.stages.at("vnd"), vnd_window.effective_budget,
                     vnd_started, vnd_finished, vnd_window.deadline,
                     schedule.carry(), schedule.pricing_reserve()};
+                if (group_result.rich_candidate_complete) {
+                    const double pattern_started = elapsed();
+                    const auto pattern_window = schedule.begin("pattern_generation", pattern_started);
+                    generate_rich_patterns_m3(problem, at(pattern_window.deadline), group_result);
+                    const double pattern_finished = elapsed();
+                    schedule.finish("pattern_generation", pattern_window, pattern_finished);
+                    group_result.rich_stage_timing["pattern_generation"] = {
+                        budgets.stages.at("pattern_generation"), pattern_window.effective_budget,
+                        pattern_started, pattern_finished, pattern_window.deadline,
+                        schedule.carry(), schedule.pricing_reserve()};
+                }
                 const RichPatternResult pattern_result = run_rich_pattern_master(
                     problem, group_result.passenger_to_seat,
                     search_deadline
@@ -191,6 +202,7 @@ FeasibilityResult solve_feasibility_mip(
                 }
             }
             result.rich_elite_store = group_result.rich_elite_store;
+            result.rich_structured = group_result.rich_structured;
             result.rich_conflict_diversity_active = group_result.rich_conflict_diversity_active;
             result.rich_construction_repair_queue = group_result.rich_construction_repair_queue;
             result.rich_stage_timing = group_result.rich_stage_timing;

@@ -20,6 +20,7 @@ const char* construction_objective_name(ConstructionObjective objective);
 struct FeasibilityResult {
     RichEliteStore rich_m1_elite_store;
     RichEliteStore rich_elite_store;
+    RichStructuredDiagnostics rich_structured;
     bool rich_conflict_diversity_active = false;
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;

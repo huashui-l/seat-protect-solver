@@ -1931,6 +1931,19 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
     return diagnostics;
 }
 
+void write_rich_structured_diagnostics(std::ostream& output, const RichStructuredDiagnostics& stats) {
+    output << "{\"enabled\":" << (stats.enabled ? "true" : "false")
+        << ",\"stopped_by_deadline\":" << (stats.stopped_by_deadline ? "true" : "false")
+        << ",\"three_tier_active\":" << (stats.three_tier_active ? "true" : "false")
+        << ",\"groups_attempted\":" << stats.groups_attempted << ",\"groups_with_patterns\":" << stats.groups_with_patterns
+        << ",\"patterns_generated\":" << stats.patterns_generated << ",\"row_windows_attempted\":" << stats.row_windows_attempted
+        << ",\"dfs_nodes\":" << stats.dfs_nodes << ",\"extreme_groups_attempted\":" << stats.extreme_groups_attempted
+        << ",\"span_reducing_patterns\":" << stats.span_reducing_patterns << ",\"seconds\":" << stats.seconds << ",\"tier_counts\":{";
+    bool first = true;
+    for (const auto& entry : stats.tier_counts) { if (!first) output << ','; first = false; output << '"' << entry.first << "\":" << entry.second; }
+    output << "},\"repair_queue\":"; write_rich_repair_queue(output, stats.repair_queue, 20); output << '}';
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

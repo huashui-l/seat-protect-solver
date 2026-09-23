@@ -666,6 +666,14 @@ int main(int argc, char** argv) {
                 diagnostics.rich_elite_store = captures;
                 vnd = full_cpp::improve_rich_vnd_m2(problem,
                     std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+                if (const auto* structured = replay.find("pipeline_structured"); structured && structured->bool_or()) {
+                    diagnostics.rich_conflict_diversity_active = full_cpp::rich_conflict_diversity_active(problem,
+                        full_cpp::build_rich_repair_queue(problem, construction_state.passenger_to_seat));
+                    if (const auto* alternate = replay.find("structured_alternate_selected"); alternate && alternate->bool_or())
+                        diagnostics.passenger_to_seat.assign(problem.passengers.size(), -1);
+                    full_cpp::generate_rich_patterns_m3(problem,
+                        std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+                }
                 state.restore(diagnostics.rich_state);
                 captures = diagnostics.rich_elite_store;
             }
@@ -767,6 +775,8 @@ int main(int argc, char** argv) {
                 full_cpp::build_rich_repair_queue(problem, construction_state.passenger_to_seat), problem.groups.size());
             std::cout << ",\"elite_store\":";
             full_cpp::write_rich_elite_store(std::cout, captures);
+            std::cout << ",\"structured\":";
+            full_cpp::write_rich_structured_diagnostics(std::cout, diagnostics.rich_structured);
             emit_score("construction_score", construction_score);
             emit_score("repair_score", full_cpp::evaluate_score_components(problem, state.passenger_to_seat));
         }
