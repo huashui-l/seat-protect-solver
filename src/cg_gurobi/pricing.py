@@ -239,6 +239,24 @@ class GroupPricer:
         m.update()
 
     # ------------------------------------------------------------------ 定价
+    def price_with_rules(self, duals: Duals, rules: Sequence[Tuple[str, bool]], *, phase_one: bool, time_limit: float) -> PricingOutcome:
+        """带分支规则的定价：(seat, must_use) —— 组必须/不得占用该座位。"""
+        m = self.model
+        temp = []
+        for seat, must in rules:
+            expr = self.occupant_expr.get(seat)
+            if expr is None:
+                if must:
+                    return PricingOutcome(self.group.gid, "infeasible", math.inf, [], math.inf, 0.0)
+                continue
+            temp.append(m.addConstr(expr == (1.0 if must else 0.0)))
+        try:
+            return self.price(duals, phase_one=phase_one, time_limit=time_limit)
+        finally:
+            for c in temp:
+                m.remove(c)
+            m.update()
+
     def _remember_start(self) -> None:
         self._last_start = [(v, v.X) for v in self.model.getVars()]
 

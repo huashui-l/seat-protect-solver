@@ -23,6 +23,7 @@ from src import allocation_evaluator as evaluator
 from .instance import Instance
 from .master import Master
 from .pricing import Column, GroupPricer, TOL, reduced_cost
+from .branching import branch_and_price
 
 PassengerKey = Tuple[int, int]
 
@@ -35,6 +36,9 @@ def _cfg(config: Mapping[str, Any]) -> Dict[str, Any]:
     c.setdefault("max_iterations", 10_000)
     c.setdefault("pricing_workers", 4)
     c.setdefault("dive", True)
+    c.setdefault("branch_and_price", True)
+    c.setdefault("bp_node_limit", 200)
+    c.setdefault("bp_integer_time_limit", 5.0)
     c.setdefault("dive_pricing_rounds", 2)
     c.setdefault("warm_start", "heuristic")   # heuristic | greedy | none
     c.setdefault("heuristic_seconds", 5.0)
@@ -262,6 +266,26 @@ def solve_single_cabin(
     if not master.phase_one:
         int_budget = min(float(cfg["integer_time_limit"]), max(1.0, deadline - time.perf_counter()))
         int_status, selected, int_cost = master.solve_integer(int_budget)
+    # 分支定价：根 LP 已认证且列池整数解与 LP 有差距时，二分 (组, 座位) 关闭 gap
+    bp: Optional[Dict[str, Any]] = None
+    proven_optimal = False
+    if (
+        bool(cfg["branch_and_price"]) and exact_lp_cost is not None and selected is not None
+        and int_cost is not None and int_cost > exact_lp_cost + TOL
+        and time.perf_counter() + 2.0 < deadline
+    ):
+        bp = branch_and_price(
+            inst, master, pricers, executor, root_cost=exact_lp_cost, incumbent_cost=int_cost,
+            incumbent=selected, deadline=deadline, cfg=cfg, log=lambda msg: _log(log, "bp " + msg),
+        )
+        if bp["incumbent"] is not None and bp["incumbent_cost"] < int_cost - TOL:
+            selected, int_cost = bp["incumbent"], bp["incumbent_cost"]
+            int_status = "branch_and_price"
+        proven_optimal = bool(bp["proven"])
+        _log(log, f"branch-and-price: proven={bp['proven']} nodes={bp['stats']['nodes']} open={bp['open_nodes']} "
+                  f"incumbent_cost={bp['incumbent_cost']:.4f} global_lb={bp['global_cost_lower_bound']:.4f}")
+    elif exact_lp_cost is not None and selected is not None and int_cost is not None and int_cost <= exact_lp_cost + TOL:
+        proven_optimal = True
     assigned: Dict[PassengerKey, str] = {}
     if selected:
         for col in selected:
@@ -285,6 +309,10 @@ def solve_single_cabin(
         "unassigned": unassigned,
         "violation_detail": detail,
         "integer_status": int_status,
+        "proven_optimal": proven_optimal,
+        "bp_bound": (-bp["global_cost_lower_bound"]) if bp is not None else lp_bound,
+        "bp_bound_certified": (bp["all_certified"] if bp is not None else lp_bound is not None),
+        "branch_and_price": (bp["stats"] | {"open_nodes": bp["open_nodes"], "proven": bp["proven"]}) if bp is not None else None,
         "lp_bound": lp_bound,
         "lp_bound_certified": lp_bound is not None,
         "safe_bound": safe_bound,
@@ -348,8 +376,12 @@ def solve(
         sum((r["lp_bound"] if r.get("lp_bound") is not None else r["safe_bound"]) for r in per_cabin.values())
         if safe_ok else None
     )
+    bp_ok = all(r.get("bp_bound") is not None and r.get("bp_bound_certified") for r in per_cabin.values())
+    bp_bound = sum(r["bp_bound"] for r in per_cabin.values()) if bp_ok else None
     return {
         "status": "complete" if complete else "incomplete",
+        "proven_optimal": complete and all(bool(r.get("proven_optimal")) for r in per_cabin.values()),
+        "bp_bound": bp_bound,
         "assigned_seats": assigned,
         "total_score": soft,
         "score_detail": soft_detail,
