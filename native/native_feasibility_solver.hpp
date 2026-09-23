@@ -124,6 +124,7 @@ struct FeasibilityResult {
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;
     double rich_search_deadline = 0.0;
+    double rich_allocation_start = 0.0;
     double rich_m1_selected_score = 0.0;
     std::string status;
     std::string q0_solver_status;

@@ -128,8 +128,6 @@ FeasibilityResult solve_feasibility_mip(
         const double search_seconds = std::min(budgets.usable_time,
             time_limit_seconds - std::min(budgets.scoring_reserve, time_limit_seconds * 0.2));
         const auto search_deadline = at(search_seconds);
-        RichStageSchedule schedule(budgets, 0.0,
-            problem.rich.restricted_pattern_mip_tail_budget, search_seconds);
         FeasibilityResult result = solve_feasibility_mip(
             problem, std::max(0.0, search_seconds - elapsed()), seed, ConstructionObjective::IndividualSoft
         );
@@ -147,6 +145,12 @@ FeasibilityResult solve_feasibility_mip(
                     search_deadline
                 );
             }
+            // Fallback preparation is charged to the global deadline, but is
+            // not Python Rich construction. Start its stage clock here so a
+            // slow fallback cannot hand Rich an already expired first window.
+            result.rich_allocation_start = elapsed();
+            RichStageSchedule schedule(budgets, result.rich_allocation_start,
+                problem.rich.restricted_pattern_mip_tail_budget, search_seconds);
             group_result = construct_rich_m1(
                 problem, result.passenger_to_seat, group_result, started, schedule
             );
