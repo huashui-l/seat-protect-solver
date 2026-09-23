@@ -9,6 +9,7 @@
 namespace full_cpp {
 
 struct GroupConstructionResult {
+    RichEliteStore rich_elite_store;
     std::map<std::string, RichStageTiming> rich_stage_timing;
     std::vector<int> passenger_to_seat;
     std::string selected_incumbent = "q0";

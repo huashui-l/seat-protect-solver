@@ -151,6 +151,7 @@ FeasibilityResult solve_feasibility_mip(
             group_result = construct_rich_m1(
                 problem, result.passenger_to_seat, group_result, started, schedule
             );
+            result.rich_m1_elite_store = group_result.rich_elite_store;
             result.rich_m1_selected_score = group_result.group_construction_score;
             // A failed construction/repair candidate leaves the legal fallback
             // selected. Never confuse candidate completeness with that incumbent.

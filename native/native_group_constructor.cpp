@@ -937,6 +937,7 @@ GroupConstructionResult construct_rich_m1(
     const double construction_started = elapsed();
     const auto construction_window = schedule.begin("construction", construction_started);
     GroupConstructionResult result = q2a_result;
+    result.rich_elite_store = RichEliteStore(problem.rich.elite_patterns_per_group);
     AssignmentState state = initialize_rich_assignment(problem);
     const auto cache = build_rich_candidate_cache(problem, state);
     const auto construction_deadline = at(construction_window.deadline);
@@ -951,6 +952,7 @@ GroupConstructionResult construct_rich_m1(
     result.rich_paired_rescue_unresolved = static_cast<int>(diagnostics.rescue.unresolved.size());
     result.rich_paired_joint_rebuilds = diagnostics.rescue.joint_rebuilds;
     result.rich_construction_repair_queue = build_rich_repair_queue(problem, state.passenger_to_seat);
+    result.rich_elite_store.capture(state, "construction");
     const double construction_finished = elapsed();
     schedule.finish("construction", construction_window, construction_finished);
     result.rich_construction_seconds = construction_finished;
@@ -966,6 +968,7 @@ GroupConstructionResult construct_rich_m1(
     const double repair_started = elapsed();
     const auto repair_window = schedule.begin("repair", repair_started, result.rich_construction_unassigned);
     repair_rich_assignment(problem, state, cache.rankings, at(repair_window.deadline), result);
+    result.rich_elite_store.capture(state, "repair");
     const double repair_finished = elapsed();
     schedule.finish("repair", repair_window, repair_finished);
     result.rich_stage_timing["repair"] = {

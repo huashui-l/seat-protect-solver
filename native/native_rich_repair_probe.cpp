@@ -32,51 +32,7 @@ int main(int argc, char** argv) {
                              record.at("conflict_diversity_active").bool_or());
                 if (!first_snapshot) std::cout << ',';
                 first_snapshot = false;
-                std::cout << '{';
-                bool first_group = true;
-                for (const auto& group : store.groups()) {
-                    if (!first_group) std::cout << ',';
-                    first_group = false;
-                    std::cout << std::quoted(std::to_string(group.first)) << ":[";
-                    bool first_pattern = true;
-                    for (const auto& item : group.second) {
-                        if (!first_pattern) std::cout << ',';
-                        first_pattern = false;
-                        std::cout << "{\"assignments\":[";
-                        for (size_t i = 0; i < item.assignments.size(); ++i) {
-                            if (i) std::cout << ',';
-                            std::cout << '[' << item.assignments[i].first << ',' << std::quoted(item.assignments[i].second) << ']';
-                        }
-                        std::cout << "],\"blocked_by_host\":[";
-                        const auto strings = [](const auto& values) {
-                            std::cout << '[';
-                            for (size_t i = 0; i < values.size(); ++i) {
-                                if (i) std::cout << ',';
-                                std::cout << std::quoted(values[i]);
-                            }
-                            std::cout << ']';
-                        };
-                        for (size_t i = 0; i < item.blocked_by_host.size(); ++i) {
-                            if (i) std::cout << ',';
-                            std::cout << '[' << item.blocked_by_host[i].first << ',';
-                            strings(item.blocked_by_host[i].second);
-                            std::cout << ']';
-                        }
-                        std::cout << "],\"occupied_seats\":"; strings(item.occupied_seats);
-                        std::cout << ",\"blocked_seats\":"; strings(item.blocked_seats);
-                        std::cout << ",\"seat_resources\":"; strings(item.seat_resources);
-                        std::cout << ",\"conflict_groups\":[";
-                        for (size_t i = 0; i < item.conflict_groups.size(); ++i) {
-                            if (i) std::cout << ',';
-                            std::cout << item.conflict_groups[i];
-                        }
-                        std::cout << "],\"local_score\":" << item.local_score
-                            << ",\"source\":" << std::quoted(item.source)
-                            << ",\"pinned\":" << (item.pinned ? "true" : "false") << '}';
-                    }
-                    std::cout << ']';
-                }
-                std::cout << '}';
+                full_cpp::write_rich_elite_store(std::cout, store);
             }
             std::cout << "]}\n";
             return 0;
@@ -125,6 +81,7 @@ int main(int argc, char** argv) {
             for (const auto& seat : row.array) rankings.back().push_back(problem.seat_index.at(seat.string));
         }
         if (!pipeline && rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
+        full_cpp::RichEliteStore captures(problem.rich.elite_patterns_per_group);
         full_cpp::GroupConstructionResult diagnostics;
         full_cpp::RichRemainingDiagnostics construction;
         int paired_added = 0;
@@ -139,10 +96,12 @@ int main(int argc, char** argv) {
             construction = combined.search;
             rescue = combined.rescue;
             paired_passes = combined.paired_passes;
+            captures.capture(state, "construction");
             construction_state = state.save();
             construction_score = full_cpp::evaluate_score_components(problem, state.passenger_to_seat);
             full_cpp::repair_rich_assignment(problem, state, cache.rankings,
                 std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+            captures.capture(state, "repair");
         } else if (const auto* rescue_mode = replay.find("paired_rescue"); rescue_mode && rescue_mode->bool_or()) {
             auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             cache.rankings = rankings;
@@ -239,6 +198,8 @@ int main(int argc, char** argv) {
             std::cout << ",\"construction_repair_queue\":";
             full_cpp::write_rich_repair_queue(std::cout,
                 full_cpp::build_rich_repair_queue(problem, construction_state.passenger_to_seat), problem.groups.size());
+            std::cout << ",\"elite_store\":";
+            full_cpp::write_rich_elite_store(std::cout, captures);
             emit_score("construction_score", construction_score);
             emit_score("repair_score", full_cpp::evaluate_score_components(problem, state.passenger_to_seat));
         }

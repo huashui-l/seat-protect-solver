@@ -269,7 +269,7 @@ asserted absent at both checkpoints in these scenarios.
 
 These comparisons use generous nonbinding construction/repair times and do not
 establish wall-clock cutoff parity. Tail-stage runtime scheduling,
-elite bookkeeping and a frozen Formal24 M1 checkpoint
+later-stage elite bookkeeping and a frozen Formal24 M1 checkpoint
 are still outstanding. The earlier inconsistent all-missing repair reproduction
 remains a separate reference defect; these passing trajectories do not prove
 it unreachable for all inputs.
@@ -301,7 +301,8 @@ This is production integration of the first three stage windows, not complete
 runtime or quality parity. The Q0/Q1/Q2A prefix is an additional native fallback
 cost absent from Python and can consume the construction window. Raw parsing and
 topology currently occur before this solver clock. Construction repair-queue bookkeeping is now native as described below;
-elite capture is still absent, so timing overhead is not identical.
+construction/repair elite capture is now native as described below. Later-stage
+bookkeeping remains incomplete, so timing overhead is not identical.
 The current RR pattern adapter remains clipped to the shared search deadline;
 it is not labeled as the missing structured/protected/pricing/LNS stages, and its
 restricted-master budget/carry semantics remain pending. Complete legal fallbacks
@@ -350,12 +351,38 @@ executes the actual nested Python function and compares every field and pattern
 order after 636 records across three limits (639 subtests including the limits).
 Coverage includes alternative protection choices, replacement/unpinning, stable
 ties, conflict diversity, all-pinned overflow and deterministic random records.
-This store is not yet wired to production stage capture: affected-group scoring,
-capture at construction/repair/VND, conflict-diversity activation, and subsequent
-structured/protected/restricted stage consumers remain required. No production
-elite-coverage or quality-parity claim follows from this isolated store test.
+The initial isolated store checkpoint did not establish production capture.
+Construction/repair capture is now integrated as described below; VND capture,
+candidate conflict-diversity activation and subsequent structured/protected/
+restricted stage consumers remain required. No full elite-coverage or
+quality-parity claim follows from the isolated store test.
 Release build passed; the full native/state-replay-enabled suite passed 96 tests,
 13,166 subtests and 9 skips. No Formal24 or profiling run was performed.
+
+Construction and repair now capture complete groups into the native elite store
+before recording each stage's finish time/carry. The store uses the configured
+`elite_patterns_per_group` with Python's lower bound of two. Captures preserve the
+actual per-passenger protection blocks and pin current group placements. Incomplete
+groups are omitted. Current-state captures have no external resource conflicts;
+this does not replace the pending conflict-diversity activation for generated
+candidate patterns. The raw CLI exposes the pre-VND store as `rich_m1_elite_store`.
+
+A shared scoring implementation now supports Rich affected-group components for
+capture: individual and compactness terms belong only to the affected group, while
+baby interference includes both outgoing and incoming interactions with other
+groups. Rich preference terms sum all toilet rules. The existing full-score entry
+retains its prior behavior. The prior diagnostic serializer is shared by the probe
+and CLI rather than duplicated. All 33 combined pipeline scenarios execute the
+actual Python nested `capture_stage_patterns` and `record_elite_pattern` functions
+and compare captured identities, resource choices, scores, source and pinning after
+construction and repair. Production scenarios also check complete-group coverage
+and omission of wholly unassigned groups. VND capture must retain real protection
+state during its migration; rebuilding that state from seat assignments alone is
+not claimed equivalent. The elite store is not yet consumed by the RR adapter or
+unmigrated ACTIVE pattern stages.
+Release build and the full native/state-replay-enabled suite passed: 96 tests,
+13,166 subtests, 9 skips. The two existing conversion warnings remain. No Formal24
+checkpoint or performance experiment was run.
 
 ## Correctness
 

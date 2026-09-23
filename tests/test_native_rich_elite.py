@@ -36,6 +36,18 @@ def python_records(records, limit):
     return json.loads(json.dumps(snapshots))
 
 
+def python_capture_namespace(context, groups, scorer, limit):
+    tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+    allocation = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                      and n.name == "_run_allocation_single_cabin")
+    functions = [n for n in allocation.body if isinstance(n, ast.FunctionDef)
+                 and n.name in ("record_elite_pattern", "capture_stage_patterns")]
+    namespace = dict(rich.__dict__, elite_pattern_store={}, elite_pattern_limit=max(2, limit),
+                     context=context, groups=groups, stage_scorer=scorer, conflict_diversity_active=True)
+    exec(compile(ast.Module(body=functions, type_ignores=[]), "frozen_elite_capture", "exec"), namespace)
+    return namespace
+
+
 class NativeRichEliteTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
 

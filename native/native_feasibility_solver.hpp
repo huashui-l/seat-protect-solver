@@ -18,6 +18,7 @@ ConstructionObjective parse_construction_objective(const std::string& value);
 const char* construction_objective_name(ConstructionObjective objective);
 
 struct FeasibilityResult {
+    RichEliteStore rich_m1_elite_store;
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;
     double rich_search_deadline = 0.0;

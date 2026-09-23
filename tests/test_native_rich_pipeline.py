@@ -12,6 +12,7 @@ from unittest.mock import patch
 from src import heuristic_seat_allocator as rich
 from src.allocation_evaluator import IncrementalSoftScorer
 from tests.general_validation_case_factory import materialize_cases
+from tests.test_native_rich_elite import python_capture_namespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -74,6 +75,9 @@ class NativeRichPipelineTests(unittest.TestCase):
                         [sorted(context.assigned_blocked.get(key, ())) for key in passengers],
                         scorer.components(context.assigned_seats))
 
+            captures = python_capture_namespace(context, expected["groups"], scorer,
+                                                config["algorithm"].get("elite_patterns_per_group", 12))
+            captures["capture_stage_patterns"]("construction")
             construction = checkpoint()
             metrics = rich._group_repair_metrics(case["groupsData"], context.assigned_seats,
                                                  scorer.new_topology, config["weights"], config,
@@ -81,6 +85,9 @@ class NativeRichPipelineTests(unittest.TestCase):
             queue = sorted(metrics.values(), key=rich._repair_priority_key)
             repair = rich.repair_unassigned_by_local_relocation(
                 expected["groups"], context, expected["passenger_sorted_seats"], config)
+            captures["capture_stage_patterns"]("repair")
+            expected_elites = json.loads(json.dumps({str(g): list(patterns.values())
+                for g, patterns in captures["elite_pattern_store"].items()}))
             repaired = checkpoint()
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
@@ -99,6 +106,14 @@ class NativeRichPipelineTests(unittest.TestCase):
         for native, reference in zip(actual["construction_repair_queue"], queue):
             for key, value in reference.items():
                 self.assertAlmostEqual(native[key], value, places=8, msg=key)
+        self.assertEqual(actual["elite_store"].keys(), expected_elites.keys())
+        for group_id, patterns in expected_elites.items():
+            native_patterns = actual["elite_store"][group_id]
+            self.assertEqual(len(native_patterns), len(patterns))
+            for native, reference in zip(native_patterns, patterns):
+                self.assertAlmostEqual(native["local_score"], reference["local_score"], places=8)
+                self.assertEqual({k: v for k, v in native.items() if k != "local_score"},
+                                 {k: v for k, v in reference.items() if k != "local_score"})
         for prefix, reference, score_key in (("construction_", construction, "construction_score"),
                                               ("", repaired, "repair_score")):
             self.assertEqual(actual[prefix + "assignments"], reference[0], prefix + "assignments")

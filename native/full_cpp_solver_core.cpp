@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <ostream>
+#include <iomanip>
 #include <tuple>
 #include <stdexcept>
 
@@ -183,6 +184,7 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = values->find("bassinet")) problem.bassinet_value = item->number_or(problem.bassinet_value);
     }
     if (const Value* algorithm = config.find("algorithm")) {
+        if (const Value* item = algorithm->find("elite_patterns_per_group")) problem.rich.elite_patterns_per_group = std::max(2, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);
         if (const Value* item = algorithm->find("back_penalty_factor")) problem.back_penalty_factor = item->number_or(problem.back_penalty_factor);
@@ -363,8 +365,8 @@ IndividualScoreComponents evaluate_individual_score(
     return result;
 }
 
-ScoreComponents evaluate_score_components(
-    const Problem& problem, const std::vector<int>& assignment
+static ScoreComponents score_components_impl(
+    const Problem& problem, const std::vector<int>& assignment, int affected_group, bool rich_preferences
 ) {
     if (assignment.size() != problem.passengers.size()) {
         throw std::runtime_error("score assignment size mismatch");
@@ -373,15 +375,27 @@ ScoreComponents evaluate_score_components(
     for (int passenger_index = 0;
          passenger_index < static_cast<int>(problem.passengers.size()); ++passenger_index) {
         const int new_index = assignment[passenger_index];
-        if (new_index < 0) continue;
-        const IndividualScoreComponents individual = evaluate_individual_score(
+        if (new_index < 0 || (affected_group >= 0 && problem.passengers[passenger_index].group != affected_group)) continue;
+        IndividualScoreComponents individual = evaluate_individual_score(
             problem, passenger_index, new_index
         );
+        if (rich_preferences) {
+            const auto& passenger = problem.passengers[passenger_index];
+            if (problem.old_seat_index.count(passenger.old_seat)) {
+                if (passenger.has_near_toilet_preference
+                    && problem.seats[new_index].near_toilet != passenger.prefer_near_toilet)
+                    individual.score_p -= problem.weight_t * passenger.near_toilet_preference_weight;
+                for (const auto& preference : passenger.rich_toilet_preferences)
+                    if (problem.seats[new_index].near_toilet != preference.first)
+                        individual.score_p += problem.weight_t * preference.second;
+            }
+        }
         result.score_s += individual.score_s;
         result.score_v += individual.score_v;
         result.score_p += individual.score_p;
     }
     for (const Group& group : problem.groups) {
+        if (affected_group >= 0 && group.id != problem.groups[affected_group].id) continue;
         if (group.passengers.size() <= 1) continue;
         double sum_x = 0.0, sum_y = 0.0;
         int count = 0;
@@ -413,6 +427,8 @@ ScoreComponents evaluate_score_components(
         for (int other = 0; other < static_cast<int>(problem.passengers.size()); ++other) {
             if (assignment[other] < 0
                 || problem.passengers[other].group == problem.passengers[infant].group) continue;
+            if (affected_group >= 0 && problem.passengers[infant].group != affected_group
+                && problem.passengers[other].group != affected_group) continue;
             const Seat& other_seat = problem.seats[assignment[other]];
             if (other_seat.cabin != infant_seat.cabin) continue;
             const double distance = 1.0 + std::abs(infant_seat.x - other_seat.x);
@@ -424,6 +440,14 @@ ScoreComponents evaluate_score_components(
         }
     }
     return result;
+}
+
+ScoreComponents evaluate_score_components(const Problem& problem, const std::vector<int>& assignment) {
+    return score_components_impl(problem, assignment, -1, false);
+}
+
+ScoreComponents evaluate_rich_group_score(const Problem& problem, const std::vector<int>& assignment, int group_index) {
+    return score_components_impl(problem, assignment, group_index, true);
 }
 
 double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
@@ -1003,6 +1027,31 @@ void AssignmentState::restore(AssignmentSnapshot snapshot) {
     seat_ssr_passenger = std::move(snapshot.seat_ssr_passenger);
 }
 
+void RichEliteStore::capture(const AssignmentState& state, const std::string& source) {
+    const auto& problem = state.problem;
+    for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
+        const auto& group = problem.groups[g];
+        RichElitePattern pattern;
+        bool complete = true;
+        for (int p : group.passengers) {
+            const int seat = state.passenger_to_seat[p];
+            if (seat < 0) { complete = false; break; }
+            const int host = problem.passengers[p].hostnum;
+            pattern.assignments.emplace_back(host, problem.seats[seat].id);
+            std::vector<std::string> blocks;
+            for (int blocked : state.assigned_blocked[p]) blocks.push_back(problem.seats[blocked].id);
+            pattern.blocked_by_host.emplace_back(host, std::move(blocks));
+        }
+        if (!complete) continue;
+        pattern.local_score = evaluate_rich_group_score(problem, state.passenger_to_seat, g).total();
+        pattern.source = source;
+        pattern.pinned = true;
+        // A captured current placement owns all of its resources, so it has
+        // no conflicts even when candidate conflict diversity is enabled.
+        record(group.id, std::move(pattern), {}, false);
+    }
+}
+
 void RichEliteStore::record(int group_id, RichElitePattern pattern,
     const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active
 ) {
@@ -1044,6 +1093,54 @@ void RichEliteStore::record(int group_id, RichElitePattern pattern,
         if (worst == patterns.end() || item->local_score < worst->local_score) worst = item;
     }
     if (worst != patterns.end()) patterns.erase(worst);
+}
+
+void write_rich_elite_store(std::ostream& output, const RichEliteStore& store) {
+    output << '{';
+    bool first_group = true;
+    for (const auto& group : store.groups()) {
+        if (!first_group) output << ',';
+        first_group = false;
+        output << std::quoted(std::to_string(group.first)) << ":[";
+        bool first_pattern = true;
+        for (const auto& item : group.second) {
+            if (!first_pattern) output << ',';
+            first_pattern = false;
+            output << "{\"assignments\":[";
+            for (size_t i = 0; i < item.assignments.size(); ++i) {
+                if (i) output << ',';
+                output << '[' << item.assignments[i].first << ',' << std::quoted(item.assignments[i].second) << ']';
+            }
+            output << "],\"blocked_by_host\":[";
+            const auto strings = [&](const auto& values) {
+                output << '[';
+                for (size_t i = 0; i < values.size(); ++i) {
+                    if (i) output << ',';
+                    output << std::quoted(values[i]);
+                }
+                output << ']';
+            };
+            for (size_t i = 0; i < item.blocked_by_host.size(); ++i) {
+                if (i) output << ',';
+                output << '[' << item.blocked_by_host[i].first << ',';
+                strings(item.blocked_by_host[i].second);
+                output << ']';
+            }
+            output << "],\"occupied_seats\":"; strings(item.occupied_seats);
+            output << ",\"blocked_seats\":"; strings(item.blocked_seats);
+            output << ",\"seat_resources\":"; strings(item.seat_resources);
+            output << ",\"conflict_groups\":[";
+            for (size_t i = 0; i < item.conflict_groups.size(); ++i) {
+                if (i) output << ',';
+                output << item.conflict_groups[i];
+            }
+            output << "],\"local_score\":" << item.local_score
+                << ",\"source\":" << std::quoted(item.source)
+                << ",\"pinned\":" << (item.pinned ? "true" : "false") << '}';
+        }
+        output << ']';
+    }
+    output << '}';
 }
 
 }  // namespace full_cpp

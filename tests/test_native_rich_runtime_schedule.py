@@ -29,6 +29,17 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 budgets = oracle(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
                                  case["groupsData"], config["weights"], config)
                 result = self.run_case(case["id"], "group-first", algorithm=variant)
+                elites = result["rich_m1_elite_store"]
+                if result["rich_candidate_complete"]:
+                    self.assertEqual(set(elites), {str(g["groupId"]) for g in case["groupsData"]})
+                if variant.get("final_repair_time_limit") == 0.0:
+                    self.assertEqual(elites, {})
+                for patterns in elites.values():
+                    self.assertTrue(patterns)
+                    for pattern in patterns:
+                        self.assertTrue(pattern["pinned"])
+                        self.assertEqual(pattern["conflict_groups"], [])
+                        self.assertIn(pattern["source"], {"construction", "repair"})
                 queue = result["rich_construction_repair_queue"]
                 self.assertEqual(len(queue), len(case["groupsData"]))
                 self.assertEqual(sum(m["assigned"] for m in queue), result["rich_construction_assigned"])

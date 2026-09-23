@@ -65,6 +65,7 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
+    int elite_patterns_per_group = 12;
     double stage3_time_budget = 20.0;
     bool enable_restricted_pattern_mip = true;
     double restricted_pattern_mip_time_budget = 0.0;
@@ -281,6 +282,8 @@ ScoreComponents evaluate_score_components(
     const std::vector<int>& passenger_to_seat
 );
 
+ScoreComponents evaluate_rich_group_score(const Problem& problem, const std::vector<int>& assignment, int group_index);
+
 double evaluate_soft_score(
     const Problem& problem,
     const std::vector<int>& passenger_to_seat
@@ -298,7 +301,8 @@ struct RichElitePattern {
 
 class RichEliteStore {
 public:
-    explicit RichEliteStore(int limit) : limit_(limit < 2 ? 2 : limit) {}
+    explicit RichEliteStore(int limit = 12) : limit_(limit < 2 ? 2 : limit) {}
+    void capture(const AssignmentState& state, const std::string& source);
     void record(int group_id, RichElitePattern pattern,
                 const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active);
     const std::map<int, std::vector<RichElitePattern>>& groups() const { return groups_; }
@@ -306,5 +310,7 @@ private:
     int limit_;
     std::map<int, std::vector<RichElitePattern>> groups_;
 };
+
+void write_rich_elite_store(std::ostream& output, const RichEliteStore& store);
 
 }  // namespace full_cpp
