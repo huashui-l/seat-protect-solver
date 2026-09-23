@@ -355,13 +355,19 @@ class GroupPricer:
         m.update()
         return col
 
-    def column_from_assignment(self, assignment: Mapping[PassengerKey, str]) -> Optional[Column]:
-        """把外部给定的整数放置（如启发式方案）固定进 MIP，求出合法的保护空座选择并生成列。"""
+    def column_from_assignment(self, assignment: Mapping[PassengerKey, str],
+                               protected: Optional[Mapping[PassengerKey, str]] = None) -> Optional[Column]:
+        """把外部给定的整数放置（如启发式方案）固定进 MIP 并生成列。
+
+        ``protected`` 给出单侧保护旅客已协调好的保护空座（跨组不重复）；未给出时由 MIP 自选。"""
         m = self.model
         temp = []
         for (pk, s), var in self.x.items():
             if assignment.get(pk) != s:
                 temp.append(m.addConstr(var == 0.0))
+        for (pk, s, t), var in self.z.items():
+            if protected and pk in protected:
+                temp.append(m.addConstr(var == (1.0 if (assignment.get(pk) == s and protected[pk] == t) else 0.0)))
         m.setObjective(self.cost_expr, GRB.MINIMIZE)
         m.Params.TimeLimit = 5.0
         m.Params.Cutoff = GRB.INFINITY

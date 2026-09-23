@@ -164,13 +164,18 @@ class Master:
     def lp_values(self) -> Dict[int, float]:
         return {i: var.X for i, var in enumerate(self.column_vars) if var.X > 1e-9}
 
-    def solve_integer(self, time_limit: float) -> Tuple[str, Optional[List[Column]], Optional[float]]:
-        """列池整数主问题（primal heuristic）。返回 (状态, 选中列, 目标成本)。"""
+    def solve_integer(self, time_limit: float, start: Optional[Sequence[Column]] = None) -> Tuple[str, Optional[List[Column]], Optional[float]]:
+        """列池整数主问题（primal heuristic）。返回 (状态, 选中列, 目标成本)。
+
+        ``start``：已知的完整合法列组合（如启发式方案），作为 MIP start，保证有解。"""
         if self.phase_one:
             return ("phase_one", None, None)
         m = self.model
-        for var in self.column_vars:
+        start_sigs = {c.signature for c in (start or [])}
+        for col, var in zip(self.columns, self.column_vars):
             var.VType = GRB.BINARY
+            if start_sigs:
+                var.Start = 1.0 if col.signature in start_sigs else 0.0
         m.Params.TimeLimit = max(0.01, float(time_limit))
         m.Params.MIPGap = 0.0
         m.optimize()

@@ -21,6 +21,7 @@ import gurobipy as gp
 from src import allocation_evaluator as evaluator
 
 from .instance import Instance
+from typing import Mapping as _Mapping
 from .master import Master
 from .pricing import Column, GroupPricer, TOL, reduced_cost
 from .branching import branch_and_price
@@ -65,6 +66,35 @@ def _blend_duals(center, current, alpha: float):
     )
 
 
+def _coordinate_single_side(inst: Instance, assigned: Mapping[PassengerKey, str]) -> Dict[PassengerKey, str]:
+    """为全部单侧保护旅客选互不重复、且不与双侧保护座冲突的空邻座（评估器同款增广路径匹配）。"""
+    occupied = set(assigned.values())
+    both_protected: set = set()
+    for p in inst.passengers.values():
+        if p.both_side and p.key in assigned:
+            both_protected.update(inst.both_side_neighbors(assigned[p.key]))
+    demands = []
+    for p in inst.passengers.values():
+        if p.single_side and p.key in assigned:
+            cands = [t for t in inst.single_side_neighbors(assigned[p.key]) if t not in occupied and t not in both_protected]
+            demands.append((p.key, cands))
+    owner: Dict[str, int] = {}
+
+    def augment(i: int, visited: set) -> bool:
+        for t in demands[i][1]:
+            if t in visited:
+                continue
+            visited.add(t)
+            if t not in owner or augment(owner[t], visited):
+                owner[t] = i
+                return True
+        return False
+
+    for i in sorted(range(len(demands)), key=lambda k: len(demands[k][1])):
+        augment(i, set())
+    return {demands[i][0]: t for t, i in owner.items()}
+
+
 def _log(enabled: bool, msg: str) -> None:
     if enabled:
         print(f"[cg_gurobi] {msg}", flush=True)
@@ -102,6 +132,7 @@ def solve_single_cabin(
     warm_columns = 0
     warm_mode = str(cfg["warm_start"]).lower()
     heuristic_score: Optional[float] = None
+    heuristic_columns: List[Column] = []
     if warm_mode == "heuristic":
         # 用项目现有的限时启发式取得一个完整合法方案，拆成各组初始列。
         # 这正是文档 6.3 允许的“启发式提供覆盖所有组的初始合法列”。
@@ -122,11 +153,15 @@ def solve_single_cabin(
                 heuristic_score, _ = evaluator.calculate_soft_score(
                     list(new_seats), list(old_seats), list(groups_data), h_assigned, dict(weights), dict(config)
                 )
+                protected_choice = _coordinate_single_side(inst, h_assigned)
                 for g in inst.groups:
                     assignment = {p.key: h_assigned[p.key] for p in g.passengers}
-                    col = pricers[g.gid].column_from_assignment(assignment)
+                    col = pricers[g.gid].column_from_assignment(assignment, protected_choice)
                     if col is not None:
                         master.add_columns([col]); warm_columns += 1
+                        heuristic_columns.append(col)
+                if len(heuristic_columns) != len(inst.groups):
+                    heuristic_columns = []   # 不完整则不能当作整数 start
             _log(log, f"heuristic warm start: legal={h_v == 0 and h_u == 0} score={heuristic_score} "
                       f"columns={warm_columns} in {time.perf_counter()-started:.2f}s")
         except Exception as exc:  # 启发式失败不影响精确路线
@@ -155,6 +190,8 @@ def solve_single_cabin(
     safe_lp_cost: Optional[float] = None
     root_lp_cost: Optional[float] = None
     infeasible_certified = False
+    integer_reserve = min(float(cfg["integer_time_limit"]), max(2.0, 0.15 * (deadline - started)))
+    cg_deadline = deadline - integer_reserve
     it = 0
     escalation = 1.0
     alpha = float(cfg["dual_smoothing_alpha"])
@@ -164,7 +201,7 @@ def solve_single_cabin(
     mispricing_rounds = 0
     while True:
         it += 1
-        if time.perf_counter() >= deadline:
+        if time.perf_counter() >= cg_deadline:
             termination = "time_limit"; break
         if it > int(cfg["max_iterations"]):
             termination = "iteration_limit"; break
@@ -176,7 +213,7 @@ def solve_single_cabin(
             _log(log, f"iter {it}: Phase I feasible, switching to original objective")
             continue
         duals = master.duals()
-        remaining = deadline - time.perf_counter()
+        remaining = max(0.05, cg_deadline - time.perf_counter())
         per_group = min(float(cfg["pricing_time_limit"]), max(0.05, remaining / max(1, len(inst.groups))))
         new_cols: List[Column] = []
         all_certified = True
@@ -257,7 +294,7 @@ def solve_single_cabin(
                 break
             # 没有新列但有组在时限内未闭合：只要还有时间就放大定价时限重试。
             escalation *= 2.0
-            if time.perf_counter() + 1.0 >= deadline:
+            if time.perf_counter() + 1.0 >= cg_deadline:
                 termination = "pricing_not_certified"
                 break
             _log(log, f"iter {it}: no new columns, {sum(1 for o in outcomes if not o.certified)} groups uncertified -> escalate x{escalation:.0f}")
@@ -284,8 +321,7 @@ def solve_single_cabin(
     # 潜水启发式：逐步固定 LP 值最大的分数列并继续定价，扩充列池（不改变根 LP 界）。
     dive_stats = {"fixed": 0, "columns_added": 0, "rounds": 0}
     if bool(cfg["dive"]) and not master.phase_one and termination != "infeasible":
-        int_reserve = min(float(cfg["integer_time_limit"]), max(1.0, 0.25 * (deadline - time.perf_counter())))
-        dive_deadline = deadline - int_reserve
+        dive_deadline = min(cg_deadline, deadline - integer_reserve)
         try:
             while time.perf_counter() < dive_deadline:
                 status, lp_cost, _ = master.solve_lp()
@@ -322,8 +358,12 @@ def solve_single_cabin(
     # 整数解：列池整数主问题
     int_status, selected, int_cost = ("phase_one", None, None)
     if not master.phase_one:
-        int_budget = min(float(cfg["integer_time_limit"]), max(1.0, deadline - time.perf_counter()))
-        int_status, selected, int_cost = master.solve_integer(int_budget)
+        int_budget = max(1.0, deadline - time.perf_counter())
+        int_status, selected, int_cost = master.solve_integer(int_budget, start=heuristic_columns or None)
+    if heuristic_columns and (selected is None or int_cost is None
+                              or int_cost > -heuristic_score + TOL):
+        # 列池 MIP 无解或劣于启发式：退回启发式方案（它也在列池中，本不应发生，作保险）
+        selected, int_cost, int_status = list(heuristic_columns), -heuristic_score, f"{int_status}->heuristic_fallback"
     # 分支定价：根 LP 已认证且列池整数解与 LP 有差距时，二分 (组, 座位) 关闭 gap
     bp: Optional[Dict[str, Any]] = None
     proven_optimal = False
