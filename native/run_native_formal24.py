@@ -7,6 +7,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import statistics
 import subprocess
 import sys
@@ -23,6 +24,22 @@ from src import allocation_evaluator as evaluator
 
 
 COMPONENTS = ("score_s", "score_v", "score_p", "score_c", "score_b")
+
+
+def paired_python_quality(rows: list[dict], tolerance: float = 1e-8) -> dict:
+    deltas = [row["delta_vs_python"] for row in rows]
+    if not deltas or not all(math.isfinite(delta) for delta in deltas):
+        raise ValueError("Python comparison requires nonempty finite per-case deltas")
+    return {
+        "improve": sum(delta > tolerance for delta in deltas),
+        "tie": sum(abs(delta) <= tolerance for delta in deltas),
+        "regress": sum(delta < -tolerance for delta in deltas),
+        "regressed_cases": [row["case_id"] for row in rows if row["delta_vs_python"] < -tolerance],
+        "minimum_delta": min(deltas),
+        "mean_delta": statistics.mean(deltas),
+        "all_cases_nonregressing": all(delta >= -tolerance for delta in deltas),
+        "tolerance": tolerance,
+    }
 
 
 def read_json(path: Path):
@@ -72,12 +89,18 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--time-limit", type=float, required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--require-python-parity", action="store_true",
+                        help="fail on any Python-60s regression; requires a 60-second group-first run")
+    parser.add_argument("--audit-reference-only", action="store_true",
+                        help="validate all reference inputs, seatmaps and allocations without launching the solver")
     parser.add_argument(
         "--construction-objective",
         choices=("feasibility", "individual-soft", "group-soft", "group-first"),
         required=True,
     )
     args = parser.parse_args()
+    if args.require_python_parity and (args.time_limit != 60 or args.construction_objective != "group-first"):
+        parser.error("--require-python-parity requires --time-limit 60 --construction-objective group-first")
 
     reference_csv = args.reference / "rich_python_formal24.csv"
     rich_raw_path = (
@@ -96,18 +119,28 @@ def main() -> None:
         if not path.exists():
             raise FileNotFoundError(path)
 
-    args.output.mkdir(parents=True, exist_ok=True)
+    if args.output.exists() and any(args.output.iterdir()):
+        raise ValueError("Output directory must be empty; refusing stale benchmark results")
     allocation_dir = args.output / "allocations"
-    allocation_dir.mkdir(exist_ok=True)
     config = read_json(args.config)
     config_root = args.config.resolve().parent
+    reference_config_path = args.reference / "rich_python_reference_config.json"
+    reference_config = read_json(reference_config_path)
+    if args.require_python_parity:
+        if {k: v for k, v in config.items() if k != "input_contract"} != {k: v for k, v in reference_config.items() if k != "input_contract"}:
+            raise ValueError("Python parity requires the frozen reference configuration (except seatmap paths)")
+    reference_rows = list(csv.DictReader(reference_csv.open(encoding="utf-8-sig")))
     references = {
         row["case_id"]: float(row["current_reference_F_I"])
-        for row in csv.DictReader(reference_csv.open(encoding="utf-8-sig"))
+        for row in reference_rows
     }
+    python_scores = {row["case_id"]: float(row["objective"]) for row in reference_rows}
+    rich_raw = read_json(rich_raw_path)
+    if rich_raw["business_time_limit_seconds"] != 60:
+        raise ValueError("Expected the frozen Python 60-second reference")
     rich_cases = {
         f"{row['direction']}:{row['case']}": row
-        for row in read_json(rich_raw_path)["cases"]
+        for row in rich_raw["cases"]
     }
     baseline_summary = read_json(baseline_summary_path)
     baseline_cases = {
@@ -120,6 +153,35 @@ def main() -> None:
     rich_details = []
     started_at = datetime.now(timezone.utc).isoformat()
     case_paths = sorted(args.corpus.glob("*/*_groups.json"))
+    case_ids = [read_json(path)["caseId"] for path in case_paths]
+    if len(case_ids) != 24 or len(reference_rows) != 24 or len(rich_raw["cases"]) != 24 or len(set(case_ids)) != 24 or set(case_ids) != set(references) or set(case_ids) != set(rich_cases):
+        raise ValueError("Formal24 requires exactly 24 unique cases matching both frozen references")
+    audited_python = {}
+    for case_path in case_paths:
+        raw = read_json(case_path)
+        case_id, direction = raw["caseId"], raw["direction"]
+        if sha256(case_path) != sha256(args.reference / rich_cases[case_id]["data_file"]):
+            raise ValueError(f"{case_id}: input differs from frozen reference source")
+        mapping = config["input_contract"]["seatmaps_by_direction"][direction]
+        reference_mapping = reference_config["input_contract"]["seatmaps_by_direction"][direction]
+        for side in ("old", "new"):
+            if sha256(config_root / mapping[side]) != sha256(args.reference / reference_mapping[side]):
+                raise ValueError(f"{case_id}: {side} seatmap differs from frozen reference source")
+        new_seats = read_json(config_root / mapping["new"])["seats"]
+        old_seats = read_json(config_root / mapping["old"])["seats"]
+        allocation = rich_raw_path.parent / "allocations" / f"{case_id.replace(':', '_')}.json"
+        assignment = assignment_map(read_json(allocation))
+        hard, missing, _ = evaluator.count_hard_constraint_violations(new_seats, raw["groups"], assignment, config)
+        score, detail = evaluator.calculate_soft_score(new_seats, old_seats, raw["groups"], assignment, config["weights"], config)
+        if hard or missing or not math.isfinite(score) or abs(score - python_scores[case_id]) > 1e-7:
+            raise ValueError(f"{case_id}: frozen Python allocation fails current legality/objective contract")
+        audited_python[case_id] = (score, detail, sha256(allocation))
+    if args.audit_reference_only:
+        print(json.dumps({"reference_cases_audited": len(audited_python),
+                          "config_sha256": sha256(args.config), "reference_csv_sha256": sha256(reference_csv),
+                          "solver_launched": False}, indent=2))
+        return
+    allocation_dir.mkdir(parents=True)
     for case_path in case_paths:
         raw = read_json(case_path)
         case_id = raw["caseId"]
@@ -133,12 +195,13 @@ def main() -> None:
             "--construction-objective", args.construction_objective,
         ], cwd=ROOT, capture_output=True, text=True)
         process_wall = time.perf_counter() - started
-        if not output_path.exists():
+        if completed.returncode != 0 or not output_path.exists():
             raise RuntimeError(f"{case_id}: native process failed: {completed.stderr}")
         result = read_json(output_path)
         mapping = config["input_contract"]["seatmaps_by_direction"][direction]
         new_seats = read_json(config_root / mapping["new"])["seats"]
         old_seats = read_json(config_root / mapping["old"])["seats"]
+        python_score, python_detail, python_allocation_sha = audited_python[case_id]
         assignments = assignment_map(result)
         violations, unassigned, violation_detail = (
             evaluator.count_hard_constraint_violations(
@@ -157,7 +220,7 @@ def main() -> None:
             new_seats, old_seats, raw["groups"], assignment_map(baseline_result),
             config["weights"], config,
         )
-        rich_detail = rich_cases[case_id]["soft_score_detail"]
+        rich_detail = python_detail
         candidate_details.append(detail)
         baseline_details.append(baseline_detail)
         rich_details.append(rich_detail)
@@ -178,7 +241,14 @@ def main() -> None:
                 float(result["individual_score"])
                 - sum(detail[key] for key in ("score_s", "score_v", "score_p"))
             ),
-            "gap_I": (reference - external_score) / max(1.0, abs(reference)),
+            "gap_frozen_union_reference": (reference - external_score) / max(1.0, abs(reference)),
+            "python_60s_score": python_score,
+            "delta_vs_python": external_score - python_score,
+            "gap_CG_percent": None,
+            "gap_LP_percent": None,
+            "old_seatmap_sha256": sha256(config_root / mapping["old"]),
+            "new_seatmap_sha256": sha256(config_root / mapping["new"]),
+            "python_allocation_sha256": python_allocation_sha,
             "baseline_score": float(baseline["external_score"]),
             "delta_vs_baseline": external_score - float(baseline["external_score"]),
             "selected_incumbent": result.get("selected_incumbent", ""),
@@ -203,6 +273,11 @@ def main() -> None:
             "process_wall_seconds": process_wall,
             "input_sha256": sha256(case_path),
             "violation_detail": violation_detail,
+            "rich_candidate_complete": bool(result.get("rich_candidate_complete", False)),
+            "rich_stage_timing": result.get("rich_stage_timing", {}),
+            "rich_stage_diagnostics": {key: result[key] for key in (
+                "rich_structured_pattern_generation", "rich_protected_multigroup_mip",
+                "rich_special_dual_pricing", "rich_multigroup_lns", "rich_restricted_pattern_mip") if key in result},
         }
         rows.append(row)
         print(
@@ -223,7 +298,7 @@ def main() -> None:
     rich_means = mean_components(rich_details)
     deltas = [row["delta_vs_baseline"] for row in rows]
     summary = {
-        "schema": "native_construction_formal24_v2",
+        "schema": "native_rich_formal24_v3",
         "mode": "RAW_NATIVE",
         "construction_objective": args.construction_objective,
         "started_at": started_at,
@@ -233,6 +308,9 @@ def main() -> None:
             "reference": str(args.reference.resolve()),
             "config": str(args.config.resolve()),
             "config_sha256": sha256(args.config),
+            "python_reference_csv_sha256": sha256(reference_csv),
+            "python_reference_raw_sha256": sha256(rich_raw_path),
+            "python_reference_config_sha256": sha256(reference_config_path),
             "binary": str(args.executable.resolve()),
             "binary_sha256": sha256(args.executable),
             "git_commit": subprocess.check_output(
@@ -280,8 +358,13 @@ def main() -> None:
             "max_process_wall_seconds": max(row["process_wall_seconds"] for row in rows),
         },
         "quality": {
-            "mean_gap_I": statistics.mean(row["gap_I"] for row in rows),
-            "median_gap_I": statistics.median(row["gap_I"] for row in rows),
+            "mean_gap_frozen_union_reference": statistics.mean(row["gap_frozen_union_reference"] for row in rows),
+            "median_gap_frozen_union_reference": statistics.median(row["gap_frozen_union_reference"] for row in rows),
+            "paired_vs_python_60s": paired_python_quality(rows, tolerance),
+            "same_60s_budget": args.time_limit == 60,
+            "cg_reference_status": "unavailable: no identity-bound CG integer certificate supplied",
+            "lp_reference_status": "unavailable: no identity-bound certified LP upper bound supplied",
+            "full_rich_parity": "not_certified_by_this_benchmark_alone",
             "paired_vs_baseline": {
                 "improve": sum(delta > tolerance for delta in deltas),
                 "tie": sum(abs(delta) <= tolerance for delta in deltas),
@@ -307,6 +390,8 @@ def main() -> None:
     )
     print(json.dumps({key: value for key, value in summary.items() if key != "cases"}, indent=2))
     if len(valid) != len(rows) or summary["evaluator_consistent_count"] != len(rows):
+        raise SystemExit(1)
+    if args.require_python_parity and not summary["quality"]["paired_vs_python_60s"]["all_cases_nonregressing"]:
         raise SystemExit(1)
 
 

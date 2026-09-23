@@ -1260,6 +1260,27 @@ restricted wrapper differential and native state replay, passed 157 tests and
 a per-case Python-60s gate; it must be audited and corrected before final use.
 No Formal24 run or performance compression was performed at this checkpoint.
 
+### Formal24 audit harness contract correction
+
+The benchmark now reports `gap_frozen_union_reference` (fractional units) and
+per-case `delta_vs_python` separately. `--require-python-parity` requires the
+60-second group-first configuration and fails on any regression beyond 1e-8;
+a positive mean cannot hide a failing case. CG integer and certified LP gaps
+remain unavailable without identity-bound certificates. The benchmark alone
+does not certify full ACTIVE coverage or the final Full Rich gate.
+
+Before invoking any solver, the harness checks exactly 24 unique cases, input
+and seatmap SHA against frozen sources, reference configuration identity in
+parity mode, and all frozen Python assignments through the independent evaluator.
+Output directories must be empty and failed subprocesses cannot consume stale
+results. Source and reference hashes and native stage diagnostics are preserved.
+`--audit-reference-only` performs this preflight without starting the solver.
+
+Validation: the actual frozen 24-case preflight passed. All reference allocations
+were complete/legal and reproduced CSV scores with maximum error 4.55e-13.
+Metric boundary tests and native runtime schedule tests passed 7 tests and 14
+subtests. The 60-second native comparison has not yet been completed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
