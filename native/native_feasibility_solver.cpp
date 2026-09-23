@@ -1,4 +1,5 @@
 #include "native_feasibility_solver.hpp"
+#include "native_group_constructor.hpp"
 
 #include "interfaces/highs_c_api.h"
 
@@ -97,12 +98,14 @@ bool same_location(const Seat& left, const Seat& right, bool by_row) {
 ConstructionObjective parse_construction_objective(const std::string& value) {
     if (value == "feasibility") return ConstructionObjective::Feasibility;
     if (value == "individual-soft") return ConstructionObjective::IndividualSoft;
+    if (value == "group-soft") return ConstructionObjective::GroupSoft;
     throw std::runtime_error("unknown construction objective: " + value);
 }
 
 const char* construction_objective_name(ConstructionObjective objective) {
-    return objective == ConstructionObjective::IndividualSoft
-        ? "individual-soft" : "feasibility";
+    if (objective == ConstructionObjective::IndividualSoft) return "individual-soft";
+    if (objective == ConstructionObjective::GroupSoft) return "group-soft";
+    return "feasibility";
 }
 
 FeasibilityResult solve_feasibility_mip(
@@ -110,6 +113,46 @@ FeasibilityResult solve_feasibility_mip(
     ConstructionObjective objective
 ) {
     const auto started = std::chrono::steady_clock::now();
+    if (objective == ConstructionObjective::GroupSoft) {
+        FeasibilityResult result = solve_feasibility_mip(
+            problem, time_limit_seconds, seed, ConstructionObjective::IndividualSoft
+        );
+        result.q0_solver_status = result.status;
+        if (result.native_hard_violations == 0) {
+            const GroupConstructionResult group_result = construct_group_aware(
+                problem, result.passenger_to_seat,
+                started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(time_limit_seconds)
+                )
+            );
+            result.passenger_to_seat = group_result.passenger_to_seat;
+            result.selected_incumbent = group_result.selected_incumbent;
+            result.fallback_reason = group_result.fallback_reason;
+            result.q0_score = group_result.q0_score;
+            result.group_construction_score = group_result.group_construction_score;
+            result.score_delta = group_result.score_delta;
+            result.q0_components = group_result.q0_components;
+            result.selected_components = group_result.selected_components;
+            result.dfs_nodes = group_result.dfs_nodes;
+            result.beam_nodes = group_result.beam_nodes;
+            result.dfs_groups = group_result.dfs_groups;
+            result.beam_groups = group_result.beam_groups;
+            result.groups_improved = group_result.groups_improved;
+            result.native_hard_violations = validate_complete_assignment(
+                problem, result.passenger_to_seat
+            );
+            result.status = result.native_hard_violations == 0
+                ? "HeuristicComplete" : "HeuristicFailed";
+        } else {
+            result.selected_incumbent = "q0";
+            result.fallback_reason = "q0_invalid";
+            result.status = "HeuristicFailed";
+        }
+        result.wall_seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started
+        ).count();
+        return result;
+    }
     preprocess_fixed_seats(problem);
     Model model;
     const int passenger_count = static_cast<int>(problem.passengers.size());
@@ -328,6 +371,7 @@ FeasibilityResult solve_feasibility_mip(
     result.wall_seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - started
     ).count();
+    result.selected_incumbent = construction_objective_name(objective);
     return result;
 }
 

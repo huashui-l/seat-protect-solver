@@ -312,16 +312,23 @@ IndividualScoreComponents evaluate_individual_score(
     return result;
 }
 
-double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
+ScoreComponents evaluate_score_components(
+    const Problem& problem, const std::vector<int>& assignment
+) {
     if (assignment.size() != problem.passengers.size()) {
         throw std::runtime_error("score assignment size mismatch");
     }
-    double score = 0.0;
+    ScoreComponents result;
     for (int passenger_index = 0;
          passenger_index < static_cast<int>(problem.passengers.size()); ++passenger_index) {
         const int new_index = assignment[passenger_index];
         if (new_index < 0) continue;
-        score += evaluate_individual_score(problem, passenger_index, new_index).total();
+        const IndividualScoreComponents individual = evaluate_individual_score(
+            problem, passenger_index, new_index
+        );
+        result.score_s += individual.score_s;
+        result.score_v += individual.score_v;
+        result.score_p += individual.score_p;
     }
     for (const Group& group : problem.groups) {
         if (group.passengers.size() <= 1) continue;
@@ -344,7 +351,7 @@ double evaluate_soft_score(const Problem& problem, const std::vector<int>& assig
             max_x = std::max(max_x, std::abs(problem.seats[seat].x - center_x));
             max_y = std::max(max_y, std::abs(problem.seats[seat].y - center_y));
         }
-        score += problem.weight_c * (
+        result.score_c += problem.weight_c * (
             problem.group_centroid_x_factor * max_x
             + problem.group_centroid_y_factor * max_y
         );
@@ -359,13 +366,17 @@ double evaluate_soft_score(const Problem& problem, const std::vector<int>& assig
             if (other_seat.cabin != infant_seat.cabin) continue;
             const double distance = 1.0 + std::abs(infant_seat.x - other_seat.x);
             if (other_seat.row == infant_seat.row && other_seat.subrow == infant_seat.subrow) {
-                score += problem.weight_b / distance;
+                result.score_b += problem.weight_b / distance;
             } else if (std::abs(other_seat.row - infant_seat.row) == 1) {
-                score += problem.weight_b * problem.baby_front_back_factor / distance;
+                result.score_b += problem.weight_b * problem.baby_front_back_factor / distance;
             }
         }
     }
-    return score;
+    return result;
+}
+
+double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
+    return evaluate_score_components(problem, assignment).total();
 }
 
 FixedSeatContext preprocess_fixed_seats(const Problem& problem) {
@@ -519,6 +530,7 @@ bool AssignmentState::can_assign(int passenger_index, int seat_index, int chosen
         || blocked_count[seat_index] > 0) return false;
     const Passenger& passenger = problem.passengers[passenger_index];
     const Seat& seat = problem.seats[seat_index];
+    if (!passenger.fixed_seat.empty() && passenger.fixed_seat != seat.id) return false;
     if (!passenger.cabin.empty() && passenger.cabin != seat.cabin) return false;
     const SsrRule rule = ssr_rule(problem, passenger);
     if ((seat.exit_row && !rule.allow_exit_row)

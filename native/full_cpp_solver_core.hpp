@@ -144,10 +144,27 @@ struct IndividualScoreComponents {
     double total() const { return score_s + score_v + score_p; }
 };
 
+struct ScoreComponents {
+    double score_s = 0.0;
+    double score_v = 0.0;
+    double score_p = 0.0;
+    double score_c = 0.0;
+    double score_b = 0.0;
+
+    double total() const {
+        return score_s + score_v + score_p + score_c + score_b;
+    }
+};
+
 IndividualScoreComponents evaluate_individual_score(
     const Problem& problem,
     int passenger_index,
     int seat_index
+);
+
+ScoreComponents evaluate_score_components(
+    const Problem& problem,
+    const std::vector<int>& passenger_to_seat
 );
 
 double evaluate_soft_score(

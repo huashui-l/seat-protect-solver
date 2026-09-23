@@ -63,6 +63,10 @@ def main() -> None:
         "--reference", type=Path, required=True,
         help="frozen artifact root containing rich_python_formal24.csv and outputs/research references",
     )
+    parser.add_argument(
+        "--baseline", type=Path,
+        help="baseline benchmark output directory; defaults to frozen feasibility",
+    )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -70,7 +74,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument(
         "--construction-objective",
-        choices=("feasibility", "individual-soft"),
+        choices=("feasibility", "individual-soft", "group-soft"),
         required=True,
     )
     args = parser.parse_args()
@@ -79,7 +83,9 @@ def main() -> None:
     rich_raw_path = (
         args.reference / "outputs/research/full_cpp_rich_reference/rich_python_raw.json"
     )
+    parser_baseline = getattr(args, "baseline", None)
     baseline_summary_path = (
+        parser_baseline / "summary.json" if parser_baseline else
         args.reference / "outputs/research/native_feasibility_formal24/summary.json"
     )
     baseline_allocation_dir = baseline_summary_path.parent / "allocations"
@@ -109,7 +115,7 @@ def main() -> None:
     }
 
     rows = []
-    q0_details = []
+    candidate_details = []
     baseline_details = []
     rich_details = []
     started_at = datetime.now(timezone.utc).isoformat()
@@ -152,7 +158,7 @@ def main() -> None:
             config["weights"], config,
         )
         rich_detail = rich_cases[case_id]["soft_score_detail"]
-        q0_details.append(detail)
+        candidate_details.append(detail)
         baseline_details.append(baseline_detail)
         rich_details.append(rich_detail)
         reference = references[case_id]
@@ -175,6 +181,14 @@ def main() -> None:
             "gap_I": (reference - external_score) / max(1.0, abs(reference)),
             "baseline_score": float(baseline["external_score"]),
             "delta_vs_feasibility": external_score - float(baseline["external_score"]),
+            "delta_vs_baseline": external_score - float(baseline["external_score"]),
+            "selected_incumbent": result.get("selected_incumbent", ""),
+            "fallback_reason": result.get("fallback_reason", ""),
+            "dfs_nodes": int(result.get("dfs_nodes", 0)),
+            "beam_nodes": int(result.get("beam_nodes", 0)),
+            "dfs_groups": int(result.get("dfs_groups", 0)),
+            "beam_groups": int(result.get("beam_groups", 0)),
+            "groups_improved": int(result.get("groups_improved", 0)),
             "score_detail": {key: detail[key] for key in (*COMPONENTS, "total_soft_score")},
             "native_wall_seconds": float(result["wall_seconds"]),
             "process_wall_seconds": process_wall,
@@ -184,7 +198,7 @@ def main() -> None:
         rows.append(row)
         print(
             f"{case_id} status={row['status']} hard={violations} "
-            f"delta={row['delta_vs_feasibility']:.6f} wall={process_wall:.3f}s",
+            f"delta={row['delta_vs_baseline']:.6f} wall={process_wall:.3f}s",
             flush=True,
         )
 
@@ -195,12 +209,12 @@ def main() -> None:
         and row["external_hard_violations"] == 0
     ]
     tolerance = 1e-8
-    q0_means = mean_components(q0_details)
+    candidate_means = mean_components(candidate_details)
     baseline_means = mean_components(baseline_details)
     rich_means = mean_components(rich_details)
-    deltas = [row["delta_vs_feasibility"] for row in rows]
+    deltas = [row["delta_vs_baseline"] for row in rows]
     summary = {
-        "schema": "native_rich_q0_formal24_v1",
+        "schema": "native_construction_formal24_v2",
         "mode": "RAW_NATIVE",
         "construction_objective": args.construction_objective,
         "started_at": started_at,
@@ -231,6 +245,19 @@ def main() -> None:
         "max_score_error": max(row["score_error"] for row in rows),
         "max_individual_score_error": max(row["individual_score_error"] for row in rows),
         "status_counts": dict(Counter(row["status"] for row in rows)),
+        "selected_incumbent_counts": dict(Counter(
+            row["selected_incumbent"] for row in rows
+        )),
+        "construction_statistics": {
+            "dfs_nodes": sum(row["dfs_nodes"] for row in rows),
+            "beam_nodes": sum(row["beam_nodes"] for row in rows),
+            "dfs_groups": sum(row["dfs_groups"] for row in rows),
+            "beam_groups": sum(row["beam_groups"] for row in rows),
+            "groups_improved": sum(row["groups_improved"] for row in rows),
+            "fallback_reasons": dict(Counter(
+                row["fallback_reason"] for row in rows if row["fallback_reason"]
+            )),
+        },
         "timing": {
             "mean_process_wall_seconds": statistics.mean(row["process_wall_seconds"] for row in rows),
             "median_process_wall_seconds": statistics.median(row["process_wall_seconds"] for row in rows),
@@ -246,15 +273,22 @@ def main() -> None:
                 "mean_delta": statistics.mean(deltas),
                 "median_delta": statistics.median(deltas),
             },
+            "paired_vs_baseline": {
+                "improve": sum(delta > tolerance for delta in deltas),
+                "tie": sum(abs(delta) <= tolerance for delta in deltas),
+                "regress": sum(delta < -tolerance for delta in deltas),
+                "mean_delta": statistics.mean(deltas),
+                "median_delta": statistics.median(deltas),
+            },
             "component_means": {
                 key: {
-                    "q0": q0_means[key],
-                    "feasibility": baseline_means[key],
+                    "candidate": candidate_means[key],
+                    "baseline": baseline_means[key],
                     "rich": rich_means[key],
-                    "q0_minus_feasibility": q0_means[key] - baseline_means[key],
-                    "q0_minus_rich": q0_means[key] - rich_means[key],
+                    "candidate_minus_baseline": candidate_means[key] - baseline_means[key],
+                    "candidate_minus_rich": candidate_means[key] - rich_means[key],
                 }
-                for key in q0_means
+                for key in candidate_means
             },
         },
         "cases": rows,

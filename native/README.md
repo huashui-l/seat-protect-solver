@@ -9,13 +9,29 @@ The raw JSON feasibility CLI consists of:
 - `seat_protect_cpp.cpp`
 - `full_cpp_solver_core.cpp/.hpp`
 - `native_feasibility_solver.cpp/.hpp`
+- `native_group_constructor.cpp/.hpp`
 - `native_json.hpp`
+
+`native_state_replay.cpp` is a build-time public-fixture differential probe for
+high-volume `AssignmentState` legality and save/restore replay tests.
 
 The CLI defaults to the frozen `feasibility` construction objective. The
 experimental `--construction-objective individual-soft` mode minimizes the
 exact negation of the native passenger-level `score_s + score_v + score_p`.
 Group compactness (`score_c`) and BSCT interaction (`score_b`) remain final
 scoring terms and are not represented as independent assignment coefficients.
+
+The experimental `group-soft` mode preserves the complete `individual-soft`
+solution as its Q0 incumbent. It then releases and jointly reconstructs one
+group at a time with deterministic ordering, a 20,000-node DFS for groups of
+at most four passengers, and bounded Beam search for larger groups. Placement
+ordering uses the exact native `score_s + score_v + score_p + score_c`; every
+complete candidate is checked with the native hard validator and full scorer,
+including `score_b`, and is committed only when strictly better. Failure,
+deadline, incompleteness, illegality, or a non-improving candidate returns Q0.
+For `group-soft`, `q0_solver_status` reports the underlying MIP status while
+the final `status` is `HeuristicComplete`; the heuristic result does not claim
+global optimality for the complete group-aware objective.
 
 The RR and restricted-master pipeline consists of:
 
@@ -56,11 +72,12 @@ feasibility summary/allocations in their recorded artifact layout. Example:
 python native/run_native_formal24.py `
   --corpus C:\private\formal24 `
   --reference C:\private\frozen-reference-root `
+  --baseline C:\private\frozen-q0-output `
   --config C:\private\config.json `
   --executable build\native\seat_protect_cpp.exe `
   --output outputs\native-rich-q0 `
   --time-limit 60 --seed 0 `
-  --construction-objective individual-soft
+  --construction-objective group-soft
 ```
 
 The output contains the full 24-case external legality/score audit, paired
