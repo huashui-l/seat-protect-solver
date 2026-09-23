@@ -13,6 +13,66 @@ from tests.general_validation_case_factory import materialize_cases
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def python_schedule_replay(budgets, replay):
+    tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                    and node.name == "_run_allocation_single_cabin")
+    assignments = [node for node in function.body if isinstance(node, ast.Assign)]
+
+    def execute(names, namespace):
+        selected = []
+        for node in function.body:
+            targets = node.targets if isinstance(node, ast.Assign) else (
+                [node.target] if isinstance(node, ast.AugAssign) else [])
+            if any(isinstance(target, ast.Name) and target.id in names for target in targets):
+                selected.append(node)
+        assert selected, names
+        exec(compile(ast.Module(body=selected, type_ignores=[]), "frozen_schedule", "exec"), namespace)
+
+    namespace = dict(stage_budgets=budgets["stages"], allocation_start=replay["allocation_start"],
+                     search_deadline=replay["allocation_start"] + budgets["usable_time"],
+                     carry=0.0, post_protected_pricing_reserve=0.0,
+                     post_protected_tail_reserve_active=budgets["post_protected_tail_reserve_active"],
+                     construction_unassigned=replay["construction_unassigned"],
+                     algorithm_config={"restricted_pattern_mip_tail_budget": replay["tail_budget"]})
+    result = []
+    for event in replay["events"]:
+        stage = event["stage"]
+        prefix = {"pattern_generation": "pattern", "protected_multigroup_mip": "protected_mip",
+                  "restricted_mip": "restricted"}.get(stage, stage)
+        namespace[prefix + "_started"] = event["started"]
+        namespace[prefix + "_finished"] = event["finished"]
+        if stage == "special_pricing":
+            call = next(node.value for node in assignments
+                        if isinstance(node.value, ast.Call)
+                        and isinstance(node.value.func, ast.Name)
+                        and node.value.func.id == "generate_special_dual_pricing_patterns")
+            deadline_expr = next(arg for arg in call.args if isinstance(arg, ast.Call)
+                                 and isinstance(arg.func, ast.Name) and arg.func.id == "min")
+            namespace["time"] = types.SimpleNamespace(perf_counter=lambda: event["started"])
+            deadline = eval(compile(ast.Expression(deadline_expr), "frozen_pricing_deadline", "eval"), namespace)
+            effective = namespace["post_protected_pricing_reserve"]
+        else:
+            names = {prefix + "_effective_budget", prefix + "_deadline"}
+            if stage == "vnd":
+                names.add("post_protected_pricing_reserve")
+            if stage == "restricted_mip":
+                names.add("restricted_tail_budget")
+            execute(names, namespace)
+            deadline = namespace[prefix + "_deadline"]
+            effective = (budgets["stages"][stage] if stage == "construction"
+                         else namespace[prefix + "_effective_budget"])
+            if stage not in ("lns", "restricted_mip"):
+                carry_node = next(node for node in assignments
+                                  if any(isinstance(t, ast.Name) and t.id == "carry" for t in node.targets)
+                                  and any(isinstance(n, ast.Name) and n.id == prefix + "_deadline"
+                                          for n in ast.walk(node)))
+                exec(compile(ast.Module(body=[carry_node], type_ignores=[]), "frozen_carry", "exec"), namespace)
+        result.append(dict(effective_budget=effective, deadline=deadline, carry=namespace["carry"],
+                           pricing_reserve=namespace["post_protected_pricing_reserve"]))
+    return result
+
+
 def python_budget_prefix():
     # Execute the actual frozen function prefix, stopping before allocation.
     tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
@@ -99,3 +159,29 @@ class NativeStageBudgetTests(unittest.TestCase):
                             self.assertAlmostEqual(actual[name][stage], budget, places=10)
                     else:
                         self.assertAlmostEqual(actual[name], value, places=10)
+                # Virtual-clock traces exercise early finish, overhead, deadline
+                # exhaustion, incomplete construction, and negative tail settings.
+                stages = ["construction", "repair", "vnd", "pattern_generation",
+                          "protected_multigroup_mip", "special_pricing", "lns", "restricted_mip"]
+                for unassigned, step, tail in [(0, 0.01, 0.1), (1, 0.3, -1.0), (0, 10.0, 2.0)]:
+                    with self.subTest(unassigned=unassigned, step=step, tail=tail):
+                        replay = dict(allocation_start=123.0, construction_unassigned=unassigned,
+                                      tail_budget=tail, events=[
+                                          dict(stage=stage, started=123.0 + i * step + step * 0.1,
+                                               finished=123.0 + i * step + step * 0.8)
+                                          for i, stage in enumerate(stages)])
+                        replay_path = work / "schedule.json"
+                        replay_path.write_text(json.dumps(replay), encoding="utf-8")
+                        run = subprocess.run([str(probe), "--input", str(work / "case.json"),
+                                              "--config", str(work / "config.json"),
+                                              "--schedule-replay", str(replay_path)],
+                                             capture_output=True, text=True)
+                        self.assertEqual(run.returncode, 0, run.stderr)
+                        actual_schedule = json.loads(run.stdout)["stage_schedule"]
+                        expected_schedule = python_schedule_replay(expected, replay)
+                        self.assertEqual(len(actual_schedule), len(expected_schedule))
+                        for stage, actual_window, expected_window in zip(
+                                stages, actual_schedule, expected_schedule):
+                            for key, value in expected_window.items():
+                                self.assertAlmostEqual(actual_window[key], value, places=10,
+                                                       msg=f"{stage}: {key}")

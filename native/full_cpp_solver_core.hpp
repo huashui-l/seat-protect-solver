@@ -153,6 +153,27 @@ RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 );
 
+struct RichStageWindow {
+    double effective_budget = 0.0;
+    double deadline = 0.0;
+};
+
+// Times use one monotonic clock origin, supplied by the caller for replay tests.
+class RichStageSchedule {
+public:
+    RichStageSchedule(const RichStageBudgets& budgets, double allocation_start,
+                      double restricted_tail_budget);
+    RichStageWindow begin(const std::string& stage, double now,
+                          int construction_unassigned = 0);
+    void finish(const std::string& stage, const RichStageWindow& window, double now);
+    double carry() const { return carry_; }
+    double pricing_reserve() const { return pricing_reserve_; }
+private:
+    RichStageBudgets budgets_;
+    double allocation_start_, search_deadline_, restricted_tail_budget_;
+    double carry_ = 0.0, pricing_reserve_ = 0.0, lns_deadline_ = 0.0;
+};
+
 struct AssignmentSnapshot {
     std::vector<int> seat_to_passenger;
     std::vector<int> passenger_to_seat;

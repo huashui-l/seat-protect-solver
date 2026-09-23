@@ -628,6 +628,49 @@ std::vector<std::pair<int, int>> rich_placement_domain(
     return options;
 }
 
+RichStageSchedule::RichStageSchedule(const RichStageBudgets& budgets,
+                                     double allocation_start, double restricted_tail_budget)
+    : budgets_(budgets), allocation_start_(allocation_start),
+      search_deadline_(allocation_start + budgets.usable_time),
+      restricted_tail_budget_(std::max(0.0, restricted_tail_budget)) {}
+
+RichStageWindow RichStageSchedule::begin(const std::string& stage, double now,
+                                         int construction_unassigned) {
+    if (stage == "special_pricing") {
+        return {pricing_reserve_, std::min(search_deadline_, now + pricing_reserve_)};
+    }
+    double effective = budgets_.stages.at(stage) + carry_;
+    if (stage == "construction") {
+        effective = budgets_.stages.at(stage);
+        return {effective, std::min(search_deadline_, allocation_start_ + effective)};
+    }
+    if (stage == "vnd") {
+        pricing_reserve_ = std::min(std::max(0.0, effective - 0.1),
+            budgets_.post_protected_tail_reserve_active ? 2.0 : 0.0);
+        effective -= pricing_reserve_;
+    }
+    if (stage == "restricted_mip") {
+        effective = std::max(budgets_.stages.at(stage), restricted_tail_budget_)
+            + std::max(0.0, lns_deadline_ - now);
+    }
+    double deadline = std::min(search_deadline_, now + effective);
+    if (stage == "repair") {
+        if (construction_unassigned > 0) deadline = search_deadline_;
+        effective = std::max(0.0, deadline - now);
+    }
+    if (stage == "lns") lns_deadline_ = deadline;
+    return {effective, deadline};
+}
+
+void RichStageSchedule::finish(const std::string& stage,
+                               const RichStageWindow& window, double now) {
+    // Python keeps protected-stage carry across special pricing. LNS carry is
+    // evaluated at restricted-stage entry, after intervening bookkeeping.
+    if (stage != "special_pricing" && stage != "lns" && stage != "restricted_mip") {
+        carry_ = std::max(0.0, window.deadline - now);
+    }
+}
+
 AssignmentState::AssignmentState(const Problem& source, const FixedSeatContext* fixed)
     : problem(source),
       seat_to_passenger(source.seats.size(), -1),

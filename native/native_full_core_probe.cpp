@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
     std::string input_path;
     std::string config_path;
     std::string output_path;
+    std::string schedule_path;
     bool placement_domains = false;
     for (int index = 1; index < argc;) {
         const std::string option = argv[index++];
@@ -17,6 +18,7 @@ int main(int argc, char** argv) {
         else if (option == "--config" && index < argc) config_path = argv[index++];
         else if (option == "--output" && index < argc) output_path = argv[index++];
         else if (option == "--placement-domains") placement_domains = true;
+        else if (option == "--schedule-replay" && index < argc) schedule_path = argv[index++];
         else return 2;
     }
     if (input_path.empty() || config_path.empty()) return 2;
@@ -181,6 +183,26 @@ int main(int argc, char** argv) {
             *output << '\"' << stage.first << "\":" << stage.second;
         }
         *output << "}}";
+        if (!schedule_path.empty()) {
+            const auto replay = native_json::parse_file(schedule_path);
+            full_cpp::RichStageSchedule schedule(budgets,
+                replay.at("allocation_start").number, replay.at("tail_budget").number);
+            *output << ",\"stage_schedule\":[";
+            bool first = true;
+            for (const auto& event : replay.at("events").array) {
+                const auto stage = event.at("stage").string;
+                const auto window = schedule.begin(stage, event.at("started").number,
+                    static_cast<int>(replay.at("construction_unassigned").number));
+                schedule.finish(stage, window, event.at("finished").number);
+                if (!first) *output << ',';
+                first = false;
+                *output << "{\"effective_budget\":" << window.effective_budget
+                        << ",\"deadline\":" << window.deadline
+                        << ",\"carry\":" << schedule.carry()
+                        << ",\"pricing_reserve\":" << schedule.pricing_reserve() << '}';
+            }
+            *output << ']';
+        }
         *output << "}\n";
         return 0;
     } catch (const std::exception& error) {

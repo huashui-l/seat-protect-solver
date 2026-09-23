@@ -101,6 +101,26 @@ yet consume this calculation; replacing its existing limits and implementing
 unused-budget carry remain required. This checkpoint is budget-calculation
 parity, not runtime scheduling or 60-second quality parity.
 
+The native core now also supplies `RichStageSchedule`, with caller-supplied
+monotonic timestamps and a `--schedule-replay` core-probe mode. It preserves
+construction's allocation-start deadline, repair's completeness-first borrowing,
+VND's post-protected pricing reserve, normal unused-budget carry, special pricing's
+separate deadline without overwriting protected carry, and restricted MIP's
+LNS carry measured at restricted entry (including intervening bookkeeping).
+Negative configured budgets and expired global deadlines retain Python behavior.
+The differential oracle executes scheduling expressions extracted from the actual
+Python allocation function, including its VND augmented assignment. Across 52
+fixture/config scenarios, 156 virtual-clock traces matched to 10 decimal places;
+these include early finishes, incomplete construction, overruns, negative tail
+budgets, nonzero clock origins, and active/inactive pricing reserve.
+Production does not yet call this scheduler: its Q0/Q1/Q2A fallback orchestration
+and partial Rich construction/repair boundaries still need separation before
+wiring in the frozen stage schedule. No absent protected/LNS/pricing stage is
+counted as executed, and no Formal24 quality claim follows from these clock tests.
+Release MSVC build passed (the two pre-existing integer-to-double warnings
+remain). Native-enabled public tests passed: 67 tests, 274 subtests, 10 skips.
+The separately enabled state-replay test passed all 12,000 operation subtests.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
