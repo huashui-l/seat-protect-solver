@@ -180,7 +180,6 @@ def main() -> None:
             ),
             "gap_I": (reference - external_score) / max(1.0, abs(reference)),
             "baseline_score": float(baseline["external_score"]),
-            "delta_vs_feasibility": external_score - float(baseline["external_score"]),
             "delta_vs_baseline": external_score - float(baseline["external_score"]),
             "selected_incumbent": result.get("selected_incumbent", ""),
             "fallback_reason": result.get("fallback_reason", ""),
@@ -283,13 +282,6 @@ def main() -> None:
         "quality": {
             "mean_gap_I": statistics.mean(row["gap_I"] for row in rows),
             "median_gap_I": statistics.median(row["gap_I"] for row in rows),
-            "paired_vs_feasibility": {
-                "improve": sum(delta > tolerance for delta in deltas),
-                "tie": sum(abs(delta) <= tolerance for delta in deltas),
-                "regress": sum(delta < -tolerance for delta in deltas),
-                "mean_delta": statistics.mean(deltas),
-                "median_delta": statistics.median(deltas),
-            },
             "paired_vs_baseline": {
                 "improve": sum(delta > tolerance for delta in deltas),
                 "tie": sum(abs(delta) <= tolerance for delta in deltas),
