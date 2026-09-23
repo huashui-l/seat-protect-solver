@@ -195,6 +195,10 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_vnd_group_rebuild_moves = group_result.rich_vnd_group_rebuild_moves;
             result.rich_vnd_score = group_result.rich_vnd_score;
             result.rich_vnd_seconds = group_result.rich_vnd_seconds;
+            result.rich_repair_attempted = group_result.rich_repair_attempted;
+            result.rich_repair_repaired = group_result.rich_repair_repaired;
+            result.rich_repair_unresolved = group_result.rich_repair_unresolved;
+            result.rich_repair_nodes = group_result.rich_repair_nodes;
             result.native_hard_violations = validate_complete_assignment(
                 problem, result.passenger_to_seat
             );

@@ -126,6 +126,10 @@ int main(int argc, char** argv) {
             << "\"rich_vnd_group_rebuild_moves\":" << result.rich_vnd_group_rebuild_moves << ','
             << "\"rich_vnd_score\":" << result.rich_vnd_score << ','
             << "\"rich_vnd_seconds\":" << result.rich_vnd_seconds << ','
+            << "\"rich_repair_attempted\":" << result.rich_repair_attempted << ','
+            << "\"rich_repair_repaired\":" << result.rich_repair_repaired << ','
+            << "\"rich_repair_unresolved\":" << result.rich_repair_unresolved << ','
+            << "\"rich_repair_nodes\":" << result.rich_repair_nodes << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;

@@ -51,6 +51,10 @@ struct FeasibilityResult {
     int rich_vnd_group_rebuild_moves = 0;
     double rich_vnd_score = 0.0;
     double rich_vnd_seconds = 0.0;
+    int rich_repair_attempted = 0;
+    int rich_repair_repaired = 0;
+    int rich_repair_unresolved = 0;
+    long long rich_repair_nodes = 0;
 };
 
 FeasibilityResult solve_feasibility_mip(
