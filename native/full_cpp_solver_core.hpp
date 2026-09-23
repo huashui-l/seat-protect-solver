@@ -10,6 +10,7 @@
 #include <utility>
 #include <tuple>
 #include <chrono>
+#include <cstdint>
 
 namespace full_cpp {
 
@@ -290,6 +291,31 @@ RichPricingGeometry build_rich_pricing_geometry(const RichPricingCache& cache);
 RichPricingBounds build_rich_pricing_bounds(const RichPricingCache& cache,
     const RichPricingGeometry& geometry, const std::vector<int>& order,
     const std::vector<std::vector<double>>& base_cost, double row_span_cost, double column_span_cost);
+
+using RichPricingMask = std::vector<std::uint64_t>;
+
+struct RichPricingCaregiver {
+    int passenger_index = -1;
+    bool allow_cross_aisle = false;
+    std::vector<int> caregivers;
+};
+
+struct RichPricingWorkspace {
+    RichPricingGeometry geometry;
+    std::vector<RichSsrLocation> flag_locations;
+    std::vector<std::vector<RichPricingMask>> resource_masks, flag_masks;
+    std::vector<std::vector<std::vector<int>>> option_flag_indexes;
+    std::vector<RichPricingCaregiver> caregiver_specs;
+    std::map<std::tuple<int, int, std::vector<int>>, std::pair<int, int>> option_by_signature;
+};
+
+RichPricingWorkspace build_rich_pricing_workspace(const Problem& problem, int group_index,
+    const RichPricingCache& cache);
+bool rich_pricing_caregiver_possible(const Problem& problem, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const std::vector<int>& selected, const RichPricingMask& used);
+// Empty mask denotes an unassigned cared passenger; a zero-filled mask denotes satisfied care.
+std::vector<RichPricingMask> rich_pricing_caregiver_state(const Problem& problem, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const std::vector<int>& selected);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

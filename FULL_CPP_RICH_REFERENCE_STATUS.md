@@ -714,15 +714,45 @@ and compare every coordinate, prefix cell, span cell and suffix cell exactly.
 Public groups plus reserved-middle and insufficient-capacity fixtures cover
 ordinary/negative placement costs, reversed passenger order, zero span factors and
 filtered last-row windows without coordinate renormalization. This is a search
-prerequisite; seat/resource/SSR masks, symmetry, dominance, caregiver reachability,
-negative-column retention, termination and complete rebuilt orchestration remain
-unimplemented in the pricing DFS. No M3 completion or quality claim follows.
+prerequisite; at this checkpoint seat/resource/SSR masks, symmetry, dominance,
+caregiver reachability, negative-column retention, termination and complete rebuilt
+orchestration remained unimplemented in the pricing DFS. No M3 completion or
+quality claim follows.
 
 Release /O2 build passed with the two existing conversion warnings. Full
 native/state-replay-enabled regression passed 124 tests and 14,553 subtests, with
 9 skips, including the 12,000-operation state differential and external raw-CLI
 legality/scoring checks. The new bounds test contributed 208 successful subtests.
 `git diff --check` passed. No Formal24 or profiling run was performed.
+
+The pricing DFS static workspace now includes native resource/SSR flag masks,
+ordered per-option flag indexes, signature lookup and caregiver specifications.
+Masks use vectors of 64-bit words with the same seat-input-order bit positions
+as Python's unbounded integers. Flag positions follow Python tuple-string ordering
+(including row 10 before row 2), and all caregivers use the frozen adult predicate.
+The workspace includes the previously verified geometric indexes/prefix sums.
+
+Native caregiver reachability now checks already selected adults and future
+resource-disjoint adult options. Its dominance-state helper distinguishes
+unassigned cared passengers from satisfied care and outstanding neighbor masks.
+Both helpers operate on the supplied domains and partial selection; the actual
+DFS state table and traversal are still pending.
+
+The oracle executes the frozen static workspace and both original caregiver
+helper bodies. Eleven public fixtures and a 216-seat/108-flag-location synthetic
+run in normal/reversed seat order with base, last-row and empty domains. Seeded
+partial selections, explicit adjacent adults and occupied-resource scenarios are
+compared field by field. Coverage assertions require multiword seat/flag/care masks,
+cross-aisle and same-side care, satisfied care, pending care and impossible care.
+The structured suite passed 10 tests and 1,115 subtests. Full search, workspace lifetime/reuse, symmetry,
+negative-column retention, termination and production structured integration remain
+required. M3 and the Full C++ Rich gate remain incomplete.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression, including the explicit multiword-care
+coverage assertion, passed 125 tests and 14,871 subtests, with 9 skips. This includes
+the 12,000-operation state differential and external raw-CLI legality/scoring
+checks. `git diff --check` passed. No Formal24 or profiling run was performed.
 
 ## Correctness
 

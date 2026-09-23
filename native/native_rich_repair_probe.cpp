@@ -31,6 +31,80 @@ int main(int argc, char** argv) {
                 }
                 if (!first) std::cout << ',';
                 first = false;
+                if (const auto* mode = request.find("workspace"); mode && mode->bool_or()) {
+                    const auto workspace = full_cpp::build_rich_pricing_workspace(problem, g, cache);
+                    std::cout << "{\"flag_locations\":[";
+                    for (size_t i = 0; i < workspace.flag_locations.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& location = workspace.flag_locations[i];
+                        if (location.subrow < 0) std::cout << "[\"row\"," << location.row << ']';
+                        else std::cout << "[\"subrow\",[" << location.row << ',' << location.subrow << "]]";
+                    }
+                    const auto emit_masks = [&](const char* name, const auto& passengers, bool quote) {
+                        std::cout << "],\"" << name << "\":[";
+                        for (size_t p = 0; p < passengers.size(); ++p) {
+                            if (p) std::cout << ',';
+                            std::cout << '[';
+                            for (size_t i = 0; i < passengers[p].size(); ++i) {
+                                if (i) std::cout << ',';
+                                std::cout << '[';
+                                for (size_t j = 0; j < passengers[p][i].size(); ++j) {
+                                    if (j) std::cout << ',';
+                                    if (quote) std::cout << '"';
+                                    std::cout << passengers[p][i][j];
+                                    if (quote) std::cout << '"';
+                                }
+                                std::cout << ']';
+                            }
+                            std::cout << ']';
+                        }
+                    };
+                    emit_masks("resource_masks", workspace.resource_masks, true);
+                    emit_masks("flag_masks", workspace.flag_masks, true);
+                    emit_masks("option_flag_indexes", workspace.option_flag_indexes, false);
+                    std::cout << "],\"caregiver_specs\":[";
+                    for (size_t i = 0; i < workspace.caregiver_specs.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& spec = workspace.caregiver_specs[i];
+                        std::cout << '[' << spec.passenger_index << ',' << (spec.allow_cross_aisle ? "true" : "false") << ",[";
+                        for (size_t j = 0; j < spec.caregivers.size(); ++j) { if (j) std::cout << ','; std::cout << spec.caregivers[j]; }
+                        std::cout << "]]";
+                    }
+                    std::cout << "],\"option_lookup\":[";
+                    bool first_option = true;
+                    for (const auto& options : cache.all_options) for (const auto& option : options) {
+                        const auto& found = workspace.option_by_signature.at({option.passenger_index, option.seat, option.blocked});
+                        if (!first_option) std::cout << ',';
+                        first_option = false;
+                        std::cout << '[' << found.first << ',' << found.second << ']';
+                    }
+                    std::cout << "],\"care_queries\":[";
+                    bool first_query = true;
+                    for (const auto& query : request.at("care_queries").array) {
+                        if (!first_query) std::cout << ',';
+                        first_query = false;
+                        std::vector<int> selected;
+                        for (const auto& entry : query.at("selected").array) selected.push_back(static_cast<int>(entry.number));
+                        full_cpp::RichPricingMask used((problem.seats.size() + 63) / 64, 0);
+                        for (const auto& entry : query.at("used_seats").array) {
+                            const int seat = problem.seat_index.at(entry.string);
+                            used[seat / 64] |= std::uint64_t{1} << (seat % 64);
+                        }
+                        std::cout << "{\"possible\":" << (full_cpp::rich_pricing_caregiver_possible(problem, cache, workspace, selected, used) ? "true" : "false");
+                        std::cout << ",\"state\":[";
+                        const auto state = full_cpp::rich_pricing_caregiver_state(problem, cache, workspace, selected);
+                        for (size_t i = 0; i < state.size(); ++i) {
+                            if (i) std::cout << ',';
+                            if (state[i].empty()) { std::cout << "null"; continue; }
+                            std::cout << '[';
+                            for (size_t j = 0; j < state[i].size(); ++j) { if (j) std::cout << ','; std::cout << '"' << state[i][j] << '"'; }
+                            std::cout << ']';
+                        }
+                        std::cout << "]}";
+                    }
+                    std::cout << "]}";
+                    continue;
+                }
                 if (const auto* mode = request.find("bounds"); mode && mode->bool_or()) {
                     const auto geometry = full_cpp::build_rich_pricing_geometry(cache);
                     std::vector<int> order;

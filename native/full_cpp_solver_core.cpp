@@ -1279,6 +1279,110 @@ RichPricingBounds build_rich_pricing_bounds(const RichPricingCache& cache,
     return bounds;
 }
 
+RichPricingWorkspace build_rich_pricing_workspace(const Problem& problem, int group_index,
+    const RichPricingCache& cache
+) {
+    RichPricingWorkspace workspace;
+    workspace.geometry = build_rich_pricing_geometry(cache);
+    // Python sorts flag locations by their tuple string, not by numeric row.
+    std::map<std::string, RichSsrLocation> sorted_flags;
+    for (const auto& options : cache.all_options) for (const auto& option : options)
+        for (const auto& location : option.ssr_flag_locations) {
+            const auto key = location.subrow < 0 ? "('row', " + std::to_string(location.row) + ")"
+                : "('subrow', (" + std::to_string(location.row) + ", " + std::to_string(location.subrow) + "))";
+            sorted_flags[key] = location;
+        }
+    std::map<RichSsrLocation, int> flag_index;
+    for (const auto& entry : sorted_flags) {
+        flag_index[entry.second] = static_cast<int>(workspace.flag_locations.size());
+        workspace.flag_locations.push_back(entry.second);
+    }
+    const size_t seat_words = (problem.seats.size() + 63) / 64;
+    const size_t flag_words = (workspace.flag_locations.size() + 63) / 64;
+    for (size_t p = 0; p < cache.all_options.size(); ++p) {
+        workspace.resource_masks.emplace_back(); workspace.flag_masks.emplace_back();
+        workspace.option_flag_indexes.emplace_back();
+        for (size_t i = 0; i < cache.all_options[p].size(); ++i) {
+            const auto& option = cache.all_options[p][i];
+            RichPricingMask resources(seat_words, 0), flags(flag_words, 0);
+            std::vector<int> indexes;
+            for (int seat : option.resources) resources[seat / 64] |= std::uint64_t{1} << (seat % 64);
+            for (const auto& location : option.ssr_flag_locations) {
+                const int bit = flag_index.at(location);
+                indexes.push_back(bit); flags[bit / 64] |= std::uint64_t{1} << (bit % 64);
+            }
+            workspace.resource_masks.back().push_back(std::move(resources));
+            workspace.flag_masks.back().push_back(std::move(flags));
+            workspace.option_flag_indexes.back().push_back(std::move(indexes));
+            workspace.option_by_signature[{option.passenger_index, option.seat, option.blocked}] =
+                {static_cast<int>(p), static_cast<int>(i)};
+        }
+    }
+    const auto& group = problem.groups[group_index];
+    for (size_t p = 0; p < group.passengers.size(); ++p) {
+        const auto& passenger = problem.passengers[group.passengers[p]];
+        const auto rule = ssr_rule(problem, passenger);
+        if (!passenger.need_cared && !rule.requires_caregiver) continue;
+        RichPricingCaregiver spec;
+        spec.passenger_index = static_cast<int>(p);
+        spec.allow_cross_aisle = passenger.need_cared && passenger.ssr.empty() ? false : rule.caregiver_allow_cross_aisle;
+        for (size_t other = 0; other < group.passengers.size(); ++other)
+            if (other != p && is_adult_caregiver(problem.passengers[group.passengers[other]]))
+                spec.caregivers.push_back(static_cast<int>(other));
+        workspace.caregiver_specs.push_back(std::move(spec));
+    }
+    return workspace;
+}
+
+bool rich_pricing_caregiver_possible(const Problem& problem, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const std::vector<int>& selected, const RichPricingMask& used
+) {
+    for (const auto& spec : workspace.caregiver_specs) {
+        if (selected[spec.passenger_index] < 0) continue;
+        const auto& seat = problem.seats[cache.all_options[spec.passenger_index][selected[spec.passenger_index]].seat];
+        const auto& neighbors = spec.allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+        bool possible = false;
+        for (int p : spec.caregivers) {
+            if (selected[p] >= 0) {
+                const int chosen = cache.all_options[p][selected[p]].seat;
+                if (std::find(neighbors.begin(), neighbors.end(), chosen) != neighbors.end()) { possible = true; break; }
+                continue;
+            }
+            for (size_t i = 0; i < cache.all_options[p].size(); ++i) {
+                if (std::find(neighbors.begin(), neighbors.end(), cache.all_options[p][i].seat) == neighbors.end()) continue;
+                bool overlap = false;
+                for (size_t word = 0; word < used.size(); ++word)
+                    if (workspace.resource_masks[p][i][word] & used[word]) { overlap = true; break; }
+                if (!overlap) { possible = true; break; }
+            }
+            if (possible) break;
+        }
+        if (!possible) return false;
+    }
+    return true;
+}
+
+std::vector<RichPricingMask> rich_pricing_caregiver_state(const Problem& problem, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const std::vector<int>& selected
+) {
+    std::vector<RichPricingMask> state;
+    for (const auto& spec : workspace.caregiver_specs) {
+        if (selected[spec.passenger_index] < 0) { state.emplace_back(); continue; }
+        const auto& seat = problem.seats[cache.all_options[spec.passenger_index][selected[spec.passenger_index]].seat];
+        const auto& neighbors = spec.allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+        RichPricingMask mask((problem.seats.size() + 63) / 64, 0);
+        for (int neighbor : neighbors) mask[neighbor / 64] |= std::uint64_t{1} << (neighbor % 64);
+        for (int p : spec.caregivers) if (selected[p] >= 0) {
+            const int chosen = cache.all_options[p][selected[p]].seat;
+            if (mask[chosen / 64] & (std::uint64_t{1} << (chosen % 64))) {
+                std::fill(mask.begin(), mask.end(), 0); break;
+            }
+        }
+        state.push_back(std::move(mask));
+    }
+    return state;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

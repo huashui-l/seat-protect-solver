@@ -2,6 +2,7 @@ import ast
 import copy
 import json
 import math
+import random
 import subprocess
 import tempfile
 import types
@@ -70,6 +71,130 @@ def python_rigid_relaxed(case, config, assignments, value_blocks=False, expired=
 class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_pricing_resource_flag_and_caregiver_workspace_match_python(self):
+        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
+        def index(name):
+            return next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)
+                        and isinstance(n.targets[0], ast.Name) and n.targets[0].id == name)
+        code = compile(ast.Module(body=function.body[index("workspace_started"):index("dynamic_refresh_started")],
+                                  type_ignores=[]), "frozen_dfs_workspace", "exec")
+        care_code = compile(ast.Module(body=[n for n in function.body if isinstance(n, ast.FunctionDef)
+                                            and n.name in ("caregiver_still_possible", "caregiver_dominance_state")],
+                                       type_ignores=[]), "frozen_dfs_care", "exec")
+        rng = random.Random(831)
+        large = self.synthetic([(101, {"ssr": "BLND", "mandatoryRule": {"needSingleSideEmpty": "Y",
+                                 "sameRowNoOtherSSR": "Y", "sameSubRowNoOtherSSR": "Y"}}),
+                                (101, {}), (101, {"needCared": "Y"}),
+                                (101, {"mandatoryRule": {"needBothSideEmpty": "Y"}})])
+        large["id"] = "workspace_multiple_words"
+        prototypes = [s for s in large["newSeatmapData"]["seats"] if s["row"] == 1]
+        large["newSeatmapData"]["seats"] = [{**s, "seatId": f"{row}{s['col']}", "row": row}
+                                            for row in range(1, 37) for s in prototypes]
+        coverage = set()
+        for original in [*self.cases[:11], large]:
+            for reverse in (False, True):
+                with self.subTest(case=original["id"], reverse=reverse):
+                    case = copy.deepcopy(original)
+                    if reverse: case["newSeatmapData"]["seats"].reverse()
+                    config = copy.deepcopy(self.config)
+                    config["input_contract"] = {"seatmaps_by_direction": {
+                        "public-test": {"old": "old.json", "new": "new.json"}}}
+                    new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                    old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                    fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                    requests, expected = [], []
+                    for g, group in enumerate(case["groupsData"]):
+                        base = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                        for window in (None, [max(new.row_seats)], []):
+                            cache = copy.copy(base)
+                            if window is not None:
+                                cache.all_options = [[o for o in options if new.seat_map[o.seat_id]["row"] in window]
+                                                     for options in base.all_options]
+                                cache.universe = [o for options in cache.all_options for o in options]
+                                cache.seat_ids = tuple(sorted({o.seat_id for o in cache.universe}))
+                                cache.row_coordinate = {s: base.row_coordinate[s] for s in cache.seat_ids}
+                                cache.x_coordinate = {s: base.x_coordinate[s] for s in cache.seat_ids}
+                            namespace = dict(exact.__dict__, cache=cache, passengers=group["psrs"],
+                                             new_topology=new, config=config, pricing_cfg={})
+                            exec(code, namespace)
+                            workspace = namespace["workspace"]
+                            seat_words = (len(new.seat_map) + 63) // 64
+                            flag_words = (len(workspace["flag_locations"]) + 63) // 64
+                            def words(mask, count):
+                                return [str((mask >> (64 * i)) & ((1 << 64) - 1)) for i in range(count)]
+                            resources = [[words(workspace["resource_mask"][o.signature], seat_words) for o in options]
+                                         for options in cache.all_options]
+                            flags = [[words(workspace["option_flag_mask"][o.signature], flag_words) for o in options]
+                                     for options in cache.all_options]
+                            indexes = [[list(bit.bit_length() - 1 for bit in workspace["option_flag_bits"][o.signature])
+                                        for o in options] for options in cache.all_options]
+                            lookup = {o.signature: [p, i] for p, options in enumerate(cache.all_options) for i, o in enumerate(options)}
+                            expected.append(dict(flag_locations=workspace["flag_locations"], resource_masks=resources,
+                                                 flag_masks=flags, option_flag_indexes=indexes,
+                                                 caregiver_specs=workspace["caregiver_specs"],
+                                                 option_lookup=[lookup[workspace["option_by_signature"][o.signature].signature]
+                                                                for o in cache.universe]))
+                            requests.append(dict(group_index=g, workspace=True))
+                            if window is not None: requests[-1]["window"] = window
+                            selections = [([-1] * len(cache.all_options), [])]
+                            for _ in range(8):
+                                selections.append(([rng.randrange(-1, len(options)) for options in cache.all_options],
+                                                   rng.sample(list(new.seat_map), min(4, len(new.seat_map)))))
+                            for cared, cross, adults in workspace["caregiver_specs"]:
+                                if not cache.all_options[cared]: continue
+                                chosen = [-1] * len(cache.all_options)
+                                chosen[cared] = 0
+                                selections.extend([(chosen[:], []), (chosen[:], list(new.seat_map))])
+                                neighbors = set(new.row_neighbors(cache.all_options[cared][0].seat_id, allow_cross_aisle=cross))
+                                for adult in adults:
+                                    adjacent = next((i for i, o in enumerate(cache.all_options[adult]) if o.seat_id in neighbors), None)
+                                    if adjacent is not None:
+                                        chosen[adult] = adjacent
+                                        selections.append((chosen[:], []))
+                                        break
+                            namespace.update(caregiver_specs=workspace["caregiver_specs"],
+                                             domains=dict(enumerate(cache.all_options)))
+                            exec(care_code, namespace)
+                            requests[-1]["care_queries"], expected[-1]["care_queries"] = [], []
+                            for selected, extra in selections:
+                                namespace["selected"] = [options[i] if i >= 0 else None for options, i in zip(cache.all_options, selected)]
+                                used_seats = set(extra)
+                                for o in namespace["selected"]:
+                                    if o is not None: used_seats.update(o.resources)
+                                used_mask = sum(workspace["seat_bit"][s] for s in used_seats)
+                                possible = namespace["caregiver_still_possible"](used_mask)
+                                states = namespace["caregiver_dominance_state"]()
+                                requests[-1]["care_queries"].append(dict(selected=selected, used_seats=sorted(used_seats)))
+                                expected[-1]["care_queries"].append(dict(possible=possible,
+                                    state=[None if mask == -1 else words(mask, seat_words) for mask in states]))
+                                if not possible: coverage.add("impossible_care")
+                                if any(mask == 0 for mask in states): coverage.add("satisfied_care")
+                                if any(mask > 0 for mask in states): coverage.add("pending_care")
+                                if any(mask >> 64 > 0 for mask in states): coverage.add("care_words")
+                            if any(int(w) for row in resources for mask in row for w in mask[1:]): coverage.add("seat_words")
+                            if any(int(w) for row in flags for mask in row for w in mask[1:]): coverage.add("flag_words")
+                            for _, cross, adults in workspace["caregiver_specs"]:
+                                if adults: coverage.add("cross" if cross else "same_side")
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                            "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                            "replay.json": {"pricing_cache": requests},
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    expected = json.loads(json.dumps(expected))
+                    self.assertEqual(len(actual), len(expected))
+                    for request, native, python in zip(requests, actual, expected):
+                        with self.subTest(request=request): self.assertEqual(native, python)
+        self.assertEqual(coverage, {"seat_words", "flag_words", "cross", "same_side",
+                                   "impossible_care", "satisfied_care", "pending_care", "care_words"})
 
     def test_pricing_rectangle_bounds_match_frozen_dfs(self):
         tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
