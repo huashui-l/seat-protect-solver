@@ -85,6 +85,8 @@ int main(int argc, char** argv) {
             << full_cpp::construction_objective_name(construction_objective) << "\","
             << "\"case_id\":\"" << escape_json(problem.case_id) << "\","
             << "\"status\":\"" << result.status << "\","
+            << "\"q0_solver_status\":\""
+            << escape_json(result.q0_solver_status) << "\","
             << "\"complete\":" << (unassigned == 0 ? "true" : "false") << ','
             << "\"unassigned\":" << unassigned << ','
             << "\"native_hard_violations\":" << result.native_hard_violations << ','

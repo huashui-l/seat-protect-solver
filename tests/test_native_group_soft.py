@@ -77,6 +77,10 @@ class NativeGroupSoftTests(unittest.TestCase):
     def test_group_soft_is_strict_better_or_q0_fallback(self):
         q0 = self.run_case("shrink_small_blockers", "individual-soft")
         group = self.run_case("shrink_small_blockers")
+        self.assertEqual("Optimal", q0["status"])
+        self.assertEqual("", q0["q0_solver_status"])
+        self.assertEqual("Optimal", group["q0_solver_status"])
+        self.assertEqual("HeuristicComplete", group["status"])
         self.assertGreaterEqual(group["native_score"], q0["native_score"])
         if group["selected_incumbent"] == "group-aware":
             self.assertGreater(group["native_score"], q0["native_score"])

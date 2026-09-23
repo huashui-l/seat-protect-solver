@@ -18,6 +18,7 @@ const char* construction_objective_name(ConstructionObjective objective);
 
 struct FeasibilityResult {
     std::string status;
+    std::string q0_solver_status;
     std::vector<int> passenger_to_seat;
     int native_hard_violations = 0;
     double wall_seconds = 0.0;

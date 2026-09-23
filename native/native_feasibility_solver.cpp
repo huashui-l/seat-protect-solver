@@ -117,6 +117,7 @@ FeasibilityResult solve_feasibility_mip(
         FeasibilityResult result = solve_feasibility_mip(
             problem, time_limit_seconds, seed, ConstructionObjective::IndividualSoft
         );
+        result.q0_solver_status = result.status;
         if (result.native_hard_violations == 0) {
             const GroupConstructionResult group_result = construct_group_aware(
                 problem, result.passenger_to_seat,
@@ -140,9 +141,12 @@ FeasibilityResult solve_feasibility_mip(
             result.native_hard_violations = validate_complete_assignment(
                 problem, result.passenger_to_seat
             );
+            result.status = result.native_hard_violations == 0
+                ? "HeuristicComplete" : "HeuristicFailed";
         } else {
             result.selected_incumbent = "q0";
             result.fallback_reason = "q0_invalid";
+            result.status = "HeuristicFailed";
         }
         result.wall_seconds = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - started

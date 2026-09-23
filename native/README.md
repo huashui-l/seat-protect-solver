@@ -29,6 +29,9 @@ ordering uses the exact native `score_s + score_v + score_p + score_c`; every
 complete candidate is checked with the native hard validator and full scorer,
 including `score_b`, and is committed only when strictly better. Failure,
 deadline, incompleteness, illegality, or a non-improving candidate returns Q0.
+For `group-soft`, `q0_solver_status` reports the underlying MIP status while
+the final `status` is `HeuristicComplete`; the heuristic result does not claim
+global optimality for the complete group-aware objective.
 
 The RR and restricted-master pipeline consists of:
 
