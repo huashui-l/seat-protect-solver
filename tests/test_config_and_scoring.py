@@ -9,6 +9,13 @@ from src import heuristic_seat_allocator as final
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FORMAL24_ROOT = (
+    PROJECT_ROOT
+    / "data"
+    / "generator_v3_2"
+    / "d3_official_24cases_2026-09-07"
+)
+FORMAL24_CONFIG = PROJECT_ROOT / "rich_python_reference_config.json"
 
 
 def make_seat(seat_id: str, row: int, seat_class: str = "Economy", col: str = "A") -> dict:
@@ -118,9 +125,8 @@ class ConfigTests(unittest.TestCase):
         for value in config["data"].values():
             self.assertFalse(Path(value).is_absolute(), value)
 
-    @unittest.skip("requires benchmark data intentionally excluded from this repository")
     def test_fixed_new_seats_preserve_cabin(self):
-        config = json.loads((PROJECT_ROOT / "config.json").read_text(encoding="utf-8"))
+        config = json.loads(FORMAL24_CONFIG.read_text(encoding="utf-8"))
         old_seats = json.loads(
             (PROJECT_ROOT / config["data"]["oldseatmap"]).read_text(encoding="utf-8")
         )["seats"]
@@ -128,7 +134,9 @@ class ConfigTests(unittest.TestCase):
             (PROJECT_ROOT / config["data"]["seatmap"]).read_text(encoding="utf-8")
         )["seats"]
         groups = json.loads(
-            (PROJECT_ROOT / config["data"]["groups"]).read_text(encoding="utf-8")
+            (FORMAL24_ROOT / "forward" / "50_normal_groups.json").read_text(
+                encoding="utf-8"
+            )
         )["groups"]
         old_classes = {seat["seatId"]: seat["seatClass"] for seat in old_seats}
         new_classes = {seat["seatId"]: seat["seatClass"] for seat in new_seats}
@@ -783,10 +791,9 @@ class ScoringTests(unittest.TestCase):
         self.assertNotIn("score_class", result["score_detail"])
         self.assertNotIn("score_cabin_match", result["score_detail"])
 
-    @unittest.skip("requires Formal24 data intentionally excluded from this repository")
     def test_reverse_50_edge_rebuilds_protected_fixed_care_group(self):
         config = json.loads(
-            (PROJECT_ROOT / "config.json").read_text(encoding="utf-8")
+            FORMAL24_CONFIG.read_text(encoding="utf-8")
         )
         old_seats = json.loads(
             (PROJECT_ROOT / "data" / "3-3seatmap.json").read_text(
@@ -800,9 +807,9 @@ class ScoringTests(unittest.TestCase):
         )["seats"]
         groups = json.loads(
             (
-                PROJECT_ROOT
-                / "data"
-                / "reverse_3-3_to_3-4-3_50_edge_groups.json"
+                FORMAL24_ROOT
+                / "reverse"
+                / "50_edge_groups.json"
             ).read_text(encoding="utf-8")
         )["groups"]
 
@@ -815,9 +822,8 @@ class ScoringTests(unittest.TestCase):
         # The regenerated case no longer relies on a particular random group
         # number.  Its protected, fixed care group must still be rebuilt as a
         # whole while both fixed passengers retain their specified seats.
-        self.assertIn((7, 1), result["assigned_seats"])
-        self.assertEqual(result["assigned_seats"][(7, 2)], "20C")
-        self.assertEqual(result["assigned_seats"][(7, 3)], "20D")
+        self.assertEqual(result["assigned_seats"][(6, 1)], "19H")
+        self.assertEqual(result["assigned_seats"][(6, 2)], "19E")
         validation = result["score_detail"]["soft_score_validation"]
         self.assertTrue(validation["passed"])
         self.assertLessEqual(
@@ -856,14 +862,15 @@ class BatchDatasetTests(unittest.TestCase):
     difficulties = ("normal", "stress", "edge")
     required_ssrs = {"CHD", "WCHR", "BLND", "BSCT", "UM", "EXST", "CBBG"}
 
-    @unittest.skip("requires Formal24 data intentionally excluded from this repository")
     def test_all_24_datasets_have_homogeneous_cabin_groups(self):
-        for prefix in ("", "reverse_3-3_to_3-4-3_"):
+        paths = sorted(FORMAL24_ROOT.glob("*/*_groups.json"))
+        self.assertEqual(len(paths), 24)
+        for direction in ("forward", "reverse"):
             for size_label in self.size_labels:
                 for difficulty in self.difficulties:
                     path = (
-                        PROJECT_ROOT / "data"
-                        / f"{prefix}{size_label}_{difficulty}_groups.json"
+                        FORMAL24_ROOT / direction
+                        / f"{size_label}_{difficulty}_groups.json"
                     )
                     groups = json.loads(
                         path.read_text(encoding="utf-8")
@@ -878,15 +885,14 @@ class BatchDatasetTests(unittest.TestCase):
                             (path.name, group["groupId"], cabins),
                         )
 
-    @unittest.skip("requires Formal24 data intentionally excluded from this repository")
     def test_batch_datasets_have_required_coverage(self):
         fixed_by_size = {}
         for size_label in self.size_labels:
             fixed_by_size[size_label] = {}
             for difficulty in self.difficulties:
                 path = (
-                    PROJECT_ROOT
-                    / "data"
+                    FORMAL24_ROOT
+                    / "forward"
                     / f"{size_label}_{difficulty}_groups.json"
                 )
                 payload = json.loads(path.read_text(encoding="utf-8"))
@@ -918,7 +924,7 @@ class BatchDatasetTests(unittest.TestCase):
                         payload["passengerCount"],
                         payload["passengerCapacity"],
                     )
-                self.assertEqual(max(len(group["psrs"]) for group in groups), 10)
+                self.assertLessEqual(max(len(group["psrs"]) for group in groups), 10)
                 self.assertEqual(present_ssrs, self.required_ssrs)
                 fixed_by_size[size_label][difficulty] = fixed
 

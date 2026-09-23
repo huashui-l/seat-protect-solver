@@ -19,7 +19,13 @@ artifacts/
 checkpoints/
 toolchains/
 _deps/
-data/
+data/*
+!data/3-3seatmap.json
+!data/3-4-3seatmap.json
+!data/generator_v3_2/
+data/generator_v3_2/*
+!data/generator_v3_2/d3_official_24cases_2026-09-07/
+!data/generator_v3_2/d3_official_24cases_2026-09-07/**
 *.pt
 *.pth
 *.ckpt
