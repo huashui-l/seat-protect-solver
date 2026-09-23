@@ -255,6 +255,24 @@ void generate_rich_value_block_patterns(const Problem& problem, int group_index,
     const RichStructuredWindows& windows, const std::vector<std::string>& active_ssr_types,
     std::chrono::steady_clock::time_point deadline, std::vector<RichTieredPattern>& patterns);
 
+struct RichHoleSpec {
+    int middle = -1;
+    std::vector<int> left, right;
+};
+
+struct RichPricingCache {
+    std::vector<std::vector<RichPlacement>> all_options;
+    std::vector<int> seat_ids;
+    std::map<int, double> row_coordinate, x_coordinate;
+    double row_big_m = 0.0, x_big_m = 0.0;
+    std::vector<std::pair<int, int>> adjacency_edges;
+    std::vector<RichHoleSpec> hole_specs;
+};
+
+RichPricingCache build_rich_pricing_cache(const Problem& problem, int group_index, const FixedSeatContext& fixed);
+RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPricingCache& cache,
+    const std::vector<int>& rows);
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 );

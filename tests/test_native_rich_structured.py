@@ -70,6 +70,74 @@ class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
 
+    def test_pricing_cache_and_window_geometry_match_python(self):
+        tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "generate_structured_group_patterns")
+        group_loop = next(n for n in function.body if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and n.target.id == "group")
+        window_loop = next(n for n in group_loop.body if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and n.target.id == "window")
+        start = next(i for i, n in enumerate(window_loop.body) if isinstance(n, ast.Assign)
+                     and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "window_cache")
+        stop = next(i for i, n in enumerate(window_loop.body) if isinstance(n, ast.AugAssign))
+        filtering = compile(ast.Module(body=window_loop.body[start:stop], type_ignores=[]), "frozen_window_cache", "exec")
+        reserved = self.synthetic([(101, {}), (202, {"newSeat": {"seatNum": "1B"}})])
+        reserved["id"] = "pricing_reserved_middle"
+        coverage = set()
+        for original in [*self.cases[:11], reserved]:
+            for reverse in (False, True):
+                with self.subTest(case=original["id"], reverse=reverse):
+                    case = copy.deepcopy(original)
+                    if reverse: case["newSeatmapData"]["seats"].reverse()
+                    config = copy.deepcopy(self.config)
+                    config["input_contract"] = {"seatmaps_by_direction": {
+                        "public-test": {"old": "old.json", "new": "new.json"}}}
+                    new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                    old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                    fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                    requests, expected = [], []
+                    for g, group in enumerate(case["groupsData"]):
+                        cache = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                        reachable = set(cache.seat_ids)
+                        if any(a not in reachable or b not in reachable for a, b in cache.adjacency_edges):
+                            coverage.add("unreachable_neighbor")
+                        if any(m not in reachable for m, _, _ in cache.hole_specs):
+                            coverage.add("unreachable_middle")
+                        rows = sorted(new.row_seats)
+                        for window in (None, rows[:1], rows[-1:], rows[::2], []):
+                            request = dict(group_index=g)
+                            selected = cache
+                            if window is not None:
+                                request["window"] = window
+                                filtered = [[o for o in options if int(new.seat_map[o.seat_id]["row"]) in window]
+                                            for options in cache.all_options]
+                                namespace = dict(rich.__dict__, cache=cache, filtered_options=filtered)
+                                exec(filtering, namespace)
+                                selected = namespace["window_cache"]
+                                if not any(selected.all_options): coverage.add("empty_window")
+                                if selected.row_coordinate and min(selected.row_coordinate.values()) > 0:
+                                    coverage.add("retained_origin")
+                            requests.append(request)
+                            expected.append({**{k: getattr(selected, k) for k in ("seat_ids", "row_coordinate", "x_coordinate",
+                                               "row_big_m", "x_big_m", "adjacency_edges", "hole_specs")},
+                                             "all_options": [[o.signature for o in options] for options in selected.all_options]})
+                    expected = json.loads(json.dumps(expected))
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                            "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                            "replay.json": {"pricing_cache": requests},
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    self.assertEqual(len(actual), len(expected))
+                    for index, (native, python) in enumerate(zip(actual, expected)):
+                        with self.subTest(request=requests[index]):
+                            self.assertEqual(native, python)
+        self.assertEqual(coverage, {"unreachable_neighbor", "unreachable_middle", "empty_window", "retained_origin"})
+
     def replay_windows(self, case, config):
         config = copy.deepcopy(config)
         config["input_contract"] = {"seatmaps_by_direction": {

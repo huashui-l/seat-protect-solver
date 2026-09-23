@@ -1108,6 +1108,78 @@ void generate_rich_value_block_patterns(const Problem& problem, int group_index,
     }
 }
 
+RichPricingCache build_rich_pricing_cache(const Problem& problem, int group_index, const FixedSeatContext& fixed) {
+    RichPricingCache cache;
+    cache.all_options = build_rich_placement_options(problem, group_index, fixed);
+    std::set<int> reachable;
+    for (const auto& options : cache.all_options) for (const auto& option : options) reachable.insert(option.seat);
+    double min_y = std::numeric_limits<double>::infinity(), min_x = min_y;
+    for (int s = 0; s < static_cast<int>(problem.seats.size()); ++s) if (reachable.count(s)) {
+        cache.seat_ids.push_back(s);
+        min_y = std::min(min_y, problem.seats[s].y); min_x = std::min(min_x, problem.seats[s].x);
+    }
+    std::set<std::pair<std::string, std::string>> edges;
+    for (int s : cache.seat_ids) {
+        cache.row_coordinate[s] = problem.seats[s].y - min_y;
+        cache.x_coordinate[s] = problem.seats[s].x - min_x;
+        cache.row_big_m = std::max(cache.row_big_m, cache.row_coordinate[s]);
+        cache.x_big_m = std::max(cache.x_big_m, cache.x_coordinate[s]);
+        for (int neighbor : problem.seats[s].row_neighbors) if (neighbor != s) {
+            auto a = problem.seats[s].id, b = problem.seats[neighbor].id;
+            if (b < a) std::swap(a, b);
+            edges.emplace(a, b);
+        }
+    }
+    for (const auto& edge : edges) cache.adjacency_edges.emplace_back(problem.seat_index.at(edge.first), problem.seat_index.at(edge.second));
+    // SeatTopology retains first-seen row order, then sorts seats within each row.
+    std::vector<int> row_order;
+    std::map<int, std::vector<int>> row_seats;
+    for (int s = 0; s < static_cast<int>(problem.seats.size()); ++s) {
+        const int row = problem.seats[s].row;
+        if (!row_seats.count(row)) row_order.push_back(row);
+        row_seats[row].push_back(s);
+    }
+    for (int row : row_order) {
+        auto& seats = row_seats[row];
+        std::sort(seats.begin(), seats.end(), [&](int a, int b) { return problem.seats[a].index_in_row < problem.seats[b].index_in_row; });
+        for (size_t i = 1; i + 1 < seats.size(); ++i) {
+            RichHoleSpec hole; hole.middle = seats[i];
+            for (size_t j = 0; j < i; ++j) if (reachable.count(seats[j])) hole.left.push_back(seats[j]);
+            for (size_t j = i + 1; j < seats.size(); ++j) if (reachable.count(seats[j])) hole.right.push_back(seats[j]);
+            if (!hole.left.empty() && !hole.right.empty()) cache.hole_specs.push_back(std::move(hole));
+        }
+    }
+    return cache;
+}
+
+RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPricingCache& cache,
+    const std::vector<int>& rows
+) {
+    RichPricingCache filtered;
+    filtered.row_big_m = cache.row_big_m; filtered.x_big_m = cache.x_big_m;
+    std::set<int> seats;
+    for (const auto& options : cache.all_options) {
+        filtered.all_options.emplace_back();
+        for (const auto& option : options) if (std::find(rows.begin(), rows.end(), problem.seats[option.seat].row) != rows.end()) {
+            filtered.all_options.back().push_back(option); seats.insert(option.seat);
+        }
+    }
+    filtered.seat_ids.assign(seats.begin(), seats.end());
+    std::sort(filtered.seat_ids.begin(), filtered.seat_ids.end(), [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; });
+    for (int s : filtered.seat_ids) {
+        filtered.row_coordinate[s] = cache.row_coordinate.at(s); filtered.x_coordinate[s] = cache.x_coordinate.at(s);
+    }
+    for (const auto& edge : cache.adjacency_edges) if (seats.count(edge.first) && seats.count(edge.second)) filtered.adjacency_edges.push_back(edge);
+    for (const auto& hole : cache.hole_specs) {
+        if (!seats.count(hole.middle)) continue;
+        RichHoleSpec item; item.middle = hole.middle;
+        for (int s : hole.left) if (seats.count(s)) item.left.push_back(s);
+        for (int s : hole.right) if (seats.count(s)) item.right.push_back(s);
+        if (!item.left.empty() && !item.right.empty()) filtered.hole_specs.push_back(std::move(item));
+    }
+    return filtered;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

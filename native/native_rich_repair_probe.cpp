@@ -11,6 +11,67 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* requests = replay.find("pricing_cache")) {
+            const auto fixed = full_cpp::preprocess_fixed_seats(problem);
+            const auto emit_seats = [&](const std::vector<int>& seats) {
+                std::cout << '[';
+                for (size_t i = 0; i < seats.size(); ++i) { if (i) std::cout << ','; std::cout << '"' << problem.seats[seats[i]].id << '"'; }
+                std::cout << ']';
+            };
+            std::cout << std::setprecision(17) << '[';
+            bool first = true;
+            for (const auto& request : requests->array) {
+                const int g = static_cast<int>(request.at("group_index").number);
+                auto cache = full_cpp::build_rich_pricing_cache(problem, g, fixed);
+                if (const auto* window = request.find("window")) {
+                    std::vector<int> rows;
+                    for (const auto& row : window->array) rows.push_back(static_cast<int>(row.number));
+                    cache = full_cpp::filter_rich_pricing_window(problem, cache, rows);
+                }
+                if (!first) std::cout << ',';
+                first = false;
+                std::cout << "{\"seat_ids\":"; emit_seats(cache.seat_ids);
+                std::cout << ",\"row_big_m\":" << cache.row_big_m << ",\"x_big_m\":" << cache.x_big_m;
+                const auto emit_coordinates = [&](const char* name, const auto& values) {
+                    std::cout << ",\"" << name << "\":{";
+                    bool first_value = true;
+                    for (const auto& entry : values) {
+                        if (!first_value) std::cout << ',';
+                        first_value = false;
+                        std::cout << '"' << problem.seats[entry.first].id << "\":" << entry.second;
+                    }
+                    std::cout << '}';
+                };
+                emit_coordinates("row_coordinate", cache.row_coordinate); emit_coordinates("x_coordinate", cache.x_coordinate);
+                std::cout << ",\"adjacency_edges\":[";
+                for (size_t i = 0; i < cache.adjacency_edges.size(); ++i) {
+                    if (i) std::cout << ',';
+                    emit_seats({cache.adjacency_edges[i].first, cache.adjacency_edges[i].second});
+                }
+                std::cout << "],\"hole_specs\":[";
+                for (size_t i = 0; i < cache.hole_specs.size(); ++i) {
+                    if (i) std::cout << ',';
+                    const auto& hole = cache.hole_specs[i];
+                    std::cout << "[\"" << problem.seats[hole.middle].id << "\",";
+                    emit_seats(hole.left); std::cout << ','; emit_seats(hole.right); std::cout << ']';
+                }
+                std::cout << "],\"all_options\":[";
+                for (size_t p = 0; p < cache.all_options.size(); ++p) {
+                    if (p) std::cout << ',';
+                    std::cout << '[';
+                    for (size_t i = 0; i < cache.all_options[p].size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& option = cache.all_options[p][i];
+                        std::cout << '[' << option.passenger_index << ",\"" << problem.seats[option.seat].id << "\",";
+                        emit_seats(option.blocked); std::cout << ']';
+                    }
+                    std::cout << ']';
+                }
+                std::cout << "]}";
+            }
+            std::cout << "]\n";
+            return 0;
+        }
         if (const auto* mode = replay.find("structured_windows"); mode && mode->bool_or()) {
             std::vector<int> assignment(problem.passengers.size(), -1);
             for (const auto& entry : replay.at("assignments").array)

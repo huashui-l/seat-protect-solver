@@ -674,6 +674,32 @@ native/state-replay-enabled regression passed 122 tests and 13,821 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed.
 
+The rebuilt-search prerequisite `RichPricingCache` now has native base geometry
+and structured row-window filtering. Base caches preserve seat input order,
+minimum-shifted coordinates and Big-M values, lexical cross-aisle edges (including
+unreachable endpoints), and first-seen-row hole specifications (whose middle may
+be unreachable). Window caches preserve placement order, sort reachable seats
+lexically, retain the base coordinate origin and Big-M, and filter both edge
+endpoints and hole middles/sides. Empty filtered passenger domains remain visible
+for the structured caller to skip before pricing.
+
+The frozen `_build_group_pricing_cache` and actual structured-window AST provide
+the field-by-field oracle. Eleven public fixtures plus a reserved-middle fixture
+run with normal/reversed seat input and base/first/last/alternating/empty windows.
+Explicit coverage assertions require unreachable neighbors, unreachable hole
+middles, retained nonzero coordinate origins and empty windows. The structured
+suite passed 8 tests and 589 subtests. This covers cache geometry, not the DFS
+workspace, rebuilt search, special pricing or production structured integration.
+The search migration must still preserve rectangle capacity/coupled bounds,
+raw-passenger and physical-option symmetry, caregiver dominance, stable negative
+column retention and node/deadline termination. M3 remains incomplete.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 123 tests and 14,345 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for this cache checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
