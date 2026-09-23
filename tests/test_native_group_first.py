@@ -80,6 +80,7 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
              "restricted_pattern_mip_tail_budget": 0.0},
         ):
             with self.subTest(algorithm=algorithm):
+                algorithm = {**algorithm, "enable_conflict_component_lns": False}
                 result = self.run_case("shrink_small_blockers", "group-first", algorithm=algorithm)
                 self.assertGreater(result["rich_pattern_count"], 0)
                 self.assertEqual(result["rich_master_time_limit"], 0.0)
@@ -112,6 +113,7 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
     def test_vnd_continues_rich_state_when_repair_loses_to_fallback(self):
         result = self.run_case("shrink_small_blockers", "group-first", algorithm={
             "enable_restricted_pattern_mip": False,
+            "enable_conflict_component_lns": False,
         })
         self.assertTrue(result["rich_candidate_complete"])
         self.assertLess(result["rich_repair_score"], result["rich_m1_selected_score"] - 1e-8)

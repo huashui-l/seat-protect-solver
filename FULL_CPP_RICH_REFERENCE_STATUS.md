@@ -1153,6 +1153,46 @@ expired deadlines, config floors and all-zero-score cutoff ties. Full regression
 with native/state replay enabled passed 148 tests and 19,188 subtests with 9 skips.
 `git diff --check` passed. No Formal24 or profiling run was made.
 
+### LNS search, acceptance and production integration
+
+Native LNS now runs the frozen component search over the native Rich state. It
+rebuilds repair-priority roots, expands ejection chains, ranks related groups,
+constructs occupied/free seat pools, generates options, solves the local master,
+rebuilds component groups in component order, validates complete legality, and
+keeps the Python distinction between partial rebuild restoration and rejected
+complete rebuild restoration. Dynamic candidate ranking, stagnation size cycling,
+late-history acceptance, score deltas, best-context restoration and diagnostics
+are implemented. The stage uses the preserved Rich state, the LNS budget plus
+preceding carry, synchronously records `lns_generated`, and captures `lns_final`
+patterns before the restricted stage.
+
+The native wrapper differential compared final assignments, assignment insertion
+order, callback records and diagnostics on eleven public fixtures with the
+candidate set traversed lexically. It also covered disabled and expired calls,
+strict acceptance, production elite capture and stage state continuation. Raw
+runtime checks cover enabled/disabled LNS, nonzero option/search diagnostics and
+actual stage timing/carry. This is the first complete native LNS stage, but the
+lexical tie traversal boundary remains documented and the full 24-case quality
+parity gate has not run.
+
+Zero LNS base budget does not disable LNS: frozen Python still consumes positive
+carry. A raw production assertion covers this explicitly. Older VND-isolation
+tests now disable LNS explicitly, while the overall Q0 fallback test requires a
+strict improvement when the selected source is LNS. A deterministic two-group
+fixture forces one worsening acceptance and verifies restoration of both the
+best assignment and its insertion order.
+
+Validation: Release /O2 passed with the two existing conversion warnings.
+LNS/runtime tests passed 14 tests and 18,820 subtests before adding the directed
+worsening fixture. The final full regression reported 151 passed, 9 skipped,
+37,107 subtests passed and one coverage-assertion failure: public fixtures did
+not exercise worsening acceptance. That assertion was moved to the directed
+fixture; both the corrected full-function test and new fixture then passed
+(2 tests, 9,167 subtests). No native source changed after that full regression;
+no remaining observed failure is unresolved. `git diff --check` passed.
+No Formal24, profiling or 5-second compression run was made. Rich restricted
+MIP/local branching, final audit and the full quality gate remain outstanding.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

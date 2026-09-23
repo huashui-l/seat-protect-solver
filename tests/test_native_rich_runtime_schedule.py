@@ -10,6 +10,31 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
 
+    def test_raw_cli_lns_activation_capture_and_stage_window(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                result = self.run_case("identity_keep_seats", "group-first", algorithm={
+                    "adaptive_stage_budgets": False, "construction_time_budget": .3,
+                    "repair_time_budget": .1, "vnd_time_budget": .1,
+                    "structured_pattern_time_budget": .1, "protected_multigroup_mip_time_budget": .1,
+                    "lns_time_budget": 0.0, "enable_conflict_component_lns": enabled,
+                    "multigroup_mip_solve_limit": 4, "multigroup_option_limit": 10,
+                })
+                self.assertTrue(result["rich_candidate_complete"])
+                stats = result["rich_multigroup_lns"]
+                self.assertEqual(stats["enabled"], enabled)
+                timing = result["rich_stage_timing"]
+                self.assertGreaterEqual(timing["lns"]["started"], timing["special_pricing"]["finished"])
+                self.assertAlmostEqual(timing["lns"]["effective_budget"], timing["lns"]["base_budget"] + timing["special_pricing"]["carry"])
+                if enabled:
+                    self.assertEqual(timing["lns"]["base_budget"], 0.0)
+                    self.assertGreater(timing["lns"]["effective_budget"], 0.0)
+                    self.assertGreater(stats["search_nodes"], 0)
+                    self.assertGreater(stats["options_generated"], 0)
+                else:
+                    self.assertEqual(stats["search_nodes"], 0)
+                    self.assertEqual(stats["options_generated"], 0)
+
     def test_raw_cli_protected_and_special_stages_honor_activation_and_carry(self):
         for enabled in (True, False):
             with self.subTest(enabled=enabled):
@@ -91,8 +116,8 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 self.assertEqual(set(final_elites), set(elites))
                 for patterns in final_elites.values():
                     for pattern in patterns:
-                        self.assertTrue(pattern["pinned"])
-                        self.assertIn(pattern["source"], {"construction", "repair", "vnd"})
+                        if pattern["source"] != "lns_generated": self.assertTrue(pattern["pinned"])
+                        self.assertIn(pattern["source"], {"construction", "repair", "vnd", "lns_generated", "lns_final"})
                 if result["rich_candidate_complete"]:
                     self.assertEqual(set(elites), {str(g["groupId"]) for g in case["groupsData"]})
                 if variant.get("final_repair_time_limit") == 0.0:
@@ -122,7 +147,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 timings = result["rich_stage_timing"]
                 stages = ["construction", "repair", "vnd"]
                 if result["rich_candidate_complete"]:
-                    stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing"))
+                    stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing", "lns"))
                 self.assertEqual(set(timings), set(stages))
                 replay = dict(allocation_start=0.0, search_deadline_limit=search_limit,
                               construction_unassigned=result["rich_construction_unassigned"],

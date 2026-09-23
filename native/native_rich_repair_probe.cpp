@@ -19,6 +19,61 @@ int main(int argc, char** argv) {
                 if (!state.assign_rich_pattern(static_cast<int>(entry.array[0].number), problem.seat_index.at(entry.array[1].string), {}, chosen))
                     throw std::runtime_error("pattern context initial assignment failed");
             }
+            if (const auto* lns = input->find("lns_search")) {
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(lns->at("deadline_seconds").number));
+                std::vector<std::vector<int>> rankings;
+                for (const auto& row : lns->at("rankings").array) {
+                    std::vector<int> seats;
+                    for (const auto& seat : row.array) seats.push_back(problem.seat_index.at(seat.string));
+                    rankings.push_back(std::move(seats));
+                }
+                full_cpp::RichLnsWorkspace workspace(state, deadline);
+                struct Recorded { int group; full_cpp::RichLnsOption option; };
+                std::vector<Recorded> recorded;
+                full_cpp::RichLnsDiagnostics diagnostics;
+                full_cpp::GroupConstructionResult stage_result;
+                const bool stage = lns->find("stage") && lns->at("stage").bool_or();
+                if (stage) {
+                    stage_result.rich_candidate_complete = true;
+                    stage_result.rich_state = state.save(); stage_result.rich_rankings = rankings;
+                    stage_result.rich_conflict_diversity_active = true;
+                    stage_result.rich_elite_store = full_cpp::RichEliteStore(problem.rich.elite_patterns_per_group);
+                    stage_result.rich_elite_store.capture(state, "lns_initial");
+                    stage_result.group_construction_score = full_cpp::evaluate_soft_score(problem, state.passenger_to_seat);
+                    diagnostics = full_cpp::improve_rich_lns_stage(problem, deadline, stage_result);
+                    state.restore(stage_result.rich_state);
+                } else diagnostics = full_cpp::improve_rich_lns(problem, state, rankings, deadline,
+                    [&](int g, const full_cpp::RichLnsOption& option) { recorded.push_back({g, option}); });
+                std::cout << std::setprecision(17) << "{\"diagnostics\":";
+                full_cpp::write_rich_lns_diagnostics(std::cout, diagnostics);
+                std::cout << ",\"assignments\":[";
+                for (size_t p = 0; p < state.passenger_to_seat.size(); ++p) {
+                    if (p) std::cout << ',';
+                    if (state.passenger_to_seat[p] < 0) std::cout << "null";
+                    else std::cout << '"' << problem.seats[state.passenger_to_seat[p]].id << '"';
+                }
+                std::cout << "],\"order\":[";
+                for (size_t i = 0; i < state.assignment_order.size(); ++i) { if (i) std::cout << ','; std::cout << state.assignment_order[i]; }
+                std::cout << "],\"recorded\":[";
+                for (size_t i = 0; i < recorded.size(); ++i) {
+                    if (i) std::cout << ',';
+                    const auto& item = recorded[i];
+                    std::cout << '[' << problem.groups[item.group].id << ',' << item.option.score << ",[";
+                    for (size_t j = 0; j < item.option.assignment.size(); ++j) {
+                        if (j) std::cout << ',';
+                        std::cout << '[' << workspace.keys_by_group[item.group][j] << ",\"" << problem.seats[item.option.assignment[j]].id << "\"]";
+                    }
+                    std::cout << "]]";
+                }
+                std::cout << ']';
+                if (stage) {
+                    std::cout << ",\"elite\":"; full_cpp::write_rich_elite_store(std::cout, stage_result.rich_elite_store);
+                    std::cout << ",\"selected_score\":" << stage_result.group_construction_score;
+                }
+                std::cout << "}\n";
+                return 0;
+            }
             if (const auto* calls = input->find("lns_master")) {
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
                 full_cpp::RichLnsWorkspace workspace(state, deadline);

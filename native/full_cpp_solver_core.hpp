@@ -82,6 +82,12 @@ struct RichConstructionConfig {
     int multigroup_pattern_group_size_limit = 6;
     int multigroup_option_limit = 60, multigroup_neighborhood_extra_seats = 2;
     int elite_patterns_from_pricing_per_call = 3;
+    bool conflict_component_lns_enabled = false;
+    int lns_related_seat_cap = 80, lns_related_group_cap = 10;
+    int lns_min_component_size = 2, lns_max_component_size = 0, lns_component_size = 6;
+    int lns_mip_solve_limit = 200, lns_passenger_limit = 14, lns_root_limit = 12, lns_free_seat_cap = 5;
+    int lns_late_history_length = 8, lns_stagnation_rounds = 3, lns_dynamic_pool_growth = 12;
+    double lns_mip_time_limit = .75, lns_allowed_drop = 20.0;
     bool protected_dynamic_relocation_enabled = true;
     double protected_dynamic_relocation_seconds = 0.08;
     int protected_dynamic_relocation_columns = 6;
@@ -564,6 +570,7 @@ ScoreComponents evaluate_score_components(
 );
 
 ScoreComponents evaluate_rich_group_score(const Problem& problem, const std::vector<int>& assignment, int group_index);
+ScoreComponents evaluate_rich_groups_score(const Problem& problem, const std::vector<int>& assignment, const std::set<int>& groups);
 
 double evaluate_soft_score(
     const Problem& problem,

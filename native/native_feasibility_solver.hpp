@@ -9,6 +9,28 @@ namespace full_cpp {
 
 struct GroupConstructionResult;
 
+struct RichLnsAcceptedComponent {
+    std::vector<int> groups;
+    double delta = 0.0, best_score = 0.0;
+};
+struct RichLnsDiagnostics {
+    bool enabled = false, stopped_by_deadline = false, initialized = false;
+    int components_tested = 0, max_tested_component_size = 0, options_generated = 0, search_nodes = 0;
+    int accepted_rebuilds = 0, accepted_worsening = 0, stagnation_rounds = 0, dynamic_reorders = 0;
+    int ejection_chains_generated = 0, ejection_chains_accepted = 0;
+    int minimum_size = 0, initial_size = 0, maximum_size = 0, configured_maximum = 0;
+    double score_improvement = 0.0, best_soft_score = 0.0, seconds = 0.0;
+    std::vector<RichGroupRepairMetric> repair_queue;
+    std::vector<std::vector<int>> tested_group_components;
+    std::vector<RichLnsAcceptedComponent> accepted_components;
+};
+RichLnsDiagnostics improve_rich_lns(const Problem& problem, AssignmentState& state,
+    const std::vector<std::vector<int>>& rankings, std::chrono::steady_clock::time_point deadline,
+    const std::function<void(int, const RichLnsOption&)>& recorder);
+void write_rich_lns_diagnostics(std::ostream& output, const RichLnsDiagnostics& diagnostics);
+RichLnsDiagnostics improve_rich_lns_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result);
+
 std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& state,
     const RichLnsWorkspace& workspace, const std::vector<int>& component,
     const std::map<int, std::vector<RichLnsOption>>& options, int root,
@@ -73,6 +95,7 @@ struct FeasibilityResult {
     RichStructuredDiagnostics rich_structured;
     RichProtectedMipDiagnostics rich_protected;
     RichSpecialPricingDiagnostics rich_special_pricing;
+    RichLnsDiagnostics rich_lns;
     bool rich_conflict_diversity_active = false;
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;

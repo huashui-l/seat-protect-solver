@@ -222,6 +222,21 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = algorithm->find("multigroup_option_limit")) problem.rich.multigroup_option_limit = std::max(10, static_cast<int>(item->number_or(60)));
         if (const Value* item = algorithm->find("multigroup_neighborhood_extra_seats")) problem.rich.multigroup_neighborhood_extra_seats = std::max(1, static_cast<int>(item->number_or(2)));
         if (const Value* item = algorithm->find("elite_patterns_from_pricing_per_call")) problem.rich.elite_patterns_from_pricing_per_call = std::max(1, static_cast<int>(item->number_or(3)));
+        if (const Value* item = algorithm->find("enable_conflict_component_lns")) problem.rich.conflict_component_lns_enabled = item->bool_or(false);
+        if (const Value* item = algorithm->find("multigroup_related_seat_cap")) problem.rich.lns_related_seat_cap = std::max(16, static_cast<int>(item->number_or(80)));
+        if (const Value* item = algorithm->find("multigroup_related_group_cap")) problem.rich.lns_related_group_cap = std::max(3, static_cast<int>(item->number_or(10)));
+        if (const Value* item = algorithm->find("multigroup_min_component_size")) problem.rich.lns_min_component_size = std::min(8, std::max(2, static_cast<int>(item->number_or(2))));
+        if (const Value* item = algorithm->find("multigroup_max_component_size")) problem.rich.lns_max_component_size = static_cast<int>(item->number_or(0));
+        if (const Value* item = algorithm->find("multigroup_component_size")) problem.rich.lns_component_size = static_cast<int>(item->number_or(6));
+        if (const Value* item = algorithm->find("multigroup_mip_solve_limit")) problem.rich.lns_mip_solve_limit = std::max(1, static_cast<int>(item->number_or(200)));
+        if (const Value* item = algorithm->find("multigroup_passenger_limit")) problem.rich.lns_passenger_limit = std::max(6, static_cast<int>(item->number_or(14)));
+        if (const Value* item = algorithm->find("multigroup_root_limit")) problem.rich.lns_root_limit = std::max(1, static_cast<int>(item->number_or(12)));
+        if (const Value* item = algorithm->find("multigroup_free_seat_cap")) problem.rich.lns_free_seat_cap = std::max(0, static_cast<int>(item->number_or(5)));
+        if (const Value* item = algorithm->find("multigroup_late_history_length")) problem.rich.lns_late_history_length = std::max(2, static_cast<int>(item->number_or(8)));
+        if (const Value* item = algorithm->find("multigroup_stagnation_rounds")) problem.rich.lns_stagnation_rounds = std::max(1, static_cast<int>(item->number_or(3)));
+        if (const Value* item = algorithm->find("multigroup_dynamic_pool_growth")) problem.rich.lns_dynamic_pool_growth = std::max(1, static_cast<int>(item->number_or(12)));
+        if (const Value* item = algorithm->find("multigroup_mip_time_limit")) problem.rich.lns_mip_time_limit = std::max(.05, item->number_or(.75));
+        if (const Value* item = algorithm->find("multigroup_allowed_drop")) problem.rich.lns_allowed_drop = std::max(0.0, item->number_or(20.0));
         if (const Value* item = algorithm->find("enable_protected_multigroup_pattern_mip")) problem.rich.protected_multigroup_enabled = item->bool_or(false);
         if (const Value* item = algorithm->find("protected_multigroup_max_passes")) problem.rich.protected_multigroup_max_passes = std::max(1, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("protected_multigroup_min_pass_gain")) problem.rich.protected_multigroup_min_pass_gain = std::max(0.0, item->number_or(1.0));
@@ -446,16 +461,18 @@ IndividualScoreComponents evaluate_individual_score(
 }
 
 static ScoreComponents score_components_impl(
-    const Problem& problem, const std::vector<int>& assignment, int affected_group, bool rich_preferences
+    const Problem& problem, const std::vector<int>& assignment, int affected_group, bool rich_preferences,
+    const std::set<int>* affected_groups = nullptr
 ) {
     if (assignment.size() != problem.passengers.size()) {
         throw std::runtime_error("score assignment size mismatch");
     }
     ScoreComponents result;
+    const auto includes = [&](int g) { return affected_groups ? affected_groups->count(g) != 0 : affected_group < 0 || g == affected_group; };
     for (int passenger_index = 0;
          passenger_index < static_cast<int>(problem.passengers.size()); ++passenger_index) {
         const int new_index = assignment[passenger_index];
-        if (new_index < 0 || (affected_group >= 0 && problem.passengers[passenger_index].group != affected_group)) continue;
+        if (new_index < 0 || !includes(problem.passengers[passenger_index].group)) continue;
         IndividualScoreComponents individual = evaluate_individual_score(
             problem, passenger_index, new_index
         );
@@ -475,8 +492,8 @@ static ScoreComponents score_components_impl(
         result.score_p += individual.score_p;
     }
     for (const Group& group : problem.groups) {
-        if (affected_group >= 0 && group.id != problem.groups[affected_group].id) continue;
         if (group.passengers.size() <= 1) continue;
+        if (!includes(problem.passengers[group.passengers.front()].group)) continue;
         double sum_x = 0.0, sum_y = 0.0;
         int count = 0;
         for (int passenger : group.passengers) {
@@ -508,8 +525,7 @@ static ScoreComponents score_components_impl(
             if (assignment[other] < 0
                 || assignment[other] == assignment[infant]
                 || problem.passengers[other].group == problem.passengers[infant].group) continue;
-            if (affected_group >= 0 && problem.passengers[infant].group != affected_group
-                && problem.passengers[other].group != affected_group) continue;
+            if (!includes(problem.passengers[infant].group) && !includes(problem.passengers[other].group)) continue;
             const Seat& other_seat = problem.seats[assignment[other]];
             if (other_seat.cabin != infant_seat.cabin) continue;
             const double distance = 1.0 + std::abs(infant_seat.x - other_seat.x);
@@ -529,6 +545,10 @@ ScoreComponents evaluate_score_components(const Problem& problem, const std::vec
 
 ScoreComponents evaluate_rich_group_score(const Problem& problem, const std::vector<int>& assignment, int group_index) {
     return score_components_impl(problem, assignment, group_index, true);
+}
+
+ScoreComponents evaluate_rich_groups_score(const Problem& problem, const std::vector<int>& assignment, const std::set<int>& groups) {
+    return score_components_impl(problem, assignment, -1, true, &groups);
 }
 
 double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {

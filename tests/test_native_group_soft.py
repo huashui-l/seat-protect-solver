@@ -97,7 +97,7 @@ class NativeGroupSoftTests(unittest.TestCase):
                 group["component_deltas"]["score_c"] + individual_delta,
                 0.0,
             )
-        elif group["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master"}:
+        elif group["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master", "rich-m4-protected-mip", "rich-m5-lns"}:
             self.assertGreater(group["native_score"], q0["native_score"])
             self.assertAlmostEqual(group["score_delta"], group["native_score"] - group["q0_score"])
         else:

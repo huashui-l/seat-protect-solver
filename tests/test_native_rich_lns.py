@@ -14,6 +14,7 @@ from src import allocation_evaluator as evaluator
 from src import heuristic_seat_allocator as rich
 from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
+from tests.test_native_rich_elite import python_capture_namespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,6 +22,113 @@ ROOT = Path(__file__).resolve().parents[1]
 class NativeRichLnsTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def replay_search(self, case, algorithm=None, initial=None, expired=False, stage=False):
+        config = copy.deepcopy(self.config)
+        config["algorithm"].update(enable_conflict_component_lns=True, multigroup_mip_solve_limit=8,
+            multigroup_option_limit=10, multigroup_free_seat_cap=2)
+        config["algorithm"].update(algorithm or {})
+        config["input_contract"] = {"seatmaps_by_direction": {"public-test": {"old": "old.json", "new": "new.json"}}}
+        seats_data = case["newSeatmapData"]["seats"]
+        topology = rich.build_seat_topology(seats_data, config)
+        globals_ = dict(zip(("_SEAT_NEIGHBORS", "_SEAT_ROW_NEIGHBORS", "_SEAT_SUBROW", "_SEAT_X", "_SEAT_ROW_INDEX"), topology))
+        globals_["_ACTIVE_CONFIG"] = config
+        with patch.multiple(rich, **globals_):
+            groups = [rich.Group(g) for g in case["groupsData"]]
+            passengers = [(g.group_id, p) for g in groups for p in g.passengers]
+            keys = [(gid, p.hostnum) for gid, p in passengers]
+            if initial is None:
+                constructed = construction_prefix()(seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], config["weights"], config)
+                context = constructed["context"]
+                initial = [[keys.index(key), seat, *sorted(context.assigned_blocked.get(key, ()))[:1]]
+                           for key, seat in context.assigned_seats.items()]
+                rankings = [[seat.seat_id for seat in constructed["passenger_sorted_seats"][key]] for key in keys]
+            else:
+                rankings = [[seat["seatId"] for seat in seats_data] for _ in keys]
+            context = rich.AssignmentContext({s["seatId"]: rich.Seat(s) for s in seats_data})
+            for p, seat, *block in initial:
+                gid, passenger = passengers[p]
+                self.assertTrue(context.assign_passenger(passenger, seat, gid, chosen_block=block[0] if block else None))
+            function = next(n for n in ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8")).body
+                            if isinstance(n, ast.FunctionDef) and n.name == "improve_with_multigroup_lns")
+            option_function = next(n for n in function.body if isinstance(n, ast.FunctionDef) and n.name == "group_options")
+            loop = next(n for n in option_function.body if isinstance(n, ast.For) and isinstance(n.iter, ast.Name) and n.iter.id == "candidate_subsets")
+            loop.iter = ast.Call(func=ast.Name(id="sorted", ctx=ast.Load()), args=[loop.iter], keywords=[])
+            ast.fix_missing_locations(function)
+            namespace = dict(rich.__dict__)
+            exec(compile(ast.Module(body=[function], type_ignores=[]), "ordered_lns_search", "exec"), namespace)
+            recorded = []
+            scorer = evaluator.IncrementalSoftScorer(seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], config["weights"], config)
+            elite = python_capture_namespace(context, groups, scorer, config["algorithm"].get("elite_patterns_per_group", 12))
+            elite["capture_stage_patterns"]("lns_initial")
+            initial_score = evaluator.calculate_soft_score(seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], context.assigned_seats, config["weights"], config)[0]
+            duration = -1 if expired else 120
+            diagnostics = namespace["improve_with_multigroup_lns"](seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], groups,
+                context, {key: [context.seats[s] for s in rankings[p]] for p, key in enumerate(keys)}, config["weights"], config,
+                rich.time.perf_counter() + duration,
+                elite["record_elite_pattern"] if stage else
+                lambda gid, assignment, score, source: recorded.append([gid, score, [[keys.index(key), s] for key, s in assignment]]))
+            expected = dict(diagnostics=diagnostics, assignments=[context.assigned_seats.get(key) for key in keys],
+                            order=[keys.index(key) for key in context.assigned_seats], recorded=recorded)
+            if stage:
+                elite["capture_stage_patterns"]("lns_final")
+                score = evaluator.calculate_soft_score(seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], context.assigned_seats, config["weights"], config)[0]
+                expected.update(elite={str(g): list(patterns.values()) for g, patterns in elite["elite_pattern_store"].items()}, selected_score=max(initial_score, score))
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"pattern_context": dict(initial=initial, lns_search=dict(rankings=rankings, deadline_seconds=duration, stage=stage))},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"), str(work / "replay.json")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)
+        actual["diagnostics"].pop("seconds")
+        expected["diagnostics"].pop("seconds")
+        expected = json.loads(json.dumps(expected))
+        def compare(a, b, path):
+            with self.subTest(case=case["id"], algorithm=algorithm, expired=expired, path=path):
+                if isinstance(b, dict):
+                    self.assertEqual(set(a), set(b))
+                    for key in b: compare(a[key], b[key], path + "/" + key)
+                elif isinstance(b, list):
+                    self.assertEqual(len(a), len(b))
+                    for i, (x, y) in enumerate(zip(a, b)): compare(x, y, path + "/" + str(i))
+                elif isinstance(b, float): self.assertAlmostEqual(a, b, places=7)
+                else: self.assertEqual(a, b)
+        compare(actual, expected, "")
+        return actual
+
+    def test_lns_full_search_matches_order_normalized_frozen_function(self):
+        totals = dict(search_nodes=0, accepted_rebuilds=0, dynamic_reorders=0, ejection_chains_generated=0)
+        for case in self.cases[:11]:
+            result = self.replay_search(case)
+            for key in totals: totals[key] += result["diagnostics"][key]
+        for key, value in totals.items(): self.assertGreater(value, 0, key)
+
+    def test_lns_accepts_worsening_then_restores_best_context(self):
+        case = self.synthetic([(30, {"oldSeat": {"seatNum": "1A"}}), (10, {"oldSeat": {"seatNum": "1B"}})])
+        initial = [[1, "1B"], [0, "1A"]]
+        result = self.replay_search(case, initial=initial, algorithm={
+            "multigroup_mip_solve_limit": 1, "multigroup_allowed_drop": 1000,
+            "multigroup_free_seat_cap": 0})
+        self.assertEqual(result["diagnostics"]["accepted_worsening"], 1)
+        self.assertEqual(result["diagnostics"]["score_improvement"], 0)
+        self.assertEqual(result["assignments"], ["1A", "1B"])
+        self.assertEqual(result["order"], [1, 0])
+
+    def test_lns_search_disabled_expired_and_strict_acceptance(self):
+        for algorithm, expired in [({"enable_conflict_component_lns": False}, False), ({}, True),
+                                   ({"multigroup_allowed_drop": 0, "multigroup_mip_solve_limit": 12}, False)]:
+            self.replay_search(self.cases[0], algorithm=algorithm, expired=expired)
+        self.replay_search(self.synthetic([(30, {}), (30, {})]), initial=[[0, "1A"], [1, "1B"]])
+
+    def test_lns_production_wrapper_preserves_elite_and_rich_state(self):
+        for case in self.cases[:11]: self.replay_search(case, stage=True)
+        self.replay_search(self.cases[0], stage=True, expired=True)
+        self.replay_search(self.cases[0], stage=True, algorithm={"enable_conflict_component_lns": False})
 
     def test_lns_local_master_matches_frozen_function(self):
         case = self.synthetic([(30, {}), (30, {}), (10, {}), (10, {}), (20, {}), (20, {})])
