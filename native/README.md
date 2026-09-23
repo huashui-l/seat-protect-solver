@@ -55,9 +55,11 @@ The RR and restricted-master pipeline consists of:
 The raw `group-first` path also runs the complete Rich stage sequence and
 outer cabin decomposition. Detailed diagnostics are nested under
 `cabin_decomposition.cabins.<cabin>.result` for multiple cabins; single-cabin
-output keeps its existing fields. All named ACTIVE stages are native, but
-Formal24 quality parity still fails (four regressions at `54f827c`). See the
-root gate documents for component evidence and acceptance boundaries.
+output keeps its existing fields. All named ACTIVE stages are native. The latest
+frozen Formal24 (`c6a41f3`) passes 24/24 completeness/legality/scoring checks,
+with 21 improve / 0 tie / 3 regress. On 2026-09-24 the user accepted these small
+regressions for migration completion; strict score nonregression remains failed.
+See the root gate documents for evidence and known trajectory/timing boundaries.
 
 ## Build
 

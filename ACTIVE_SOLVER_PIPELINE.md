@@ -39,8 +39,11 @@ The restricted stage consumes the complete
 Rich elite store; raw Rich no longer calls the separate RR adapter/master.
 All these stages use the shared native deadline and carry scheduler. Raw input
 and seatmaps are JSON; this path has no Python callback or `.native_v2` input.
-Component integration is not the Formal24 quality-parity gate. See
-`FULL_CPP_RICH_REFERENCE_STATUS.md` for differential evidence and remaining audit.
+Migration acceptance was completed on 2026-09-24 after the user accepted the
+three small score regressions in the frozen `c6a41f3` Formal24 run. All 24 cases
+pass completeness, legality and evaluator checks; strict score nonregression
+remains failed. See `FULL_CPP_RICH_REFERENCE_STATUS.md` for differential evidence,
+the acceptance decision and retained timing/trajectory boundaries.
 
 The V1R flow below is the historical preprocessed-input release path and remains
 separate from the raw Rich migration.

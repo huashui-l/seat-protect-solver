@@ -55,7 +55,7 @@ Therefore the historically valid statement is:
 
 > PARTIAL NATIVE VERSION MET THE 5S RELEASE BUDGET; FULL C++ COVERAGE WAS NOT TESTED.
 
-The migration must preserve the existing `HEADER_V2` route as a differential oracle while moving the raw-input-to-option boundary and every Rich `ACTIVE` stage into C++. Current raw Rich implementation and per-case acceptance are recorded below; `FULL-CPP-CORRECTNESS` remains unpassed because the quality gate fails.
+The migration must preserve the existing `HEADER_V2` route as a differential oracle while moving the raw-input-to-option boundary and every Rich `ACTIVE` stage into C++. Current raw Rich implementation and per-case acceptance are recorded below; the original strict quality gate remains unpassed, with its three small regressions accepted by the user for migration completion on 2026-09-24.
 
 ## Current integration audit (supersedes historical pending statuses above)
 
@@ -67,9 +67,11 @@ global deadline. `seat_protect_cpp.cpp` adds per-cabin budgets/topology and
 merged final validation/scoring. `make_problem` shares parsing semantics between
 file input and filtered in-memory cabin input.
 
-Implementation inventory is complete; universal trajectory equivalence and the
-final 24/24 quality gate are not. `54f827c` passes 24/24 complete/legal/evaluator
-checks but has four Python score regressions. A timed DFS boundary is reproduced
+Implementation inventory and migration acceptance are complete under the user's
+2026-09-24 acceptance of the remaining small score differences. Universal
+trajectory equivalence and strict 24/24 score nonregression are not certified.
+`c6a41f3` passes 24/24 complete/legal/evaluator checks with three accepted Python
+score regressions. A timed DFS boundary is reproduced
 on reverse:50_normal; LNS hash-set ordering and incomplete reference repair
 states remain documented limitations. Do not interpret historical PARTIAL_CPP
 rows or native component existence as evidence of a passed quality gate.

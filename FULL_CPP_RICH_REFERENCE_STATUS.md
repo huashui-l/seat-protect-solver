@@ -1,6 +1,18 @@
 # Full C++ Rich Reference Status
 
-Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in progress.**
+Status: **Native Rich migration ACCEPTED with user-approved quality exceptions (2026-09-24).**
+
+## Current acceptance decision
+
+The user explicitly accepted the remaining small score differences and instructed that further time should not be spent eliminating isolated minor gaps. This supersedes the requirement to eliminate the three observed per-case regressions before closing this migration. It does not change the frozen reference, numerical tolerance, solver parameters, or historical benchmark verdict.
+
+All named Rich ACTIVE stages, including outer cabin orchestration, have native production implementations. The frozen `c6a41f3` run passes 24/24 completeness, legality and evaluator consistency; production raw Rich has no Python callback or `.native_v2` dependency. Its 21 improve / 0 tie / 3 regress result is accepted for this migration. Strict 24/24 score nonregression remains **FAIL**, not a newly passing benchmark. The accepted exceptions are forward:full_normal (-3.05), reverse:50_normal (-1.20), and reverse:full_edge (-4.554323673).
+
+Completion review reused the unchanged Release /O2 build and its full regression record: 166 tests passed, 9 skipped, 37,230 subtests passed. The current binary SHA-256 matches the frozen result (`2f0852a75ab5660ab0dcfb4a3478a5149f0351e9949a0982133cde3fd188602e`); source changes since that implementation are documentation only. No additional solver run or best-of-runs selection was needed for this acceptance decision.
+
+Known boundaries remain visible: wall-clock DFS and LNS set traversal can change trajectories; the frozen Python repair orphan-occupancy defect is not emulated; Q0 overhead can consume the restricted stage's time (zero attempts on reverse:full_edge). These are not claims of universal trajectory or timing equivalence. Further investigation aimed at removing the accepted score differences is deferred. CG integer / certified exact LP / certified safe LP identity-bound case counts are all 0; corresponding gaps remain unavailable. No expensive CG/LP rerun, profiling, or 5-second compression is included in this completed migration scope.
+
+The historical checkpoints below retain their original strict verdicts and earlier pending-work descriptions. This acceptance decision governs the current migration status.
 
 ## Rich Python
 
@@ -12,7 +24,7 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in pro
 ## Migration
 
 The raw Rich path now implements the full single-cabin stage inventory plus
-native outer cabin decomposition. Current 60-second quality parity **FAILS**:
+native outer cabin decomposition. Strict 60-second quality parity **FAILS** (accepted exceptions above):
 21 improve / 0 tie / 3 regress against the frozen Python result. Complete/legal
 and evaluator gates pass 24/24, including complete Rich candidates in every case.
 No profiling or 5-second compression is permitted. The detailed sections below
@@ -1469,7 +1481,7 @@ See the acceptance checkpoint above for each case and diagnostic boundaries.
 
 The earlier 1.668-second native-core smoke remains a solver-ready `.native_v2` test, not a Full C++ performance result. Native profiling is intentionally deferred until raw JSON, Rich active-stage coverage, correctness, and quality parity pass.
 
-## Required answer
+## Implementation boundary
 
 All named single-cabin ACTIVE stages and enabled outer cabin orchestration now
 have native implementations. Full C++ Rich parity is not certified: three frozen

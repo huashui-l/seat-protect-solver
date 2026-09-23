@@ -4,9 +4,9 @@
 > internal research archive. The data, binaries, and result artifacts are not
 > distributed in this repository.
 
-Current status: **NATIVE Rich pipeline implemented; FULL-CPP-CORRECTNESS remains in progress**.
+Current status: **Native Rich migration ACCEPTED with user-approved quality exceptions (2026-09-24)**.
 
-This file is a gate ledger, not a declaration of completion.
+This ledger separates completed native coverage and legal/scoring gates from the original strict score-nonregression gate, which remains failed.
 
 | Production stage | Native now | Evidence / remaining work |
 | --- | --- | --- |
@@ -33,9 +33,10 @@ construction, native stages and HiGHS; no Python invocation, IPC callback or
 callback counter. Historical RR/master objects remain linked for separate
 adapter/probe uses but raw Rich no longer invokes their solver path.
 
-Latest frozen acceptance `54f827c` is **quality FAIL**: 20 improve, 0 tie,
-4 regress versus Python 60s, worst -4.554324. Native completeness and scoring
-pass 24/24; this does not grant FULL-CPP-CORRECTNESS or authorize profiling.
+Latest frozen result `c6a41f3`: 21 improve, 0 tie, 3 regress versus Python
+60s, worst -4.554324; native completeness and scoring pass 24/24. On 2026-09-24
+the user accepted these small differences as nonblocking for migration completion.
+The strict quality verdict stays FAIL; no profiling or 5-second work is included.
 See `FULL_CPP_RICH_REFERENCE_STATUS.md` for per-case deltas and known semantic,
 clock and tie-order boundaries. Sections below are historical evidence.
 
