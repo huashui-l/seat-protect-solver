@@ -947,6 +947,38 @@ Validation: Release /O2 build passed with the two existing conversion warnings.
 Full native/state-replay-enabled regression passed 132 tests and 16,211 subtests
 with 9 skips. `git diff --check` passed.
 
+### Protected dynamic relocation prerequisite
+
+`add_rich_dynamic_relocation_patterns` ports the protected MIP's nested dynamic
+pricing function. Per-group base caches survive repeated component calls; released
+caches filter complete occupied/protection resource sets, preserve coordinate
+origins/Big-M and reproduce the frozen shallow-copy history/workspace behavior.
+The implementation preserves empty-domain exits, discovery deadline placement,
+column limits, the artificial group dual of `1e12`, affected-group rescoring and
+`released_component_pricing` source. New identities enter the elite store directly:
+existing identities are never replaced, ordinary capacity eviction is bypassed,
+and empty group entries are retained after a pricing call with no patterns.
+
+The frozen nested-function differential passes 720 sequential call subtests over
+eleven public fixtures with active/disabled/clamped-one-column settings, repeated
+calls, expired calls and partial/full outside-resource occupancy. It compares full
+elite contents/order/scores, cache counts and per-call diagnostics, requiring
+actual protected patterns and growth beyond the ordinary two-pattern test limit.
+Resource/window cache geometry differential now passes 924 subtests, explicitly
+covering exclusion caused by a blocked resource while the occupied seat remains
+available. Existing elite normalization is shared without changing ordinary
+replacement, pinning or eviction behavior.
+
+The protected stage remains incomplete: root/component selection, its integer
+model and conditional SSR rows, context reconstruction and strict acceptance are
+still required before production integration. These component checks do not close
+M3/M4 or the Full C++ Rich quality gate; no Formal24 or profiling run was made.
+
+Final-version validation: Release /O2 build passed with the two existing conversion
+warnings. Full native/state-replay-enabled regression passed 133 tests and 17,331
+subtests with 9 skips. Duplicate identities skip scoring before insertion, as in
+Python. `git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

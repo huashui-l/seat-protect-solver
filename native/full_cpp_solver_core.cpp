@@ -218,6 +218,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = values->find("bassinet")) problem.bassinet_value = item->number_or(problem.bassinet_value);
     }
     if (const Value* algorithm = config.find("algorithm")) {
+        if (const Value* item = algorithm->find("protected_dynamic_relocation_enabled")) problem.rich.protected_dynamic_relocation_enabled = item->bool_or(true);
+        if (const Value* item = algorithm->find("protected_dynamic_relocation_seconds")) problem.rich.protected_dynamic_relocation_seconds = std::max(0.01, item->number_or(0.08));
+        if (const Value* item = algorithm->find("protected_dynamic_relocation_columns")) problem.rich.protected_dynamic_relocation_columns = std::max(1, static_cast<int>(item->number_or(6)));
         if (const Value* item = algorithm->find("elite_patterns_per_group")) problem.rich.elite_patterns_per_group = std::max(2, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("enable_structured_pattern_generation")) problem.rich.enable_structured_pattern_generation = item->bool_or(true);
         if (const Value* item = algorithm->find("structured_pattern_dfs_per_group")) problem.rich.structured_pattern_dfs_per_group = std::max(0.005, item->number_or(0.08));
@@ -1203,6 +1206,40 @@ RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPr
         filtered.all_options.emplace_back();
         for (const auto& option : options) if (std::find(rows.begin(), rows.end(), problem.seats[option.seat].row) != rows.end()) {
             filtered.all_options.back().push_back(option); seats.insert(option.seat);
+        }
+    }
+    filtered.seat_ids.assign(seats.begin(), seats.end());
+    std::sort(filtered.seat_ids.begin(), filtered.seat_ids.end(), [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; });
+    for (int s : filtered.seat_ids) {
+        filtered.row_coordinate[s] = cache.row_coordinate.at(s); filtered.x_coordinate[s] = cache.x_coordinate.at(s);
+    }
+    for (const auto& edge : cache.adjacency_edges) if (seats.count(edge.first) && seats.count(edge.second)) filtered.adjacency_edges.push_back(edge);
+    for (const auto& hole : cache.hole_specs) {
+        if (!seats.count(hole.middle)) continue;
+        RichHoleSpec item; item.middle = hole.middle;
+        for (int s : hole.left) if (seats.count(s)) item.left.push_back(s);
+        for (int s : hole.right) if (seats.count(s)) item.right.push_back(s);
+        if (!item.left.empty() && !item.right.empty()) filtered.hole_specs.push_back(std::move(item));
+    }
+    return filtered;
+}
+
+RichPricingCache filter_rich_pricing_resources(const Problem& problem, const RichPricingCache& cache,
+    const std::set<int>& outside_resources
+) {
+    // Python shallow-copies the base cache; history/workspace keep their identity.
+    auto filtered = cache;
+    filtered.all_options.clear();
+    filtered.row_coordinate.clear(); filtered.x_coordinate.clear();
+    filtered.adjacency_edges.clear(); filtered.hole_specs.clear();
+    std::set<int> seats;
+    for (const auto& options : cache.all_options) {
+        filtered.all_options.emplace_back();
+        for (const auto& option : options) {
+            if (std::any_of(option.resources.begin(), option.resources.end(),
+                [&](int s) { return outside_resources.count(s) != 0; })) continue;
+            filtered.all_options.back().push_back(option);
+            seats.insert(option.seat);
         }
     }
     filtered.seat_ids.assign(seats.begin(), seats.end());
@@ -2362,9 +2399,7 @@ void RichEliteStore::record_candidate(int group_id, RichElitePattern pattern,
     record(group_id, std::move(pattern), owners, conflict_diversity_active);
 }
 
-void RichEliteStore::record(int group_id, RichElitePattern pattern,
-    const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active
-) {
+static void normalize_rich_elite_pattern(RichElitePattern& pattern) {
     std::sort(pattern.assignments.begin(), pattern.assignments.end());
     pattern.blocked_by_host.erase(std::remove_if(pattern.blocked_by_host.begin(), pattern.blocked_by_host.end(),
         [](const auto& entry) { return entry.second.empty(); }), pattern.blocked_by_host.end());
@@ -2378,6 +2413,12 @@ void RichEliteStore::record(int group_id, RichElitePattern pattern,
     pattern.blocked_seats.assign(blocked.begin(), blocked.end());
     blocked.insert(pattern.occupied_seats.begin(), pattern.occupied_seats.end());
     pattern.seat_resources.assign(blocked.begin(), blocked.end());
+}
+
+void RichEliteStore::record(int group_id, RichElitePattern pattern,
+    const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active
+) {
+    normalize_rich_elite_pattern(pattern);
     std::set<int> conflicts;
     if (conflict_diversity_active) for (const auto& seat : pattern.seat_resources) {
         const auto owner = owner_by_resource.find(seat);
@@ -2403,6 +2444,66 @@ void RichEliteStore::record(int group_id, RichElitePattern pattern,
         if (worst == patterns.end() || item->local_score < worst->local_score) worst = item;
     }
     if (worst != patterns.end()) patterns.erase(worst);
+}
+
+bool RichEliteStore::insert_relocation(int group_id, RichElitePattern pattern, const std::function<double()>& score) {
+    normalize_rich_elite_pattern(pattern);
+    auto& patterns = groups_[group_id];
+    for (const auto& old : patterns)
+        if (old.assignments == pattern.assignments && old.blocked_by_host == pattern.blocked_by_host) return false;
+    pattern.local_score = score();
+    patterns.push_back(std::move(pattern));
+    return true;
+}
+
+RichDynamicRelocationDiagnostics add_rich_dynamic_relocation_patterns(
+    const Problem& problem, const AssignmentState& state, int group_index,
+    const std::set<int>& outside_resources, std::chrono::steady_clock::time_point deadline,
+    const FixedSeatContext& fixed, const std::vector<RichBabyCost>& baby,
+    std::map<int, RichPricingCache>& pricing_caches, RichEliteStore& elite
+) {
+    using Clock = std::chrono::steady_clock;
+    RichDynamicRelocationDiagnostics diagnostics;
+    if (!problem.rich.protected_dynamic_relocation_enabled || Clock::now() >= deadline) return diagnostics;
+    auto found = pricing_caches.find(group_index);
+    if (found == pricing_caches.end())
+        found = pricing_caches.emplace(group_index, build_rich_pricing_cache(problem, group_index, fixed)).first;
+    auto released = filter_rich_pricing_resources(problem, found->second, outside_resources);
+    if (std::any_of(released.all_options.begin(), released.all_options.end(),
+        [](const auto& options) { return options.empty(); })) return diagnostics;
+    const auto call_deadline = std::min(deadline, Clock::now()
+        + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(problem.rich.protected_dynamic_relocation_seconds)));
+    auto config = problem.rich_pricing_config;
+    config.type = native_json::Value::Type::Object;
+    for (const auto& entry : std::vector<std::pair<std::string, double>>{
+        {"quick_pricing_columns_per_group", static_cast<double>(problem.rich.protected_dynamic_relocation_columns)},
+        {"dfs_discovery_time_limit", std::max(.01, std::chrono::duration<double>(call_deadline - Clock::now()).count())}}) {
+        auto& value = config.object[entry.first];
+        value.type = native_json::Value::Type::Number; value.number = entry.second;
+    }
+    const int gid = problem.groups[group_index].id;
+    RichPricingDuals duals; duals.group[gid] = 1e12;
+    ++diagnostics.calls;
+    const auto priced = price_rich_group_dfs(problem, group_index, config, duals, baby,
+        {}, {}, call_deadline, released, false, false, false);
+    elite.ensure_group(gid);
+    for (size_t i = 0; i < priced.patterns.size() && i < static_cast<size_t>(problem.rich.protected_dynamic_relocation_columns); ++i) {
+        const auto& candidate = priced.patterns[i];
+        RichElitePattern pattern;
+        auto proposal = state.passenger_to_seat;
+        for (const auto& entry : candidate.assignments) {
+            pattern.assignments.emplace_back(problem.passengers[entry.first].hostnum, problem.seats[entry.second].id);
+            proposal[entry.first] = entry.second;
+        }
+        std::map<int, std::vector<std::string>> blocked;
+        for (const auto& entry : candidate.blocked_by)
+            blocked[problem.passengers[entry.second].hostnum].push_back(problem.seats[entry.first].id);
+        pattern.blocked_by_host.assign(blocked.begin(), blocked.end());
+        pattern.source = "released_component_pricing";
+        if (elite.insert_relocation(gid, std::move(pattern),
+            [&]() { return evaluate_rich_group_score(problem, proposal, group_index).total(); })) ++diagnostics.patterns;
+    }
+    return diagnostics;
 }
 
 void write_rich_elite_store(std::ostream& output, const RichEliteStore& store) {

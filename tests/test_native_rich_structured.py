@@ -74,6 +74,97 @@ class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
 
+    def test_dynamic_relocation_matches_frozen_nested_function(self):
+        tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+        outer = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                     and n.name == "improve_protected_multigroup_pattern_mip")
+        function = next(n for n in outer.body if isinstance(n, ast.FunctionDef)
+                        and n.name == "add_dynamic_relocation_patterns")
+        code = compile(ast.Module(body=[function], type_ignores=[]), "frozen_dynamic_relocation", "exec")
+        coverage = set()
+        for original in self.cases[:11]:
+            for mode in ("active", "disabled", "one_column"):
+                config = copy.deepcopy(self.config)
+                config["algorithm"].update(protected_dynamic_relocation_enabled=mode != "disabled",
+                    protected_dynamic_relocation_columns=0 if mode == "one_column" else 6,
+                    protected_dynamic_relocation_seconds=120.0)
+                config.setdefault("column_generation", {})["dfs_node_limit"] = 100
+                config["input_contract"] = {"seatmaps_by_direction": {
+                    "public-test": {"old": "old.json", "new": "new.json"}}}
+                new = evaluator.SeatTopology(original["newSeatmapData"]["seats"], config)
+                old = evaluator.SeatTopology(original["oldSeatmapData"]["seats"], config)
+                fixed = exact._preprocess_fixed_seats(original["groupsData"], new, config)
+                scorer = evaluator.IncrementalSoftScorer(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                                                        original["groupsData"], config["weights"], config)
+                current = original["referenceAssignments"]
+                if len(current) != sum(len(g["psrs"]) for g in original["groupsData"]):
+                    current = construction_prefix()(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                        original["groupsData"], config["weights"], config)["context"].assigned_seats
+                columns = 1 if mode == "one_column" else 6
+                pricing_config = copy.deepcopy(config)
+                pricing = pricing_config["column_generation"]
+                pricing["quick_pricing_columns_per_group"] = columns
+                namespace = dict(rich.__dict__, dynamic_relocation_enabled=mode != "disabled",
+                    dynamic_relocation_seconds=120.0, dynamic_relocation_columns=columns,
+                    raw_group_by_id={g["groupId"]: g for g in original["groupsData"]},
+                    pricing_caches={}, new_topology=new, old_topology=old, weights=config["weights"],
+                    pricing_config=pricing_config, fixed_context=fixed, pricing=pricing, exact=exact,
+                    baby_cost=exact._baby_pairs(new, original["groupsData"], config["weights"], pricing_config),
+                    diagnostics=dict(dynamic_relocation_calls=0, dynamic_relocation_patterns=0),
+                    elite_pattern_store={}, context=types.SimpleNamespace(assigned_seats=current), scorer=scorer)
+                exec(code, namespace)
+                requests, expected = [], []
+                seat_ids = [s["seatId"] for s in original["newSeatmapData"]["seats"]]
+                for g, group in enumerate(original["groupsData"]):
+                    for variant, outside, duration in (("expired", [], -1), ("free", [], 120),
+                            ("duplicate", [], 120), ("half", seat_ids[::2], 120), ("all", seat_ids, 120)):
+                        requests.append(dict(group_index=g, outside_resources=outside, deadline_seconds=duration))
+                        before = dict(namespace["diagnostics"])
+                        namespace["add_dynamic_relocation_patterns"](group["groupId"], set(outside), rich.time.perf_counter() + duration)
+                        counters = namespace["diagnostics"]
+                        calls = counters["dynamic_relocation_calls"] - before["dynamic_relocation_calls"]
+                        added = counters["dynamic_relocation_patterns"] - before["dynamic_relocation_patterns"]
+                        elite = {str(gid): list(patterns.values()) for gid, patterns in namespace["elite_pattern_store"].items()}
+                        expected.append(copy.deepcopy(dict(calls=calls, patterns=added,
+                            cache_count=len(namespace["pricing_caches"]), elite=elite)))
+                        if mode == "active":
+                            if variant == "duplicate" and calls:
+                                self.assertEqual(added, 0)
+                                coverage.add("duplicate")
+                            if any(len(patterns) > 2 for patterns in elite.values()): coverage.add("no_eviction")
+                            if any(p["blocked_seats"] for patterns in elite.values() for p in patterns): coverage.add("protection")
+                            if variant == "all":
+                                self.assertEqual(calls, 0)
+                                coverage.add("empty_domain")
+                initial = [[i, current[g["groupId"], p["hostnum"]]]
+                           for i, (g, p) in enumerate((g, p) for g in original["groupsData"] for p in g["psrs"])
+                           if (g["groupId"], p["hostnum"]) in current]
+                with tempfile.TemporaryDirectory() as directory:
+                    work = Path(directory)
+                    for name, value in {
+                        "case.json": {"caseId": original["id"], "direction": "public-test", "groups": original["groupsData"]},
+                        "old.json": original["oldSeatmapData"], "new.json": original["newSeatmapData"], "config.json": config,
+                        "replay.json": {"dynamic_relocation": requests, "assignments": initial},
+                    }.items():
+                        (work / name).write_text(json.dumps(value), encoding="utf-8")
+                    run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                          str(work / "replay.json")], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                actual = json.loads(run.stdout)
+                self.assertEqual(len(actual), len(expected))
+                for request, native, python in zip(requests, actual, expected):
+                    with self.subTest(case=original["id"], mode=mode, request=request):
+                        python = json.loads(json.dumps(python))
+                        self.assertEqual(native.keys(), python.keys())
+                        self.assertEqual(native["elite"].keys(), python["elite"].keys())
+                        for gid in python["elite"]:
+                            self.assertEqual(len(native["elite"][gid]), len(python["elite"][gid]))
+                            for a, b in zip(native["elite"][gid], python["elite"][gid]):
+                                self.assertEqual(a.pop("conflict_groups"), [])
+                                self.assertAlmostEqual(a.pop("local_score"), b.pop("local_score"), places=8)
+                        self.assertEqual(native, python)
+        self.assertEqual(coverage, {"duplicate", "no_eviction", "protection", "empty_domain"})
+
     def test_special_dual_pricing_matches_frozen_function(self):
         prefix = construction_prefix()
         total_accepted = 0
@@ -773,6 +864,15 @@ class NativeRichStructuredTests(unittest.TestCase):
                      and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "window_cache")
         stop = next(i for i, n in enumerate(window_loop.body) if isinstance(n, ast.AugAssign))
         filtering = compile(ast.Module(body=window_loop.body[start:stop], type_ignores=[]), "frozen_window_cache", "exec")
+        protected = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                         and n.name == "improve_protected_multigroup_pattern_mip")
+        dynamic = next(n for n in protected.body if isinstance(n, ast.FunctionDef)
+                       and n.name == "add_dynamic_relocation_patterns")
+        start = next(i for i, n in enumerate(dynamic.body) if isinstance(n, ast.Assign)
+                     and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "released_cache")
+        stop = next(i for i, n in enumerate(dynamic.body) if isinstance(n, ast.Assign)
+                    and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "call_deadline")
+        released_filtering = compile(ast.Module(body=dynamic.body[start:stop], type_ignores=[]), "frozen_released_cache", "exec")
         reserved = self.synthetic([(101, {}), (202, {"newSeat": {"seatNum": "1B"}})])
         reserved["id"] = "pricing_reserved_middle"
         coverage = set()
@@ -813,6 +913,20 @@ class NativeRichStructuredTests(unittest.TestCase):
                             expected.append({**{k: getattr(selected, k) for k in ("seat_ids", "row_coordinate", "x_coordinate",
                                                "row_big_m", "x_big_m", "adjacency_edges", "hole_specs")},
                                              "all_options": [[o.signature for o in options] for options in selected.all_options]})
+                        all_seats = [s["seatId"] for s in case["newSeatmapData"]["seats"]]
+                        for outside in ([], all_seats[:1], all_seats[::2], all_seats):
+                            filtered = [[o for o in options if not set(o.resources).intersection(outside)]
+                                        for options in cache.all_options]
+                            if any(o.seat_id not in outside and set(o.blocked).intersection(outside)
+                                   for options in cache.all_options for o in options):
+                                coverage.add("blocked_resource_filtered")
+                            namespace = dict(rich.__dict__, cache=cache, filtered_options=filtered)
+                            exec(released_filtering, namespace)
+                            selected = namespace["released_cache"]
+                            requests.append(dict(group_index=g, outside_resources=outside))
+                            expected.append({**{k: getattr(selected, k) for k in ("seat_ids", "row_coordinate", "x_coordinate",
+                                               "row_big_m", "x_big_m", "adjacency_edges", "hole_specs")},
+                                             "all_options": [[o.signature for o in options] for options in selected.all_options]})
                     expected = json.loads(json.dumps(expected))
                     with tempfile.TemporaryDirectory() as directory:
                         work = Path(directory)
@@ -830,7 +944,7 @@ class NativeRichStructuredTests(unittest.TestCase):
                     for index, (native, python) in enumerate(zip(actual, expected)):
                         with self.subTest(request=requests[index]):
                             self.assertEqual(native, python)
-        self.assertEqual(coverage, {"unreachable_neighbor", "unreachable_middle", "empty_window", "retained_origin"})
+        self.assertEqual(coverage, {"unreachable_neighbor", "unreachable_middle", "empty_window", "retained_origin", "blocked_resource_filtered"})
 
     def replay_windows(self, case, config):
         config = copy.deepcopy(config)

@@ -19,7 +19,7 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | beam search | construction Beam | native remaining-stage Beam with skips, compactness ranking, dominance and transactional commit; separate RR pattern Beam remains | PARTIAL_CPP | yes | ACTIVE |
 | construction repair queue | `_group_repair_metrics`, `_repair_priority_key` | native metrics, quality threshold, exact priority ordering, full queue retention and top-20 diagnostics; direct and combined Python differentials | FULL_CPP | no | ACTIVE |
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |
-| protection exchange | protected multi-group pattern MIP | none | PYTHON_ONLY | no | ACTIVE |
+| protection exchange | protected multi-group pattern MIP | native released-resource pricing and direct elite insertion verified; component MIP, reconstruction and production orchestration pending | PARTIAL_CPP | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
 | group matching | exact bitmask matching | stateful Python-ordered related-group partitions and bitmask matching integrated in production; combined stage differential passed | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |

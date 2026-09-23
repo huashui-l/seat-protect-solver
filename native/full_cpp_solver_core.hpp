@@ -73,6 +73,9 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
+    bool protected_dynamic_relocation_enabled = true;
+    double protected_dynamic_relocation_seconds = 0.08;
+    int protected_dynamic_relocation_columns = 6;
     bool enable_structured_pattern_generation = true;
     double structured_pattern_dfs_per_group = 0.08;
     int structured_patterns_per_group = 12;
@@ -285,6 +288,8 @@ struct RichPricingCache {
 RichPricingCache build_rich_pricing_cache(const Problem& problem, int group_index, const FixedSeatContext& fixed);
 RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPricingCache& cache,
     const std::vector<int>& rows);
+RichPricingCache filter_rich_pricing_resources(const Problem& problem, const RichPricingCache& cache,
+    const std::set<int>& outside_resources);
 
 struct RichPricingGeometry {
     std::vector<double> row_values, x_values;
@@ -538,6 +543,9 @@ public:
                 const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active);
     void record_candidate(int group_id, RichElitePattern pattern,
                           const AssignmentState& state, bool conflict_diversity_active);
+    // Protected MIP inserts new identities directly, without replacement or eviction.
+    bool insert_relocation(int group_id, RichElitePattern pattern, const std::function<double()>& score);
+    void ensure_group(int group_id) { groups_.try_emplace(group_id); }
     const std::map<int, std::vector<RichElitePattern>>& groups() const { return groups_; }
 private:
     int limit_;
@@ -545,5 +553,14 @@ private:
 };
 
 void write_rich_elite_store(std::ostream& output, const RichEliteStore& store);
+
+struct RichDynamicRelocationDiagnostics {
+    int calls = 0, patterns = 0;
+};
+RichDynamicRelocationDiagnostics add_rich_dynamic_relocation_patterns(
+    const Problem& problem, const AssignmentState& state, int group_index,
+    const std::set<int>& outside_resources, std::chrono::steady_clock::time_point deadline,
+    const FixedSeatContext& fixed, const std::vector<RichBabyCost>& baby,
+    std::map<int, RichPricingCache>& pricing_caches, RichEliteStore& elite);
 
 }  // namespace full_cpp
