@@ -116,6 +116,19 @@ RichPairedRescueDiagnostics rescue_rich_paired_ssrs(
     std::chrono::steady_clock::time_point deadline
 );
 
+struct RichConstructionDiagnostics {
+    RichRemainingDiagnostics search;
+    RichPairedRescueDiagnostics rescue;
+    int paired_passes = 0;
+};
+
+AssignmentState initialize_rich_assignment(const Problem& problem);
+
+RichConstructionDiagnostics construct_rich_assignment(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    std::chrono::steady_clock::time_point construction_deadline
+);
+
 void improve_rich_vnd_m2(
     const Problem& problem,
     std::vector<int>& assignment,

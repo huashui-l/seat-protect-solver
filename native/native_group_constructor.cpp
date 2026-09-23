@@ -919,6 +919,10 @@ void repair_rich_assignment(
     result.rich_repair_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 }
 
+AssignmentState initialize_rich_assignment(const Problem& problem) {
+    return fixed_initial_state(problem);
+}
+
 GroupConstructionResult construct_rich_m1(
     const Problem& problem, const std::vector<int>& q0_assignment,
     const GroupConstructionResult& q2a_result,
@@ -927,35 +931,21 @@ GroupConstructionResult construct_rich_m1(
     (void)q0_assignment;
     const auto started = std::chrono::steady_clock::now();
     GroupConstructionResult result = q2a_result;
-    AssignmentState state = fixed_initial_state(problem);
+    AssignmentState state = initialize_rich_assignment(problem);
     const auto cache = build_rich_candidate_cache(problem, state);
     const auto construction_deadline = std::min(global_deadline, started
         + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
             std::chrono::duration<double>(problem.rich.construction_time_budget)));
-    std::vector<int> anchored, groups;
-    for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
-        groups.push_back(g);
-        if (std::any_of(problem.groups[g].passengers.begin(), problem.groups[g].passengers.end(),
-                [&](int p) { return state.passenger_to_seat[p] >= 0; })) anchored.push_back(g);
-    }
-    const auto capture = [&](const RichRemainingDiagnostics& diagnostics) {
-        result.rich_dfs_attempted += diagnostics.dfs_attempted;
-        result.rich_dfs_succeeded += diagnostics.dfs_succeeded;
-        result.rich_dfs_nodes += diagnostics.dfs_nodes;
-        result.rich_beam_groups += diagnostics.beam_groups;
-    };
-    if (!anchored.empty()) capture(assign_rich_remaining(problem, state, cache, anchored, construction_deadline));
-    while (result.rich_paired_ssr_passes < 4 && std::chrono::steady_clock::now() < construction_deadline) {
-        const int added = assign_rich_paired_ssrs(problem, state, cache, construction_deadline);
-        ++result.rich_paired_ssr_passes;
-        if (added <= 0) break;
-    }
-    const auto rescue = rescue_rich_paired_ssrs(problem, state, cache, construction_deadline);
-    result.rich_paired_rescue_attempted = static_cast<int>(rescue.attempted.size());
-    result.rich_paired_rescue_rescued = static_cast<int>(rescue.rescued.size());
-    result.rich_paired_rescue_unresolved = static_cast<int>(rescue.unresolved.size());
-    result.rich_paired_joint_rebuilds = rescue.joint_rebuilds;
-    capture(assign_rich_remaining(problem, state, cache, groups, construction_deadline));
+    const auto diagnostics = construct_rich_assignment(problem, state, cache, construction_deadline);
+    result.rich_dfs_attempted = diagnostics.search.dfs_attempted;
+    result.rich_dfs_succeeded = diagnostics.search.dfs_succeeded;
+    result.rich_dfs_nodes = diagnostics.search.dfs_nodes;
+    result.rich_beam_groups = diagnostics.search.beam_groups;
+    result.rich_paired_ssr_passes = diagnostics.paired_passes;
+    result.rich_paired_rescue_attempted = static_cast<int>(diagnostics.rescue.attempted.size());
+    result.rich_paired_rescue_rescued = static_cast<int>(diagnostics.rescue.rescued.size());
+    result.rich_paired_rescue_unresolved = static_cast<int>(diagnostics.rescue.unresolved.size());
+    result.rich_paired_joint_rebuilds = diagnostics.rescue.joint_rebuilds;
     const auto construction_finished = std::chrono::steady_clock::now();
     result.rich_construction_seconds = std::chrono::duration<double>(construction_finished - started).count();
     result.rich_construction_carry_seconds = std::max(0.0,

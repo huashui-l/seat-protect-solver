@@ -254,9 +254,31 @@ rescue diagnostics on 11 public fixtures plus fixed-neighbor displacement,
 immovable fixed neighbors, bounded joint-rebuild rollback/success, and two cared
 passengers sharing one adult. Release build and the complete native/state-replay
 public suite passed: 92 tests, 12,392 subtests, 9 skips. Isolated rescue parity and
-production integration are established for these scenarios; combined construction
-checkpoints, adaptive runtime scheduling and Formal24 parity remain outstanding.
+production integration are established for these scenarios; adaptive runtime
+scheduling and Formal24 parity remain outstanding.
 No Formal24 checkpoint or quality claim accompanies this change.
+
+The production construction sequence is now shared with the stage probe through
+`construct_rich_assignment`, including the same fixed-state initializer and native
+candidate cache. A new combined oracle executes the actual frozen Python allocation
+prefix through anchored, paired, rescue and remaining stages, then its actual
+relocation repair. For 11 public fixtures in each of three modes (normal DFS,
+DFS disabled for Beam, remaining-stage time zero to exercise repair), all 33
+scenarios match exact pre/post-repair assignments, protection blocks, five score
+components and total, paired-pass counts, ordered rescue diagnostics, six
+construction counters and four repair counters. Python orphan occupancy is
+asserted absent at both checkpoints in these scenarios.
+
+These comparisons use generous nonbinding construction/repair times and do not
+establish wall-clock cutoff parity. The production adaptive stage scheduler,
+construction repair queue/elite bookkeeping, and a frozen Formal24 M1 checkpoint
+are still outstanding. The earlier inconsistent all-missing repair reproduction
+remains a separate reference defect; these passing trajectories do not prove
+it unreachable for all inputs.
+Release MSVC build and the full native/state-replay-enabled public suite passed:
+93 tests, 12,425 subtests, 9 skips. This includes the 12,000-operation state replay
+and the existing raw-native external legality/score audits. Only the two existing
+integer-to-double conversion warnings remain; no Formal24 run was performed.
 
 ## Correctness
 

@@ -9,7 +9,10 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
-        full_cpp::AssignmentState state(problem);
+        const auto* pipeline_mode = replay.find("construction_pipeline");
+        const bool pipeline = pipeline_mode && pipeline_mode->bool_or();
+        auto state = pipeline ? full_cpp::initialize_rich_assignment(problem)
+                              : full_cpp::AssignmentState(problem);
         for (const auto& entry : replay.at("assignments").array) {
             const int passenger = static_cast<int>(entry.array.at(0).number);
             const int seat = problem.seat_index.at(entry.array.at(1).string);
@@ -38,16 +41,30 @@ int main(int argc, char** argv) {
             std::cout << "]}\n";
             return 0;
         }
-        for (const auto& row : replay.at("rankings").array) {
+        if (!pipeline) for (const auto& row : replay.at("rankings").array) {
             rankings.emplace_back();
             for (const auto& seat : row.array) rankings.back().push_back(problem.seat_index.at(seat.string));
         }
-        if (rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
+        if (!pipeline && rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
         full_cpp::GroupConstructionResult diagnostics;
         full_cpp::RichRemainingDiagnostics construction;
         int paired_added = 0;
         full_cpp::RichPairedRescueDiagnostics rescue;
-        if (const auto* mode = replay.find("paired_rescue"); mode && mode->bool_or()) {
+        full_cpp::AssignmentSnapshot construction_state;
+        full_cpp::ScoreComponents construction_score;
+        int paired_passes = 0;
+        if (pipeline) {
+            const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            const auto combined = full_cpp::construct_rich_assignment(problem, state, cache,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60));
+            construction = combined.search;
+            rescue = combined.rescue;
+            paired_passes = combined.paired_passes;
+            construction_state = state.save();
+            construction_score = full_cpp::evaluate_score_components(problem, state.passenger_to_seat);
+            full_cpp::repair_rich_assignment(problem, state, cache.rankings,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
+        } else if (const auto* rescue_mode = replay.find("paired_rescue"); rescue_mode && rescue_mode->bool_or()) {
             auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             cache.rankings = rankings;
             rescue = full_cpp::rescue_rich_paired_ssrs(problem, state, cache,
@@ -113,7 +130,37 @@ int main(int argc, char** argv) {
         emit_keys("attempted", rescue.attempted);
         emit_keys("rescued", rescue.rescued);
         emit_keys("unresolved", rescue.unresolved);
-        std::cout << "}}\n";
+        std::cout << '}';
+        if (pipeline) {
+            std::cout << ",\"paired_passes\":" << paired_passes << ",\"construction_assignments\":[";
+            for (size_t p = 0; p < problem.passengers.size(); ++p) {
+                if (p) std::cout << ',';
+                const int seat = construction_state.passenger_to_seat[p];
+                if (seat < 0) std::cout << "null";
+                else std::cout << '"' << problem.seats[seat].id << '"';
+            }
+            std::cout << "],\"construction_blocked\":[";
+            for (size_t p = 0; p < problem.passengers.size(); ++p) {
+                if (p) std::cout << ',';
+                std::cout << '[';
+                const auto& blocks = construction_state.assigned_blocked[p];
+                for (size_t b = 0; b < blocks.size(); ++b) {
+                    if (b) std::cout << ',';
+                    std::cout << '"' << problem.seats[blocks[b]].id << '"';
+                }
+                std::cout << ']';
+            }
+            std::cout << ']';
+            const auto emit_score = [](const char* name, const full_cpp::ScoreComponents& score) {
+                std::cout << ",\"" << name << "\":{\"score_s\":" << score.score_s
+                    << ",\"score_v\":" << score.score_v << ",\"score_p\":" << score.score_p
+                    << ",\"score_c\":" << score.score_c << ",\"score_b\":" << score.score_b
+                    << ",\"total_soft_score\":" << score.total() << '}';
+            };
+            emit_score("construction_score", construction_score);
+            emit_score("repair_score", full_cpp::evaluate_score_components(problem, state.passenger_to_seat));
+        }
+        std::cout << "}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

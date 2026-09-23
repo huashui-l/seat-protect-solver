@@ -638,4 +638,34 @@ RichPairedRescueDiagnostics rescue_rich_paired_ssrs(
     return diagnostics;
 }
 
+RichConstructionDiagnostics construct_rich_assignment(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    std::chrono::steady_clock::time_point construction_deadline
+) {
+    RichConstructionDiagnostics diagnostics;
+    std::vector<int> anchored, groups;
+    for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
+        groups.push_back(g);
+        if (std::any_of(problem.groups[g].passengers.begin(), problem.groups[g].passengers.end(),
+                [&](int p) { return state.passenger_to_seat[p] >= 0; })) anchored.push_back(g);
+    }
+    const auto capture = [&](const RichRemainingDiagnostics& update) {
+        diagnostics.search.groups_considered += update.groups_considered;
+        diagnostics.search.transaction_failures += update.transaction_failures;
+        diagnostics.search.dfs_attempted += update.dfs_attempted;
+        diagnostics.search.dfs_succeeded += update.dfs_succeeded;
+        diagnostics.search.dfs_nodes += update.dfs_nodes;
+        diagnostics.search.beam_groups += update.beam_groups;
+    };
+    if (!anchored.empty()) capture(assign_rich_remaining(problem, state, cache, anchored, construction_deadline));
+    while (diagnostics.paired_passes < 4 && std::chrono::steady_clock::now() < construction_deadline) {
+        const int added = assign_rich_paired_ssrs(problem, state, cache, construction_deadline);
+        ++diagnostics.paired_passes;
+        if (added <= 0) break;
+    }
+    diagnostics.rescue = rescue_rich_paired_ssrs(problem, state, cache, construction_deadline);
+    capture(assign_rich_remaining(problem, state, cache, groups, construction_deadline));
+    return diagnostics;
+}
+
 }  // namespace full_cpp
