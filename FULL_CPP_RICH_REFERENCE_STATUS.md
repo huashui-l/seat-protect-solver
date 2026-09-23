@@ -616,6 +616,37 @@ native/state-replay-enabled regression passed 119 tests and 13,775 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed.
 
+Structured group ordering and row-window selection are now native. The ordering
+retains primary-group precedence, the full nested repair-priority tuple, special
+passenger counts and stable ties. Difficult-group admission uses the frozen
+small-group research threshold only for shrinking aircraft at the configured raw
+business time. Full-resource global-block activation is separate and retains its
+protected-demand and exact-capacity conditions. All ordered metrics are retained;
+the diagnostic serializer limits the visible repair queue to 20 as in Python.
+
+Window generation uses reachable placement-seat capacity for minimum width,
+includes every fixed row, preserves gaps in actual row numbers and retains both
+all windows and the capped list. Window ranking uses cabin shortage and desired
+seat-value mismatch over all seats in the chosen rows, then target span, actual
+span, old-seat row-center distance, width and row tuple. Missing old seats,
+passenger/seat explicit values, nonpositive window limits and negative extra-row
+settings follow the frozen implementation.
+
+The oracle executes the actual ordering and window AST slices from
+`generate_structured_group_patterns`. The structured test file passed 6 tests and
+54 subtests, including 33 public/config window scenarios and two explicit-value /
+missing-old-seat scenarios. Both active and disabled full-resource cases are
+covered. These are generator prerequisites; value-block/global-value-block,
+rebuilt search, final candidate recording, special pricing and production
+orchestration remain incomplete. No M3 or Formal24 completion claim is made.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 121 tests and 13,810 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. The structured suite also passed after adding an explicit
+repair-queue length assertion. `git diff --check` passed. No Formal24 or profiling
+run was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

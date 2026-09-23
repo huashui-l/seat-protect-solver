@@ -10,6 +10,47 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* mode = replay.find("structured_windows"); mode && mode->bool_or()) {
+            std::vector<int> assignment(problem.passengers.size(), -1);
+            for (const auto& entry : replay.at("assignments").array)
+                assignment.at(static_cast<size_t>(entry.array[0].number)) = problem.seat_index.at(entry.array[1].string);
+            const auto order = full_cpp::build_rich_structured_order(problem, assignment);
+            const auto emit_groups = [&](const std::vector<int>& groups) {
+                std::cout << '[';
+                for (size_t i = 0; i < groups.size(); ++i) { if (i) std::cout << ','; std::cout << problem.groups[groups[i]].id; }
+                std::cout << ']';
+            };
+            const auto emit_windows = [&](const std::vector<std::vector<int>>& windows) {
+                std::cout << '[';
+                for (size_t i = 0; i < windows.size(); ++i) {
+                    if (i) std::cout << ',';
+                    std::cout << '[';
+                    for (size_t j = 0; j < windows[i].size(); ++j) { if (j) std::cout << ','; std::cout << windows[i][j]; }
+                    std::cout << ']';
+                }
+                std::cout << ']';
+            };
+            std::cout << std::setprecision(17) << "{\"min_group_size\":" << order.min_group_size
+                << ",\"full_resource_global_blocks\":" << (order.full_resource_global_blocks ? "true" : "false") << ",\"ordered_groups\":";
+            emit_groups(order.ordered_groups);
+            std::cout << ",\"difficult_groups\":"; emit_groups(order.difficult_groups);
+            std::cout << ",\"repair_queue\":"; full_cpp::write_rich_repair_queue(std::cout, order.repair_queue, 20);
+            std::cout << ",\"windows\":{";
+            const auto fixed = full_cpp::preprocess_fixed_seats(problem);
+            for (size_t i = 0; i < order.ordered_groups.size(); ++i) {
+                if (i) std::cout << ',';
+                const int g = order.ordered_groups[i];
+                const auto options = full_cpp::build_rich_placement_options(problem, g, fixed);
+                const auto windows = full_cpp::build_rich_structured_windows(problem, g, options, order.repair_queue[i]);
+                std::cout << '"' << problem.groups[g].id << "\":{\"minimum_width\":" << windows.minimum_width
+                    << ",\"old_center\":" << windows.old_center << ",\"all_row_windows\":";
+                emit_windows(windows.all_row_windows);
+                std::cout << ",\"row_windows\":"; emit_windows(windows.row_windows);
+                std::cout << '}';
+            }
+            std::cout << "}}\n";
+            return 0;
+        }
         if ((replay.find("placement_options") && replay.at("placement_options").bool_or()) || replay.find("pattern_assembly") || replay.find("rigid_relaxed")) {
             const auto fixed = full_cpp::preprocess_fixed_seats(problem);
             const auto seats = [&](const std::vector<int>& indices) {

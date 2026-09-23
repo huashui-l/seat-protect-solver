@@ -70,6 +70,9 @@ struct RichConstructionConfig {
     int elite_patterns_per_group = 12;
     int structured_pattern_min_group_size = 5;
     int structured_rigid_shift_rows = 3;
+    int structured_research_min_group_size = 2;
+    int structured_pattern_extra_rows = 2;
+    int structured_pattern_window_limit = 12;
     double stage3_time_budget = 20.0;
     bool enable_restricted_pattern_mip = true;
     double restricted_pattern_mip_time_budget = 0.0;
@@ -150,6 +153,8 @@ struct Problem {
     bool rich_quality_repair_active = false;
     bool rich_conflict_diversity_time_active = false;
     bool rich_three_tier_active = false;
+    bool rich_structured_small_groups_active = false;
+    bool rich_full_resource_global_blocks = false;
 };
 
 struct RichGroupRepairMetric {
@@ -166,6 +171,15 @@ void write_rich_repair_queue(std::ostream& output,
     const std::vector<RichGroupRepairMetric>& queue, size_t limit);
 bool rich_conflict_diversity_active(const Problem& problem,
     const std::vector<RichGroupRepairMetric>& construction_metrics);
+
+struct RichStructuredOrder {
+    int min_group_size = 0;
+    bool full_resource_global_blocks = false;
+    std::vector<int> ordered_groups, difficult_groups;
+    std::vector<RichGroupRepairMetric> repair_queue;
+};
+
+RichStructuredOrder build_rich_structured_order(const Problem& problem, const std::vector<int>& assignment);
 
 struct FixedSeatContext {
     std::vector<int> owner_by_seat;
@@ -225,6 +239,15 @@ struct RichTieredPattern {
 std::vector<RichTieredPattern> generate_rich_rigid_relaxed_patterns(
     const Problem& problem, int group_index, const std::vector<int>& current_targets,
     const std::vector<std::vector<RichPlacement>>& options, const std::vector<std::string>& active_ssr_types);
+
+struct RichStructuredWindows {
+    int minimum_width = 0;
+    double old_center = 0.0;
+    std::vector<std::vector<int>> all_row_windows, row_windows;
+};
+
+RichStructuredWindows build_rich_structured_windows(const Problem& problem, int group_index,
+    const std::vector<std::vector<RichPlacement>>& options, const RichGroupRepairMetric& current_metric);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

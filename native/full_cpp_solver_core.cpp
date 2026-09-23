@@ -187,6 +187,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = algorithm->find("elite_patterns_per_group")) problem.rich.elite_patterns_per_group = std::max(2, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("structured_pattern_min_group_size")) problem.rich.structured_pattern_min_group_size = std::max(1, static_cast<int>(item->number_or(5)));
         if (const Value* item = algorithm->find("structured_rigid_shift_rows")) problem.rich.structured_rigid_shift_rows = std::max(0, static_cast<int>(item->number_or(3)));
+        if (const Value* item = algorithm->find("structured_research_min_group_size")) problem.rich.structured_research_min_group_size = std::max(1, static_cast<int>(item->number_or(2)));
+        if (const Value* item = algorithm->find("structured_pattern_extra_rows")) problem.rich.structured_pattern_extra_rows = static_cast<int>(item->number_or(2));
+        if (const Value* item = algorithm->find("structured_pattern_window_limit")) problem.rich.structured_pattern_window_limit = std::max(1, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);
         if (const Value* item = algorithm->find("back_penalty_factor")) problem.back_penalty_factor = item->number_or(problem.back_penalty_factor);
@@ -328,6 +331,13 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     const auto* three_tier = stage_algorithm ? stage_algorithm->find("enable_three_tier_patterns") : nullptr;
     problem.rich_three_tier_active = (!three_tier || three_tier->bool_or(true))
         && setting("business_time_limit_seconds", 5.0) >= setting("three_tier_min_business_time_seconds", 0.0);
+    problem.rich_structured_small_groups_active = problem.seats.size() < problem.old_seats.size()
+        && setting("business_time_limit_seconds", 5.0) >= setting("structured_small_group_min_business_time_seconds", 10.0);
+    const auto* global_blocks = stage_algorithm ? stage_algorithm->find("enable_global_full_resource_blocks") : nullptr;
+    problem.rich_full_resource_global_blocks = (!global_blocks || global_blocks->bool_or(true))
+        && setting("business_time_limit_seconds", 5.0) >= 10.0 && problem.seats.size() < problem.old_seats.size()
+        && problem.rich_stage_budgets.seat_demand == static_cast<int>(problem.seats.size())
+        && problem.rich_stage_budgets.seat_demand > static_cast<int>(problem.passengers.size());
     return problem;
 }
 
@@ -525,6 +535,40 @@ std::vector<RichGroupRepairMetric> build_rich_repair_queue(
         return key(left) < key(right);
     });
     return queue;
+}
+
+RichStructuredOrder build_rich_structured_order(const Problem& problem, const std::vector<int>& assignment) {
+    RichStructuredOrder result;
+    result.min_group_size = problem.rich.structured_pattern_min_group_size;
+    if (problem.rich_structured_small_groups_active)
+        result.min_group_size = std::min(result.min_group_size, problem.rich.structured_research_min_group_size);
+    result.full_resource_global_blocks = problem.rich_full_resource_global_blocks;
+    const auto metrics = build_rich_repair_queue(problem, assignment);
+    std::map<int, RichGroupRepairMetric> by_group;
+    for (const auto& metric : metrics) by_group[metric.group_id] = metric;
+    std::vector<int> special(problem.groups.size(), 0);
+    for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
+        result.ordered_groups.push_back(g);
+        for (int p : problem.groups[g].passengers) {
+            const auto& item = problem.passengers[p];
+            special[g] += !item.ssr.empty() || item.need_cared || item.need_single_empty || item.need_both_empty;
+        }
+    }
+    const auto key = [&](int g) {
+        const auto& group = problem.groups[g];
+        const auto& metric = by_group.at(group.id);
+        const bool primary = group.passengers.size() >= static_cast<size_t>(problem.rich.structured_pattern_min_group_size) || special[g] > 0;
+        return std::make_tuple(!primary,
+            std::make_tuple(-metric.priority_loss, -metric.row_span, -metric.compactness_penalty, metric.group_id),
+            -special[g], -static_cast<int>(group.passengers.size()), group.id);
+    };
+    std::stable_sort(result.ordered_groups.begin(), result.ordered_groups.end(), [&](int a, int b) { return key(a) < key(b); });
+    for (int g : result.ordered_groups) {
+        result.repair_queue.push_back(by_group.at(problem.groups[g].id));
+        if (special[g] || problem.groups[g].passengers.size() >= static_cast<size_t>(result.min_group_size))
+            result.difficult_groups.push_back(g);
+    }
+    return result;
 }
 
 bool rich_conflict_diversity_active(const Problem& problem,
@@ -914,6 +958,75 @@ std::vector<RichTieredPattern> generate_rich_rigid_relaxed_patterns(
         }
         if (valid) add_targets(targets, "relaxed");
     }
+    return result;
+}
+
+RichStructuredWindows build_rich_structured_windows(const Problem& problem, int group_index,
+    const std::vector<std::vector<RichPlacement>>& options, const RichGroupRepairMetric& current_metric
+) {
+    RichStructuredWindows result;
+    const auto& group = problem.groups[group_index];
+    std::map<int, std::set<int>> reachable;
+    for (const auto& row : options) for (const auto& option : row) reachable[problem.seats[option.seat].row].insert(option.seat);
+    std::vector<int> rows;
+    int capacity = 1, protected_demand = 0;
+    for (const auto& row : reachable) { rows.push_back(row.first); capacity = std::max(capacity, static_cast<int>(row.second.size())); }
+    std::set<int> fixed_rows;
+    std::map<std::string, int> required_classes;
+    std::vector<std::pair<std::string, double>> desired_values;
+    double old_sum = 0.0;
+    int old_count = 0;
+    const auto value = [&](const Seat& seat) {
+        return std::isnan(seat.explicit_value)
+            ? (seat.cabin == "Business" ? problem.business_seat_value : 0.0)
+                + (seat.extra_legroom ? problem.extra_legroom_value : 0.0) + (seat.bassinet ? problem.bassinet_value : 0.0)
+            : seat.explicit_value;
+    };
+    for (int p : group.passengers) {
+        const auto& passenger = problem.passengers[p];
+        protected_demand += passenger.need_both_empty ? 2 : passenger.need_single_empty ? 1 : 0;
+        const auto fixed = problem.seat_index.find(passenger.fixed_seat);
+        if (fixed != problem.seat_index.end()) fixed_rows.insert(problem.seats[fixed->second].row);
+        if (!passenger.cabin.empty()) ++required_classes[passenger.cabin];
+        const auto old = problem.old_seat_index.find(passenger.old_seat);
+        if (old != problem.old_seat_index.end()) {
+            const auto& seat = problem.old_seats[old->second];
+            old_sum += seat.row; ++old_count;
+            desired_values.emplace_back(passenger.cabin, std::isnan(passenger.old_seat_value) ? value(seat) : passenger.old_seat_value);
+        }
+    }
+    result.minimum_width = std::max(1, (static_cast<int>(group.passengers.size()) + protected_demand + capacity - 1) / capacity);
+    result.old_center = rows.empty() ? 0.0 : old_count ? old_sum / old_count : rows.front();
+    const int max_width = std::min(static_cast<int>(rows.size()), result.minimum_width + problem.rich.structured_pattern_extra_rows);
+    for (int width = result.minimum_width; width <= max_width; ++width)
+        for (int start = 0; start + width <= static_cast<int>(rows.size()); ++start) {
+            std::vector<int> window(rows.begin() + start, rows.begin() + start + width);
+            if (std::includes(window.begin(), window.end(), fixed_rows.begin(), fixed_rows.end())) result.all_row_windows.push_back(std::move(window));
+        }
+    const auto key = [&](const std::vector<int>& window) {
+        std::map<std::string, int> available;
+        std::map<std::string, std::vector<double>> values;
+        for (const auto& seat : problem.seats) if (std::binary_search(window.begin(), window.end(), seat.row)) {
+            ++available[seat.cabin]; values[seat.cabin].push_back(value(seat));
+        }
+        int shortage = 0;
+        for (const auto& demand : required_classes) shortage += std::max(0, demand.second - available[demand.first]);
+        double mismatch = 0.0, center = 0.0;
+        if (current_metric.value_mismatch_score < 0.0) for (const auto& desired : desired_values) {
+            double best = std::numeric_limits<double>::infinity();
+            for (double candidate : values[desired.first]) best = std::min(best, std::abs(candidate - desired.second));
+            mismatch += best;
+        }
+        for (int row : window) center += row;
+        center /= window.size();
+        const int span = window.back() - window.front();
+        return std::make_tuple(shortage, mismatch, span <= std::max(0, current_metric.row_span - 2) ? 0 : 1,
+            span, std::abs(center - result.old_center), window.size(), window);
+    };
+    std::stable_sort(result.all_row_windows.begin(), result.all_row_windows.end(), [&](const auto& a, const auto& b) { return key(a) < key(b); });
+    result.row_windows = result.all_row_windows;
+    if (result.row_windows.size() > static_cast<size_t>(problem.rich.structured_pattern_window_limit))
+        result.row_windows.resize(problem.rich.structured_pattern_window_limit);
     return result;
 }
 
