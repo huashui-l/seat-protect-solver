@@ -186,6 +186,7 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     if (const Value* algorithm = config.find("algorithm")) {
         if (const Value* item = algorithm->find("elite_patterns_per_group")) problem.rich.elite_patterns_per_group = std::max(2, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("structured_pattern_min_group_size")) problem.rich.structured_pattern_min_group_size = std::max(1, static_cast<int>(item->number_or(5)));
+        if (const Value* item = algorithm->find("structured_rigid_shift_rows")) problem.rich.structured_rigid_shift_rows = std::max(0, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);
         if (const Value* item = algorithm->find("back_penalty_factor")) problem.back_penalty_factor = item->number_or(problem.back_penalty_factor);
@@ -324,6 +325,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         >= setting("three_tier_min_business_time_seconds", 10.0);
     problem.rich_conflict_diversity_time_active = problem.rich_stage_budgets.business_time_limit
         >= setting("three_tier_min_business_time_seconds", 10.0);
+    const auto* three_tier = stage_algorithm ? stage_algorithm->find("enable_three_tier_patterns") : nullptr;
+    problem.rich_three_tier_active = (!three_tier || three_tier->bool_or(true))
+        && setting("business_time_limit_seconds", 5.0) >= setting("three_tier_min_business_time_seconds", 0.0);
     return problem;
 }
 
@@ -827,6 +831,90 @@ RichExactPattern build_rich_exact_pattern(const Problem& problem, int group_inde
         pattern.master_cost += problem.weight_b * factor / (1.0 + std::abs(infant.x - other.x));
     }
     return pattern;
+}
+
+std::vector<RichTieredPattern> generate_rich_rigid_relaxed_patterns(
+    const Problem& problem, int group_index, const std::vector<int>& current_targets,
+    const std::vector<std::vector<RichPlacement>>& options, const std::vector<std::string>& active_ssr_types
+) {
+    std::vector<RichTieredPattern> result;
+    if (!problem.rich_three_tier_active || std::find(current_targets.begin(), current_targets.end(), -1) != current_targets.end()) return result;
+    std::map<std::pair<int, std::string>, int> seat_at;
+    std::map<int, std::vector<int>> rows;
+    for (int s = 0; s < static_cast<int>(problem.seats.size()); ++s) {
+        const auto& seat = problem.seats[s];
+        seat_at[{seat.row, seat.column}] = s;
+        rows[seat.row].push_back(s);
+    }
+    for (auto& row : rows) std::sort(row.second.begin(), row.second.end(), [&](int a, int b) {
+        return problem.seats[a].index_in_row < problem.seats[b].index_in_row;
+    });
+    using Signature = std::vector<std::pair<int, std::vector<int>>>;
+    std::map<Signature, size_t> positions;
+    const auto add_targets = [&](const std::vector<int>& targets, const char* source) {
+        std::vector<RichPlacement> selected;
+        std::vector<bool> used(problem.seats.size(), false);
+        const auto choose = [&](auto&& self, size_t p) -> bool {
+            if (p == options.size()) return rich_placements_caregiver_ok(problem, group_index, selected);
+            for (const auto& option : options[p]) {
+                if (option.seat != targets[p]) continue;
+                if (std::any_of(option.resources.begin(), option.resources.end(), [&](int s) { return used[s]; })) continue;
+                selected.push_back(option);
+                for (int s : option.resources) used[s] = true;
+                if (self(self, p + 1)) return true;
+                selected.pop_back();
+                for (int s : option.resources) used[s] = false;
+            }
+            return false;
+        };
+        if (!choose(choose, 0)) return;
+        auto pattern = build_rich_exact_pattern(problem, group_index, selected, active_ssr_types);
+        Signature signature;
+        for (const auto& placement : pattern.placements) signature.emplace_back(placement.seat, placement.blocked);
+        const auto old = positions.find(signature);
+        if (old == positions.end()) {
+            positions.emplace(std::move(signature), result.size());
+            result.push_back({std::move(pattern), source});
+        } else {
+            // Python dict assignment replaces value/source but keeps insertion order.
+            result[old->second] = {std::move(pattern), source};
+        }
+    };
+    for (int delta = -problem.rich.structured_rigid_shift_rows; delta <= problem.rich.structured_rigid_shift_rows; ++delta) {
+        for (bool mirrored : {false, true}) {
+            std::vector<int> targets;
+            for (int s : current_targets) {
+                const auto& seat = problem.seats[s];
+                const int row = seat.row + delta;
+                std::string column = seat.column;
+                const auto row_it = rows.find(row);
+                if (mirrored && row_it != rows.end() && seat.index_in_row < static_cast<int>(row_it->second.size()))
+                    column = problem.seats[row_it->second[row_it->second.size() - 1 - seat.index_in_row]].column;
+                const auto target = seat_at.find({row, column});
+                if (target == seat_at.end()) { targets.clear(); break; }
+                targets.push_back(target->second);
+            }
+            if (!targets.empty()) add_targets(targets, "rigid");
+        }
+    }
+    std::map<std::string, std::pair<int, int>> subrows;
+    for (int s : current_targets) {
+        const auto& seat = problem.seats[s];
+        subrows["(" + std::to_string(seat.row) + ", " + std::to_string(seat.subrow) + ")"] = {seat.row, seat.subrow};
+    }
+    for (const auto& subrow : subrows) for (int delta : {-1, 1}) {
+        auto targets = current_targets;
+        bool valid = true;
+        for (size_t p = 0; p < current_targets.size(); ++p) {
+            const auto& seat = problem.seats[current_targets[p]];
+            if (std::make_pair(seat.row, seat.subrow) != subrow.second) continue;
+            const auto target = seat_at.find({seat.row + delta, seat.column});
+            if (target == seat_at.end()) { valid = false; break; }
+            targets[p] = target->second;
+        }
+        if (valid) add_targets(targets, "relaxed");
+    }
+    return result;
 }
 
 RichStageBudgets calculate_rich_stage_budgets(

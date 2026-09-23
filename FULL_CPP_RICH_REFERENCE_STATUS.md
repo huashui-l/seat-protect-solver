@@ -583,6 +583,39 @@ native/state-replay-enabled regression passed 115 tests and 13,756 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed.
 
+The structured generator's rigid and relaxed per-group layers now exist natively
+in `generate_rich_rigid_relaxed_patterns`. They consume the full placement domain
+and actual current group seats, enumerate row translations and mirror targets in
+Python order, then move one original subrow forward/backward. Subrows use Python's
+string ordering, including two-digit row numbers. Mirroring uses the source index
+within the target row, with Python's original-column behavior when target rows are
+shorter. A target DFS selects the first resource-disjoint, caregiver-valid
+protection combination; it does not add SSR rejection absent from the frozen
+prefix. Duplicate signatures update the pattern/source while retaining first
+insertion order, so a relaxed duplicate can overwrite the rigid label.
+
+The raw three-tier activation condition (including its default zero threshold),
+nonnegative rigid-shift clamp and incomplete-group skip are implemented. This
+per-group layer has no added deadline checks: the Python prefix checks the stage
+clock outside these loops. Overall structured enablement, difficult-group ordering,
+row windows, value-block/global-value-block/rebuilt layers, recorder acceptance
+and production scheduling are still pending.
+
+The differential oracle executes the actual frozen AST from `seat_at` through the
+statement preceding `group_deadline`; it does not reimplement these transforms.
+Tests compare ordered pattern content, resource signatures, costs, keyed SSR
+coefficients and source labels across eleven public construction states, activation
+and shift-cap variants, incomplete groups, protection DFS backtracking, caregiver
+mirroring, unequal row widths, reversed input order and string-ordered subrows.
+Both rigid and relaxed outputs, and relaxed source replacement, are required by
+the coverage assertions. No end-to-end M3 or Formal24 gate is claimed.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 119 tests and 13,775 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
