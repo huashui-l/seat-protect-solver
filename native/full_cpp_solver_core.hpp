@@ -139,6 +139,20 @@ struct FixedSeatContext {
     std::vector<bool> deterministic_blocked;
 };
 
+struct RichStageBudgets {
+    double business_time_limit = 0.0;
+    double scoring_reserve = 0.0;
+    double usable_time = 0.0;
+    int seat_demand = 0;
+    bool post_protected_tail_reserve_active = false;
+    bool post_protected_special_pricing_active = false;
+    std::map<std::string, double> stages;
+};
+
+RichStageBudgets calculate_rich_stage_budgets(
+    const Problem& problem, const native_json::Value& algorithm
+);
+
 struct AssignmentSnapshot {
     std::vector<int> seat_to_passenger;
     std::vector<int> passenger_to_seat;

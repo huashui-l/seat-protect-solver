@@ -161,6 +161,26 @@ int main(int argc, char** argv) {
             }
             *output << ']';
         }
+        const auto config = native_json::parse_file(config_path);
+        const auto* algorithm = config.find("algorithm");
+        const auto budgets = full_cpp::calculate_rich_stage_budgets(
+            problem, algorithm ? *algorithm : native_json::Value{});
+        *output << ",\"stage_budgets\":{\"business_time_limit\":" << budgets.business_time_limit
+                << ",\"scoring_reserve\":" << budgets.scoring_reserve
+                << ",\"usable_time\":" << budgets.usable_time
+                << ",\"seat_demand_total\":" << budgets.seat_demand
+                << ",\"post_protected_tail_reserve_active\":"
+                << (budgets.post_protected_tail_reserve_active ? "true" : "false")
+                << ",\"post_protected_special_pricing_active\":"
+                << (budgets.post_protected_special_pricing_active ? "true" : "false")
+                << ",\"stages\":{";
+        bool first_budget = true;
+        for (const auto& stage : budgets.stages) {
+            if (!first_budget) *output << ',';
+            first_budget = false;
+            *output << '\"' << stage.first << "\":" << stage.second;
+        }
+        *output << "}}";
         *output << "}\n";
         return 0;
     } catch (const std::exception& error) {

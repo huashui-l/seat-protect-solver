@@ -88,6 +88,19 @@ the native-enabled suite passed: 66 tests, 66 subtests, 10 skips. This is static
 domain parity on those fixtures; dynamic state semantics and structured search
 ordering/retention are not established by this test.
 
+Initial Rich stage-budget calculation is now available as a native core
+function and exposed by the core probe. It matches the frozen Python allocation
+prefix for scoring reserve, protection-aware seat demand, adaptive interpolation,
+priority/protected stage activation, proportional scaling, and post-protected
+tail/special-pricing activation. The oracle executes the actual Python prefix
+without running search. All 52 fixture/config scenarios matched to 10 decimal
+places, including absent settings, negative budgets, threshold boundaries,
+shrink/expand layouts, and protected demand. MSVC and the native-enabled suite
+passed: 67 tests, 118 subtests, 10 skips. Production stage orchestration does not
+yet consume this calculation; replacing its existing limits and implementing
+unused-budget carry remain required. This checkpoint is budget-calculation
+parity, not runtime scheduling or 60-second quality parity.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
