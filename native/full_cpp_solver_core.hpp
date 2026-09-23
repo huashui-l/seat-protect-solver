@@ -327,6 +327,28 @@ RichPricingSymmetry build_rich_pricing_symmetry(const Problem& problem, int grou
 bool rich_pricing_symmetry_ok(const RichPricingSymmetry& symmetry, const std::vector<int>& selected,
     int passenger_index, int option_index);
 
+struct RichBabyCost { int infant = -1, occupant = -1; double cost = 0.0; };
+struct RichPricingDuals {
+    std::map<int, double> group, seat;
+    std::map<RichSsrResource, double> ssr_all;
+    // Preserve row insertion order for aggregation over SSR types.
+    std::vector<std::tuple<int, RichSsrResource, double>> ssr_flag;
+    std::map<std::pair<int, int>, double> baby_lower, baby_infant_upper, baby_occupant_upper;
+};
+struct RichPricingCosts {
+    std::vector<std::vector<double>> base;
+    std::vector<double> flags;
+    double baby_relaxation = 0.0;
+};
+std::vector<RichBabyCost> build_rich_baby_costs(const Problem& problem);
+double rich_same_group_baby_upper_bound(const RichPricingCache& cache,
+    const std::vector<RichBabyCost>& baby_cost, int passenger_count);
+RichPricingCosts build_rich_pricing_costs(int group_id, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, bool phase_one);
+double rich_pattern_reduced_cost(const RichExactPattern& pattern, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, bool phase_one);
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 );

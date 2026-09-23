@@ -784,6 +784,38 @@ native/state-replay-enabled regression passed 126 tests and 15,094 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for this symmetry checkpoint.
 
+Native pricing now generates ordered infant/occupant interference pairs and the
+frozen same-group infant correction upper bound. The latter clamps pair costs to
+nonnegative values, takes at most the passenger count per possible infant seat,
+then retains at most the number of infant passengers. Phase-I excludes this
+objective relaxation while retaining every dual contribution.
+
+`build_rich_pricing_costs` aggregates infant/occupant duals in pair order and SSR
+flag duals in their supplied insertion order. Placement costs subtract occupied
+and protection-seat resources, SSR counts and occupant/infant duals. SSR flag costs
+remain separate per location for first activation during DFS. Full pattern reduced
+costs include group, seat, flagged/all SSR and all three infant-row dual families.
+Native column evaluation preserves the frozen SSR tuple-string coefficient order;
+seat-set and pattern-cost floating summation is checked with numerical tolerance.
+
+The oracle calls the original frozen functions directly. Eleven public fixtures
+plus a multi-infant/flagged synthetic cover signed sparse duals, missing defaults,
+shuffled flag-row insertion, other-group flag rows, protected resources, ordinary
+and Phase-I pricing, positive/negative/zero infant pair costs, and passenger-count
+limits including zero. Four sampled placement combinations per group also compare
+full column reduced costs; these assembly probes do not claim feasible columns.
+The structured suite passed 12 tests and 1,582 subtests. Pair identities/order and
+costs compare exactly; placement costs use nine decimal places, infant relaxation
+twelve, and column/flag/upper-bound costs eight. DFS traversal, historical starts,
+negative-column retention, termination, workspace reuse and production structured
+integration remain required. No M3 completion claim is made.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 127 tests and 15,338 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for the dynamic-cost checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

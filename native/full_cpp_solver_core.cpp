@@ -1482,6 +1482,110 @@ bool rich_pricing_symmetry_ok(const RichPricingSymmetry& symmetry, const std::ve
     return true;
 }
 
+std::vector<RichBabyCost> build_rich_baby_costs(const Problem& problem) {
+    std::vector<RichBabyCost> costs;
+    if (std::none_of(problem.passengers.begin(), problem.passengers.end(), [](const auto& p) { return p.ssr == "BSCT"; })) return costs;
+    for (int u = 0; u < static_cast<int>(problem.seats.size()); ++u) for (int v = 0; v < static_cast<int>(problem.seats.size()); ++v) {
+        const auto& infant = problem.seats[u]; const auto& other = problem.seats[v];
+        if (u == v || infant.cabin != other.cabin) continue;
+        double score = 0.0;
+        const double distance = 1.0 + std::abs(infant.x - other.x);
+        if (infant.row == other.row && infant.subrow == other.subrow) score = problem.weight_b / distance;
+        else if (std::abs(infant.row - other.row) == 1) score = problem.weight_b * problem.baby_front_back_factor / distance;
+        if (score != 0.0) costs.push_back({u, v, -score});
+    }
+    return costs;
+}
+
+double rich_same_group_baby_upper_bound(const RichPricingCache& cache,
+    const std::vector<RichBabyCost>& baby_cost, int passenger_count
+) {
+    if (baby_cost.empty() || passenger_count <= 0) return 0.0;
+    int infants = 0;
+    std::set<int> infant_seats, occupied(cache.seat_ids.begin(), cache.seat_ids.end());
+    for (const auto& options : cache.all_options) {
+        bool infant = false;
+        for (const auto& option : options) if (option.is_infant) { infant = true; infant_seats.insert(option.seat); }
+        infants += infant;
+    }
+    std::vector<double> per_infant;
+    for (int u : infant_seats) {
+        std::vector<double> costs;
+        for (const auto& pair : baby_cost) if (pair.infant == u && occupied.count(pair.occupant)) costs.push_back(std::max(0.0, pair.cost));
+        std::sort(costs.begin(), costs.end(), std::greater<double>());
+        double total = 0.0;
+        for (size_t i = 0; i < costs.size() && i < static_cast<size_t>(passenger_count); ++i) total += costs[i];
+        per_infant.push_back(total);
+    }
+    std::sort(per_infant.begin(), per_infant.end(), std::greater<double>());
+    double total = 0.0;
+    for (size_t i = 0; i < per_infant.size() && i < static_cast<size_t>(infants); ++i) total += per_infant[i];
+    return total;
+}
+
+RichPricingCosts build_rich_pricing_costs(int group_id, const RichPricingCache& cache,
+    const RichPricingWorkspace& workspace, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, bool phase_one
+) {
+    const auto get = [](const auto& values, const auto& key) { const auto found = values.find(key); return found == values.end() ? 0.0 : found->second; };
+    std::map<int, double> infant_dual, occupant_dual;
+    for (const auto& pair : baby_cost) {
+        const auto key = std::make_pair(pair.infant, pair.occupant);
+        infant_dual[pair.infant] += get(duals.baby_lower, key) + get(duals.baby_infant_upper, key);
+        occupant_dual[pair.occupant] += get(duals.baby_lower, key) + get(duals.baby_occupant_upper, key);
+    }
+    std::map<std::pair<int, RichSsrLocation>, double> flag_duals;
+    for (const auto& entry : duals.ssr_flag) flag_duals[{std::get<0>(entry), std::get<1>(entry).location}] += std::get<2>(entry);
+    RichPricingCosts costs;
+    for (const auto& options : cache.all_options) {
+        costs.base.emplace_back();
+        for (const auto& option : options) {
+            double value = phase_one ? 0.0 : option.individual_cost;
+            for (int seat : option.resources) value -= get(duals.seat, seat);
+            for (const auto& resource : option.ssr_resources) value -= get(duals.ssr_all, resource);
+            value -= get(occupant_dual, option.seat);
+            if (option.is_infant) value -= get(infant_dual, option.seat);
+            costs.base.back().push_back(value);
+        }
+    }
+    for (const auto& location : workspace.flag_locations) costs.flags.push_back(-get(flag_duals, std::make_pair(group_id, location)));
+    if (!phase_one && !baby_cost.empty()) costs.baby_relaxation = -rich_same_group_baby_upper_bound(cache, baby_cost, static_cast<int>(cache.all_options.size()));
+    return costs;
+}
+
+double rich_pattern_reduced_cost(const RichExactPattern& pattern, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, bool phase_one
+) {
+    const auto get = [](const auto& values, const auto& key) { const auto found = values.find(key); return found == values.end() ? 0.0 : found->second; };
+    double value = (phase_one ? 0.0 : pattern.master_cost) - get(duals.group, pattern.group_id);
+    double seats = 0.0;
+    for (int seat : pattern.seat_resources) seats += get(duals.seat, seat);
+    value -= seats;
+    const auto ordered = [](const auto& coefficients) {
+        std::map<std::string, std::pair<RichSsrResource, int>> result;
+        for (const auto& entry : coefficients) {
+            const auto& r = entry.first; const auto& l = r.location;
+            const auto location = l.subrow < 0 ? "'row', " + std::to_string(l.row)
+                : "'subrow', (" + std::to_string(l.row) + ", " + std::to_string(l.subrow) + ")";
+            result["(" + location + ", '" + r.ssr + "')"] = entry;
+        }
+        return result;
+    };
+    std::map<std::pair<int, RichSsrResource>, double> flagged;
+    for (const auto& entry : duals.ssr_flag) flagged[{std::get<0>(entry), std::get<1>(entry)}] = std::get<2>(entry);
+    for (const auto& item : ordered(pattern.ssr_flagged)) value -= get(flagged, std::make_pair(pattern.group_id, item.second.first)) * item.second.second;
+    for (const auto& item : ordered(pattern.ssr_all)) value -= get(duals.ssr_all, item.second.first) * item.second.second;
+    for (const auto& pair : baby_cost) {
+        const auto key = std::make_pair(pair.infant, pair.occupant);
+        const int infant = std::find(pattern.infant_seats.begin(), pattern.infant_seats.end(), pair.infant) != pattern.infant_seats.end();
+        const int occupied = std::find(pattern.occupied_seats.begin(), pattern.occupied_seats.end(), pair.occupant) != pattern.occupied_seats.end();
+        value -= get(duals.baby_lower, key) * (infant + occupied);
+        value -= get(duals.baby_infant_upper, key) * infant;
+        value -= get(duals.baby_occupant_upper, key) * occupied;
+    }
+    return value;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

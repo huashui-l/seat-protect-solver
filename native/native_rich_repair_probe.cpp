@@ -31,6 +31,56 @@ int main(int argc, char** argv) {
                 }
                 if (!first) std::cout << ',';
                 first = false;
+                if (const auto* mode = request.find("pricing_costs"); mode && mode->bool_or()) {
+                    full_cpp::RichPricingDuals duals;
+                    const auto& input = request.at("duals");
+                    for (const auto& e : input.at("group").array) duals.group[static_cast<int>(e.array[0].number)] = e.array[1].number;
+                    for (const auto& e : input.at("seat").array) duals.seat[problem.seat_index.at(e.array[0].string)] = e.array[1].number;
+                    for (const auto& e : input.at("ssr_all").array)
+                        duals.ssr_all[{{static_cast<int>(e.array[0].number), static_cast<int>(e.array[1].number)}, e.array[2].string}] = e.array[3].number;
+                    for (const auto& e : input.at("ssr_flag").array)
+                        duals.ssr_flag.emplace_back(static_cast<int>(e.array[0].number), full_cpp::RichSsrResource{
+                            {static_cast<int>(e.array[1].number), static_cast<int>(e.array[2].number)}, e.array[3].string}, e.array[4].number);
+                    for (const auto& e : input.at("baby").array) {
+                        const auto pair = std::make_pair(problem.seat_index.at(e.array[0].string), problem.seat_index.at(e.array[1].string));
+                        duals.baby_lower[pair] = e.array[2].number; duals.baby_infant_upper[pair] = e.array[3].number;
+                        duals.baby_occupant_upper[pair] = e.array[4].number;
+                    }
+                    const auto baby = full_cpp::build_rich_baby_costs(problem);
+                    const auto workspace = full_cpp::build_rich_pricing_workspace(problem, g, cache);
+                    const bool phase_one = request.at("phase_one").bool_or();
+                    const auto costs = full_cpp::build_rich_pricing_costs(problem.groups[g].id, cache, workspace, duals, baby, phase_one);
+                    std::cout << "{\"baby_pairs\":[";
+                    for (size_t i = 0; i < baby.size(); ++i) {
+                        if (i) std::cout << ',';
+                        std::cout << "[\"" << problem.seats[baby[i].infant].id << "\",\"" << problem.seats[baby[i].occupant].id << "\"," << baby[i].cost << ']';
+                    }
+                    std::cout << "],\"base\":[";
+                    for (size_t p = 0; p < costs.base.size(); ++p) {
+                        if (p) std::cout << ','; std::cout << '[';
+                        for (size_t i = 0; i < costs.base[p].size(); ++i) { if (i) std::cout << ','; std::cout << costs.base[p][i]; }
+                        std::cout << ']';
+                    }
+                    std::cout << "],\"flags\":[";
+                    for (size_t i = 0; i < costs.flags.size(); ++i) { if (i) std::cout << ','; std::cout << costs.flags[i]; }
+                    std::cout << "],\"baby_relaxation\":" << costs.baby_relaxation << ",\"upper_bounds\":[";
+                    for (int count = 0; count <= static_cast<int>(cache.all_options.size()) + 1; ++count) {
+                        if (count) std::cout << ',';
+                        std::cout << full_cpp::rich_same_group_baby_upper_bound(cache, baby, count);
+                    }
+                    std::cout << "],\"column_rc\":[";
+                    bool first_pattern = true;
+                    for (const auto& selection : request.at("patterns").array) {
+                        if (!first_pattern) std::cout << ',';
+                        first_pattern = false;
+                        std::vector<full_cpp::RichPlacement> placements;
+                        for (size_t p = 0; p < selection.array.size(); ++p) placements.push_back(cache.all_options[p].at(static_cast<size_t>(selection.array[p].number)));
+                        const auto pattern = full_cpp::build_rich_exact_pattern(problem, g, placements, {});
+                        std::cout << full_cpp::rich_pattern_reduced_cost(pattern, duals, baby, phase_one);
+                    }
+                    std::cout << "]}";
+                    continue;
+                }
                 if (const auto* mode = request.find("symmetry"); mode && mode->bool_or()) {
                     if (const auto* keep = request.find("keep_options")) for (size_t p = 0; p < cache.all_options.size(); ++p) {
                         const auto original = cache.all_options[p]; cache.all_options[p].clear();

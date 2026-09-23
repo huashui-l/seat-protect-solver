@@ -73,6 +73,105 @@ class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
 
+    def test_pricing_dynamic_costs_and_baby_relaxation_match_python(self):
+        mixed = self.synthetic([(101, {"ssr": "BSCT"}), (101, {"ssr": "BSCT"}), (101, {}),
+                                (101, {"ssr": "BLND", "mandatoryRule": {"sameRowNoOtherSSR": "Y",
+                                                                          "sameSubRowNoOtherSSR": "Y"}})])
+        mixed["id"] = "pricing_multiple_infants_flags"
+        rng = random.Random(853)
+        coverage = set()
+        for case in [*self.cases[:11], mixed]:
+            for variant in range(4):
+                with self.subTest(case=case["id"], variant=variant):
+                    config = copy.deepcopy(self.config)
+                    if variant == 2: config["weights"]["w_b"] = 0.7
+                    if variant == 3: config["weights"]["w_b"] = 0.0
+                    config["input_contract"] = {"seatmaps_by_direction": {
+                        "public-test": {"old": "old.json", "new": "new.json"}}}
+                    new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                    old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                    fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                    baby = exact._baby_pairs(new, case["groupsData"], config["weights"], config)
+                    phase_one = variant == 1
+                    requests, expected = [], []
+                    def location(row, subrow): return ("row", row) if subrow < 0 else ("subrow", (row, subrow))
+                    for g, group in enumerate(case["groupsData"]):
+                        cache = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                        duals = exact.MasterDuals()
+                        payload = dict(group=[[group["groupId"], 17.125]], seat=[], ssr_all=[], ssr_flag=[], baby=[])
+                        duals.group[group["groupId"]] = 17.125
+                        for i, s in enumerate(new.seat_map):
+                            if i % 3 == 0: continue
+                            value = rng.randrange(-20, 21) / 3
+                            payload["seat"].append([s, value]); duals.seat[s] = value
+                        locations = [(row, -1) for row in new.row_seats]
+                        locations += sorted(set((row, subrow) for row, subrow in new.subrow.values()))
+                        for row, subrow in locations:
+                            for ssr in config["ssr_rules"]:
+                                all_value = rng.randrange(-20, 21) / 3
+                                flag_value = rng.randrange(-20, 21) / 3
+                                resource = (*location(row, subrow), ssr)
+                                payload["ssr_all"].append([row, subrow, ssr, all_value]); duals.ssr_all[resource] = all_value
+                                payload["ssr_flag"].append([group["groupId"], row, subrow, ssr, flag_value])
+                        rng.shuffle(payload["ssr_flag"])
+                        payload["ssr_flag"].append([-999, locations[0][0], -1, "BLND", 1024.0])
+                        for gid, row, subrow, ssr, value in payload["ssr_flag"]:
+                            duals.ssr_flag[gid, *location(row, subrow), ssr] = value
+                        for i, (u, v) in enumerate(baby):
+                            if i % 3 == 0: continue
+                            lower, infant, occupant = [rng.randrange(-9, 10) / 7 for _ in range(3)]
+                            payload["baby"].append([u, v, lower, infant, occupant])
+                            duals.baby_lower[u, v] = lower; duals.baby_infant_upper[u, v] = infant
+                            duals.baby_occupant_upper[u, v] = occupant
+                        infant_dual, occupant_dual = exact._aggregate_baby_duals(baby, duals)
+                        flagged = exact._aggregate_flagged_location_duals(duals)
+                        flags = sorted({l for o in cache.universe for l in o.ssr_flag_locations}, key=str)
+                        patterns = [[rng.randrange(len(row)) for row in cache.all_options] for _ in range(4)]
+                        column_rc = []
+                        for selection in patterns:
+                            pattern = exact._pattern_from_placements(group, [row[i] for row, i in zip(cache.all_options, selection)],
+                                                                     new, config["weights"], config, baby)
+                            column_rc.append(exact._master_column_reduced_cost(pattern, duals, baby, phase_one=phase_one))
+                        upper = exact._same_group_baby_cost_upper_bound(cache, baby, len(group["psrs"]))
+                        result = dict(baby_pairs=[[u, v, c] for (u, v), c in baby.items()],
+                                      base=[[exact._placement_base_reduced_cost(o, duals, infant_dual, occupant_dual, phase_one=phase_one)
+                                             for o in row] for row in cache.all_options],
+                                      flags=[-flagged.get((group["groupId"], *l), 0.0) for l in flags],
+                                      baby_relaxation=-upper if not phase_one and baby else 0.0,
+                                      upper_bounds=[exact._same_group_baby_cost_upper_bound(cache, baby, n)
+                                                    for n in range(len(group["psrs"]) + 2)], column_rc=column_rc)
+                        requests.append(dict(group_index=g, pricing_costs=True, phase_one=phase_one, duals=payload, patterns=patterns))
+                        expected.append(result)
+                        if upper > 0: coverage.add("positive_upper")
+                        if any(c < 0 for c in baby.values()): coverage.add("negative_pairs")
+                        if any(o.ssr_flag_locations for o in cache.universe): coverage.add("flagged")
+                        if any(o.blocked for o in cache.universe): coverage.add("protected")
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                            "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                            "replay.json": {"pricing_cache": requests},
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    self.assertEqual(len(actual), len(expected))
+                    for native, python in zip(actual, expected):
+                        with self.subTest(group=len(python["base"])):
+                            self.assertEqual(native["baby_pairs"], python["baby_pairs"])
+                            for name in ("flags", "upper_bounds", "column_rc"):
+                                self.assertEqual(len(native[name]), len(python[name]))
+                                for a, b in zip(native[name], python[name]): self.assertAlmostEqual(a, b, places=8)
+                            self.assertAlmostEqual(native["baby_relaxation"], python["baby_relaxation"], places=12)
+                            self.assertEqual(len(native["base"]), len(python["base"]))
+                            for a, b in zip(native["base"], python["base"]):
+                                self.assertEqual(len(a), len(b))
+                                for x, y in zip(a, b): self.assertAlmostEqual(x, y, places=9)
+        self.assertEqual(coverage, {"positive_upper", "negative_pairs", "flagged", "protected"})
+
     def test_pricing_symmetry_matches_frozen_dfs(self):
         tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
