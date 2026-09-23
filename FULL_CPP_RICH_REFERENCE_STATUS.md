@@ -754,6 +754,36 @@ coverage assertion, passed 125 tests and 14,871 subtests, with 9 skips. This inc
 the 12,000-operation state differential and external raw-CLI legality/scoring
 checks. `git diff --check` passed. No Formal24 or profiling run was performed.
 
+Pricing symmetry now has native raw-passenger prefiltering, physical placement
+descriptors, class/rank construction and partial-selection rejection. The parser
+retains each numeric token alongside its existing double value so raw identity
+does not collapse integers into floats or lose integer distinctions beyond 2^53.
+Passenger fingerprints exclude only `hostnum`, retain unknown/nested fields,
+distinguish boolean/integer/float and floating signed zero, and ignore object key
+insertion order. These equality keys need not reproduce Python's JSON text.
+
+Only passengers in nonsingleton raw buckets enter physical classification. As in
+Python, eligible passengers from different raw buckets can then merge if their
+full physical-domain descriptors and caregiver roles match. Physical keys retain
+seat/block/resource ordering, SSR coefficients/flags, infant role and Python's
+12-decimal cost rounding. Ranks and pruning preserve passenger-index ordering;
+disabled symmetry yields no classes or pruning.
+
+The oracle executes the frozen symmetry AST, including `symmetry_ok`. Eleven
+public fixtures plus identical, singleton-type, nested-metadata and protected/SSR
+fixtures compare raw equivalence, every class, every option rank and seeded partial
+selection decisions. Domain clipping/reordering and exact halfway rounding with
+adjacent floating values are covered. The structured suite passed 11 tests and
+1,338 subtests. DFS traversal, dynamic reduced costs/infant relaxation, negative
+column retention, workspace reuse, termination and structured production entry
+remain required; this is not completed rebuilt search or M3.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 126 tests and 15,094 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for this symmetry checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

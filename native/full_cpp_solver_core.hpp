@@ -38,6 +38,7 @@ struct Passenger {
     int group = -1;
     int group_id = -1;
     int hostnum = -1;
+    std::string rich_symmetry_fingerprint;
     std::string cabin;
     std::string ssr;
     std::string old_seat;
@@ -316,6 +317,15 @@ bool rich_pricing_caregiver_possible(const Problem& problem, const RichPricingCa
 // Empty mask denotes an unassigned cared passenger; a zero-filled mask denotes satisfied care.
 std::vector<RichPricingMask> rich_pricing_caregiver_state(const Problem& problem, const RichPricingCache& cache,
     const RichPricingWorkspace& workspace, const std::vector<int>& selected);
+
+struct RichPricingSymmetry {
+    std::vector<std::vector<int>> classes, ranks;
+    int class_count = 0;
+};
+RichPricingSymmetry build_rich_pricing_symmetry(const Problem& problem, int group_index,
+    const RichPricingCache& domains, bool enabled = true);
+bool rich_pricing_symmetry_ok(const RichPricingSymmetry& symmetry, const std::vector<int>& selected,
+    int passenger_index, int option_index);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

@@ -31,6 +31,44 @@ int main(int argc, char** argv) {
                 }
                 if (!first) std::cout << ',';
                 first = false;
+                if (const auto* mode = request.find("symmetry"); mode && mode->bool_or()) {
+                    if (const auto* keep = request.find("keep_options")) for (size_t p = 0; p < cache.all_options.size(); ++p) {
+                        const auto original = cache.all_options[p]; cache.all_options[p].clear();
+                        for (const auto& i : keep->array[p].array) cache.all_options[p].push_back(original.at(static_cast<size_t>(i.number)));
+                    }
+                    if (const auto* costs = request.find("option_costs")) for (size_t p = 0; p < cache.all_options.size(); ++p)
+                        for (size_t i = 0; i < cache.all_options[p].size(); ++i) cache.all_options[p][i].individual_cost = costs->array[p].array[i].number;
+                    const auto symmetry = full_cpp::build_rich_pricing_symmetry(problem, g, cache, request.at("enabled").bool_or());
+                    const auto emit_ints = [&](const std::vector<int>& values) {
+                        std::cout << '[';
+                        for (size_t i = 0; i < values.size(); ++i) { if (i) std::cout << ','; std::cout << values[i]; }
+                        std::cout << ']';
+                    };
+                    std::vector<int> raw_classes;
+                    const auto& passengers = problem.groups[g].passengers;
+                    for (size_t p = 0; p < passengers.size(); ++p) {
+                        size_t first_equal = 0;
+                        while (problem.passengers[passengers[first_equal]].rich_symmetry_fingerprint != problem.passengers[passengers[p]].rich_symmetry_fingerprint) ++first_equal;
+                        raw_classes.push_back(static_cast<int>(first_equal));
+                    }
+                    std::cout << "{\"raw_classes\":"; emit_ints(raw_classes);
+                    std::cout << ",\"class_count\":" << symmetry.class_count << ",\"classes\":[";
+                    for (size_t p = 0; p < symmetry.classes.size(); ++p) { if (p) std::cout << ','; emit_ints(symmetry.classes[p]); }
+                    std::cout << "],\"ranks\":[";
+                    for (size_t p = 0; p < symmetry.ranks.size(); ++p) { if (p) std::cout << ','; emit_ints(symmetry.ranks[p]); }
+                    std::cout << "],\"allowed\":[";
+                    bool first_query = true;
+                    for (const auto& query : request.at("queries").array) {
+                        if (!first_query) std::cout << ',';
+                        first_query = false;
+                        std::vector<int> selected;
+                        for (const auto& i : query.at("selected").array) selected.push_back(static_cast<int>(i.number));
+                        std::cout << (full_cpp::rich_pricing_symmetry_ok(symmetry, selected,
+                            static_cast<int>(query.at("passenger").number), static_cast<int>(query.at("option").number)) ? "true" : "false");
+                    }
+                    std::cout << "]}";
+                    continue;
+                }
                 if (const auto* mode = request.find("workspace"); mode && mode->bool_or()) {
                     const auto workspace = full_cpp::build_rich_pricing_workspace(problem, g, cache);
                     std::cout << "{\"flag_locations\":[";

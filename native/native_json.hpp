@@ -17,6 +17,7 @@ struct Value {
     Type type = Type::Null;
     bool boolean = false;
     double number = 0.0;
+    std::string number_token;  // Preserve integer/float identity for raw Rich symmetry fingerprints.
     std::string string;
     std::vector<Value> array;
     std::map<std::string, Value> object;
@@ -175,6 +176,7 @@ private:
         if (end == begin || errno == ERANGE) fail("invalid number");
         position_ += static_cast<size_t>(end - begin);
         Value value; value.type = Value::Type::Number; value.number = number;
+        value.number_token.assign(begin, static_cast<size_t>(end - begin));
         return value;
     }
     Value parse_array() {

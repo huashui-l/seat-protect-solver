@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import random
+from dataclasses import replace
 import subprocess
 import tempfile
 import types
@@ -71,6 +72,94 @@ def python_rigid_relaxed(case, config, assignments, value_blocks=False, expired=
 class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_pricing_symmetry_matches_frozen_dfs(self):
+        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
+        start = next(i for i, n in enumerate(function.body) if isinstance(n, ast.FunctionDef) and n.name == "physical_option_key")
+        stop = next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)
+                    and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "symmetry_class_count")
+        code = compile(ast.Module(body=function.body[start:stop + 1], type_ignores=[]), "frozen_dfs_symmetry", "exec")
+        identical = self.synthetic([(101, {})] * 4)
+        identical["id"] = "symmetry_identical"
+        metadata = self.synthetic([(101, {"audit_extra": value}) for value in
+                                  (1, 1.0, True, -0.0, 0.0, 9007199254740992, 9007199254740993,
+                                   {"中文": [None, 1, "x:y"], "b": 2}, {"b": 2, "中文": [None, 1, "x:y"]})
+                                  for _ in range(2)])
+        metadata["id"] = "symmetry_raw_numeric_and_nested_metadata"
+        singletons = self.synthetic([(101, {"audit_extra": 1}), (101, {"audit_extra": 1.0})])
+        singletons["id"] = "symmetry_raw_singletons"
+        protected = self.synthetic([(101, {"mandatoryRule": {"needSingleSideEmpty": "Y"}})] * 2
+                                   + [(101, {"ssr": "BLND", "mandatoryRule": {"sameRowNoOtherSSR": "Y"}})] * 2
+                                   + [(101, {})] * 2)
+        protected["id"] = "symmetry_protection_flags_and_care"
+        coverage = set()
+        rng = random.Random(842)
+        for case in [*self.cases[:11], identical, metadata, singletons, protected]:
+            with self.subTest(case=case["id"]):
+                config = copy.deepcopy(self.config)
+                config["input_contract"] = {"seatmaps_by_direction": {
+                    "public-test": {"old": "old.json", "new": "new.json"}}}
+                new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                requests, expected = [], []
+                for g, group in enumerate(case["groupsData"]):
+                    cache = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                    raw_keys = [json.dumps({k: v for k, v in p.items() if k != "hostnum"}, ensure_ascii=False,
+                                           sort_keys=True, separators=(",", ":")) for p in group["psrs"]]
+                    raw_classes = [raw_keys.index(k) for k in raw_keys]
+                    for variant in range(4):
+                        options = copy.deepcopy(cache.all_options)
+                        request = dict(group_index=g, symmetry=True, enabled=variant != 1, queries=[])
+                        if variant == 2:
+                            keep = [list(range(len(row)))[::2] if p % 2 else list(reversed(range(len(row))))
+                                    for p, row in enumerate(options)]
+                            options = [[row[i] for i in indexes] for row, indexes in zip(options, keep)]
+                            request["keep_options"] = keep
+                        if variant == 3:
+                            costs = [[math.nextafter((1 if i % 2 else 3) * 2 ** -13, math.inf) if p % 2
+                                      else (1 if i % 2 else 3) * 2 ** -13 for i in range(len(row))]
+                                     for p, row in enumerate(options)]
+                            options = [[replace(o, individual_cost=c) for o, c in zip(row, values)]
+                                       for row, values in zip(options, costs)]
+                            request["option_costs"] = costs
+                        namespace = dict(exact.__dict__, passengers=group["psrs"], domains=dict(enumerate(options)),
+                                         pricing_cfg={"dfs_symmetry_breaking_enabled": request["enabled"]}, config=config)
+                        exec(code, namespace)
+                        classes = [list(namespace["symmetry_class"].get(p, ())) for p in range(len(options))]
+                        ranks = [[namespace["symmetry_rank"][o.signature] for o in row] if classes[p] else []
+                                 for p, row in enumerate(options)]
+                        result = dict(raw_classes=raw_classes, classes=classes, ranks=ranks,
+                                      class_count=namespace["symmetry_class_count"], allowed=[])
+                        if result["class_count"]: coverage.add("classes")
+                        if any(len({raw_classes[p] for p in members}) > 1 for members in classes): coverage.add("merged_raw_buckets")
+                        for _ in range(24):
+                            selected = [rng.randrange(-1, len(row)) for row in options]
+                            passenger = rng.randrange(len(options))
+                            option = rng.randrange(len(options[passenger]))
+                            namespace["selected"] = [row[i] if i >= 0 else None for row, i in zip(options, selected)]
+                            allowed = namespace["symmetry_ok"](passenger, options[passenger][option])
+                            request["queries"].append(dict(selected=selected, passenger=passenger, option=option))
+                            result["allowed"].append(allowed)
+                            if not allowed: coverage.add("pruned")
+                        requests.append(request); expected.append(result)
+                with tempfile.TemporaryDirectory() as directory:
+                    work = Path(directory)
+                    for name, value in {
+                        "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                        "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                        "replay.json": {"pricing_cache": requests},
+                    }.items():
+                        (work / name).write_text(json.dumps(value), encoding="utf-8")
+                    run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                          str(work / "replay.json")], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                actual = json.loads(run.stdout)
+                self.assertEqual(len(actual), len(expected))
+                for i, (native, python) in enumerate(zip(actual, expected)):
+                    with self.subTest(group=requests[i]["group_index"], variant=i % 4): self.assertEqual(native, python)
+        self.assertEqual(coverage, {"classes", "merged_raw_buckets", "pruned"})
 
     def test_pricing_resource_flag_and_caregiver_workspace_match_python(self):
         tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))

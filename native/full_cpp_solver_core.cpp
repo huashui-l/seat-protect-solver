@@ -10,11 +10,42 @@
 #include <iomanip>
 #include <tuple>
 #include <stdexcept>
+#include <charconv>
+#include <cstring>
 
 namespace full_cpp {
 namespace {
 
 using native_json::Value;
+
+// Equality key for Python json.dumps(sort_keys=True), without needing its textual float format.
+// Integer literals stay exact; float literals compare as parsed doubles, including signed zero.
+std::string rich_raw_fingerprint(const Value& value) {
+    const auto frame = [](const std::string& text) { return std::to_string(text.size()) + ":" + text; };
+    switch (value.type) {
+    case Value::Type::Null: return "n";
+    case Value::Type::Boolean: return value.boolean ? "t" : "f";
+    case Value::Type::String: return "s" + frame(value.string);
+    case Value::Type::Number: {
+        if (value.number_token.find_first_of(".eE") == std::string::npos)
+            return "i" + frame(value.number_token == "-0" ? "0" : value.number_token);
+        std::uint64_t bits;
+        std::memcpy(&bits, &value.number, sizeof(bits));
+        return "d" + frame(std::to_string(bits));
+    }
+    case Value::Type::Array: {
+        std::string result = "a";
+        for (const auto& item : value.array) result += frame(rich_raw_fingerprint(item));
+        return result;
+    }
+    case Value::Type::Object: {
+        std::string result = "o";
+        for (const auto& item : value.object) result += frame(item.first) + frame(rich_raw_fingerprint(item.second));
+        return result;
+    }
+    }
+    throw std::runtime_error("unknown JSON value type");
+}
 
 const Value& required(const Value& value, const std::string& key) {
     return value.at(key);
@@ -280,6 +311,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         const Value& passengers = required(raw_group, "psrs");
         for (const Value& raw : passengers.array) {
             Passenger passenger;
+            auto symmetry_raw = raw;
+            symmetry_raw.object.erase("hostnum");
+            passenger.rich_symmetry_fingerprint = rich_raw_fingerprint(symmetry_raw);
             passenger.group = static_cast<int>(problem.groups.size());
             passenger.group_id = group.id;
             passenger.hostnum = static_cast<int>(std::llround(required(raw, "hostnum").number_or()));
@@ -1381,6 +1415,71 @@ std::vector<RichPricingMask> rich_pricing_caregiver_state(const Problem& problem
         state.push_back(std::move(mask));
     }
     return state;
+}
+
+RichPricingSymmetry build_rich_pricing_symmetry(const Problem& problem, int group_index,
+    const RichPricingCache& domains, bool enabled
+) {
+    RichPricingSymmetry result;
+    const auto& group = problem.groups[group_index];
+    result.classes.resize(group.passengers.size()); result.ranks.resize(group.passengers.size());
+    if (!enabled) return result;
+    using Location = std::tuple<bool, int, int>;
+    using Resource = std::tuple<bool, int, int, std::string>;
+    using Physical = std::tuple<std::string, std::vector<std::string>, std::vector<std::string>, double,
+        std::vector<Resource>, std::vector<Location>, bool>;
+    using Descriptor = std::tuple<std::vector<Physical>, int, bool>;
+    const auto physical = [&](const RichPlacement& option) {
+        std::vector<std::string> blocked, resources;
+        for (int seat : option.blocked) blocked.push_back(problem.seats[seat].id);
+        for (int seat : option.resources) resources.push_back(problem.seats[seat].id);
+        std::vector<Resource> ssr;
+        for (const auto& r : option.ssr_resources) ssr.emplace_back(r.location.subrow >= 0, r.location.row, r.location.subrow, r.ssr);
+        std::vector<Location> flags;
+        for (const auto& l : option.ssr_flag_locations) flags.emplace_back(l.subrow >= 0, l.row, l.subrow);
+        char decimal[512];
+        const auto converted = std::to_chars(decimal, decimal + sizeof(decimal), option.individual_cost, std::chars_format::fixed, 12);
+        if (converted.ec != std::errc{}) throw std::runtime_error("pricing symmetry cost rounding failed");
+        const double rounded = std::stod(std::string(decimal, converted.ptr));
+        return Physical{problem.seats[option.seat].id, blocked, resources, rounded, ssr, flags, option.is_infant};
+    };
+    std::map<std::string, std::vector<int>> raw_buckets;
+    for (size_t p = 0; p < group.passengers.size(); ++p)
+        raw_buckets[problem.passengers[group.passengers[p]].rich_symmetry_fingerprint].push_back(static_cast<int>(p));
+    std::map<Descriptor, std::vector<int>> buckets;
+    std::vector<std::vector<Physical>> keys(group.passengers.size());
+    for (const auto& bucket : raw_buckets) if (bucket.second.size() >= 2) for (int p : bucket.second) {
+        for (const auto& option : domains.all_options[p]) keys[p].push_back(physical(option));
+        auto sorted = keys[p]; std::sort(sorted.begin(), sorted.end());
+        const auto& passenger = problem.passengers[group.passengers[p]];
+        const auto rule = ssr_rule(problem, passenger);
+        const int care = !passenger.need_cared && !rule.requires_caregiver ? -1
+            : passenger.need_cared && passenger.ssr.empty() ? 0 : static_cast<int>(rule.caregiver_allow_cross_aisle);
+        buckets[{sorted, care, is_adult_caregiver(passenger)}].push_back(p);
+    }
+    for (auto& bucket : buckets) if (bucket.second.size() > 1) {
+        auto& members = bucket.second; std::sort(members.begin(), members.end());
+        ++result.class_count;
+        auto ordered = keys[members.front()]; std::sort(ordered.begin(), ordered.end());
+        ordered.erase(std::unique(ordered.begin(), ordered.end()), ordered.end());
+        for (int p : members) {
+            result.classes[p] = members;
+            for (const auto& key : keys[p]) result.ranks[p].push_back(static_cast<int>(std::lower_bound(ordered.begin(), ordered.end(), key) - ordered.begin()));
+        }
+    }
+    return result;
+}
+
+bool rich_pricing_symmetry_ok(const RichPricingSymmetry& symmetry, const std::vector<int>& selected,
+    int passenger_index, int option_index
+) {
+    if (symmetry.classes[passenger_index].empty()) return true;
+    const int rank = symmetry.ranks[passenger_index][option_index];
+    for (int other : symmetry.classes[passenger_index]) if (selected[other] >= 0) {
+        const int other_rank = symmetry.ranks[other][selected[other]];
+        if ((other < passenger_index && other_rank > rank) || (other > passenger_index && other_rank < rank)) return false;
+    }
+    return true;
 }
 
 RichStageBudgets calculate_rich_stage_budgets(
