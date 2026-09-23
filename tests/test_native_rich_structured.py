@@ -73,6 +73,130 @@ class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
 
+    def test_complete_pricing_dfs_matches_frozen_search(self):
+        ordinary = self.synthetic([(101, {})] * 3)
+        ordinary["id"] = "dfs_identical_ordinary"
+        protected = self.synthetic([(101, {"mandatoryRule": {"needSingleSideEmpty": "Y"}}), (101, {})])
+        protected["id"] = "dfs_protected"
+        care = self.synthetic([(101, {"ssr": "BLND", "mandatoryRule": {"sameRowNoOtherSSR": "Y"}}),
+                               (101, {"ssr": "BSCT"}), (101, {})])
+        care["id"] = "dfs_care_infant_flags"
+        rng = random.Random(864)
+        coverage = set()
+        for case in [self.cases[i] for i in (0, 5, 7, 8)] + [ordinary, protected, care]:
+            for dual_variant in range(3):
+                with self.subTest(case=case["id"], dual_variant=dual_variant):
+                    config = copy.deepcopy(self.config)
+                    config["input_contract"] = {"seatmaps_by_direction": {
+                        "public-test": {"old": "old.json", "new": "new.json"}}}
+                    new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                    old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                    fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                    baby = exact._baby_pairs(new, case["groupsData"], config["weights"], config)
+                    requests, expected = [], []
+                    for g, group in enumerate(case["groupsData"]):
+                        if len(group["psrs"]) > 4: continue
+                        cache = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                        duals = exact.MasterDuals(group={group["groupId"]: 1.0e12 if dual_variant == 0 else 0.0})
+                        if dual_variant:
+                            duals.seat = {s: rng.randrange(-12, 13) / 4 for s in new.seat_map}
+                        payload = dict(group=list(duals.group.items()), seat=list(duals.seat.items()), ssr_all=[], ssr_flag=[], baby=[])
+                        if dual_variant == 2:
+                            duals.group[group["groupId"]] = 1000.0
+                            payload["group"] = list(duals.group.items())
+                            locations = [(row, -1) for row in new.row_seats] + sorted(set(new.subrow.values()))
+                            for row, subrow in locations:
+                                location = ("row", row) if subrow < 0 else ("subrow", (row, subrow))
+                                for ssr in config["ssr_rules"]:
+                                    all_value, flagged = rng.randrange(-8, 9) / 8, rng.randrange(-8, 9) / 8
+                                    duals.ssr_all[*location, ssr] = all_value
+                                    duals.ssr_flag[group["groupId"], *location, ssr] = flagged
+                                    payload["ssr_all"].append([row, subrow, ssr, all_value])
+                                    payload["ssr_flag"].append([group["groupId"], row, subrow, ssr, flagged])
+                            for u, v in baby:
+                                lower, infant, occupant = [rng.randrange(-4, 5) / 8 for _ in range(3)]
+                                duals.baby_lower[u, v] = lower; duals.baby_infant_upper[u, v] = infant
+                                duals.baby_occupant_upper[u, v] = occupant
+                                payload["baby"].append([u, v, lower, infant, occupant])
+                        base = dict(dfs_exact_time_limit=120.0, dfs_discovery_time_limit=120.0,
+                                    dfs_large_group_exact_time_limit=120.0, dfs_node_limit=5000,
+                                    dfs_large_group_node_limit=10, dfs_large_group_min_size=2,
+                                    pricing_columns_per_group=3, tolerance=1e-7)
+                        def call(**changes):
+                            item = dict(pricing_config=copy.deepcopy(base), exact=False, phase_one=False,
+                                        stop_on_negative=False, deadline_seconds=120.0)
+                            item.update(changes)
+                            return item
+                        calls = [call(history=[], pricing_config={**base, "benchmark_legacy_pricing": True, "dfs_node_limit": 30}),
+                                 call(history=[], pricing_config={**base, "benchmark_legacy_pricing": True, "dfs_node_limit": 30}),
+                                 call(history=[], pricing_config={**base, "dfs_node_limit": 0}),
+                                 call(history=[]), call(),
+                                 call(stop_on_negative=True, pricing_config={**base, "dfs_negative_refinement_time": 0.0}),
+                                 call(history=[], phase_one=True),
+                                 call(history=[], exact=True, pricing_config={**base, "dfs_node_limit": 1}),
+                                 call(history=[], deadline_seconds=-1.0),
+                                 call(history=[], forbidden=[o.signature for o in cache.all_options[0]]),
+                                 call(history=[], forced=[o.signature for o in cache.all_options[0][:2]]),
+                                 call(history=[], forced=[cache.all_options[0][0].signature], forbidden=[cache.all_options[0][0].signature]),
+                                 call(history=[], forced=[cache.all_options[0][0].signature]),
+                                 call(history=[row[0].signature for row in cache.all_options]),
+                                 call(history=[], pricing_config={**base, "dfs_symmetry_breaking_enabled": False})]
+                        request = dict(group_index=g, pricing_costs=True, duals=payload, dfs_calls=calls)
+                        results = []
+                        def finite(x): return x if x is not None and math.isfinite(x) else None
+                        for index, item in enumerate(calls):
+                            if "history" in item: cache.historical_mip_start = tuple(item["history"])
+                            pricing_config = {**config, "column_generation": item["pricing_config"]}
+                            result = exact._price_group_exact_dfs(group, new, config["weights"], pricing_config,
+                                duals, baby, set(item.get("forced", [])), set(item.get("forbidden", [])),
+                                rich.time.perf_counter() + item["deadline_seconds"], cache,
+                                exact=item["exact"], phase_one=item["phase_one"], stop_on_negative=item["stop_on_negative"])
+                            results.append(dict(reduced_cost=finite(result.reduced_cost), lower_bound=finite(result.reduced_cost_lower_bound),
+                                proven_optimal=result.proven_optimal, incumbent_seeded=result.dfs_incumbent_seeded,
+                                nodes=result.nodes, priced_placements=result.priced_placements,
+                                bound_prunes=result.dfs_bound_prunes, resource_prunes=result.dfs_resource_prunes,
+                                symmetry_prunes=result.dfs_symmetry_prunes, symmetry_classes=result.dfs_symmetry_classes,
+                                negative_patterns_seen=result.dfs_negative_patterns_seen, unique_negative_patterns=result.dfs_unique_negative_patterns,
+                                workspace_builds=result.dfs_workspace_builds, workspace_reuses=result.dfs_workspace_reuses,
+                                termination=result.termination, history=cache.historical_mip_start or (),
+                                patterns=[dict(signature=p.signature, master_cost=p.master_cost,
+                                               rc=exact._master_column_reduced_cost(p, duals, baby, phase_one=item["phase_one"])) for p in result.patterns]))
+                            coverage.add(result.termination)
+                            if result.dfs_incumbent_seeded: coverage.add("seeded")
+                            if result.dfs_symmetry_prunes: coverage.add("symmetry")
+                            if result.proven_optimal and result.patterns: coverage.add("complete_patterns")
+                            if result.dfs_unique_negative_patterns > len(result.patterns): coverage.add("pool_eviction")
+                        requests.append(request); expected.append(results)
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                            "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                            "replay.json": {"pricing_cache": requests},
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout); expected = json.loads(json.dumps(expected))
+                    self.assertEqual(len(actual), len(expected))
+                    for native_calls, python_calls in zip(actual, expected):
+                        self.assertEqual(len(native_calls), len(python_calls))
+                        for index, (native, python) in enumerate(zip(native_calls, python_calls)):
+                            with self.subTest(call=index):
+                                for name in ("reduced_cost", "lower_bound"):
+                                    a, b = native.pop(name), python.pop(name)
+                                    if a is None or b is None: self.assertEqual(a, b)
+                                    else: self.assertAlmostEqual(a, b, delta=max(1e-8, 8 * math.ulp(b)))
+                                self.assertEqual(len(native["patterns"]), len(python["patterns"]))
+                                for a, b in zip(native["patterns"], python["patterns"]):
+                                    self.assertAlmostEqual(a.pop("master_cost"), b.pop("master_cost"), places=8)
+                                    x, y = a.pop("rc"), b.pop("rc")
+                                    self.assertAlmostEqual(x, y, delta=max(1e-8, 8 * math.ulp(y)))
+                                self.assertEqual(native, python)
+        self.assertTrue({"dfs_negative", "dfs_optimal", "dfs_node_limit", "dfs_time_limit", "infeasible_branch",
+                         "seeded", "symmetry", "complete_patterns", "pool_eviction"}.issubset(coverage), coverage)
+
     def test_pricing_dynamic_costs_and_baby_relaxation_match_python(self):
         mixed = self.synthetic([(101, {"ssr": "BSCT"}), (101, {"ssr": "BSCT"}), (101, {}),
                                 (101, {"ssr": "BLND", "mandatoryRule": {"sameRowNoOtherSSR": "Y",

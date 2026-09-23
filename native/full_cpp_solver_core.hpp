@@ -11,6 +11,8 @@
 #include <tuple>
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <set>
 
 namespace full_cpp {
 
@@ -262,6 +264,8 @@ struct RichHoleSpec {
     std::vector<int> left, right;
 };
 
+using RichPlacementSignature = std::tuple<int, int, std::vector<int>>;
+struct RichPricingWorkspace;
 struct RichPricingCache {
     std::vector<std::vector<RichPlacement>> all_options;
     std::vector<int> seat_ids;
@@ -269,6 +273,8 @@ struct RichPricingCache {
     double row_big_m = 0.0, x_big_m = 0.0;
     std::vector<std::pair<int, int>> adjacency_edges;
     std::vector<RichHoleSpec> hole_specs;
+    std::vector<RichPlacementSignature> historical_start;
+    std::shared_ptr<RichPricingWorkspace> dfs_workspace;
 };
 
 RichPricingCache build_rich_pricing_cache(const Problem& problem, int group_index, const FixedSeatContext& fixed);
@@ -348,6 +354,24 @@ RichPricingCosts build_rich_pricing_costs(int group_id, const RichPricingCache& 
     const std::vector<RichBabyCost>& baby_cost, bool phase_one);
 double rich_pattern_reduced_cost(const RichExactPattern& pattern, const RichPricingDuals& duals,
     const std::vector<RichBabyCost>& baby_cost, bool phase_one);
+
+struct RichPricingResult {
+    std::vector<RichExactPattern> patterns;
+    double reduced_cost = std::numeric_limits<double>::infinity();
+    double lower_bound = std::numeric_limits<double>::quiet_NaN();
+    bool proven_optimal = true, incumbent_seeded = false;
+    long long nodes = 0, bound_prunes = 0, resource_prunes = 0, symmetry_prunes = 0;
+    long long negative_patterns_seen = 0, unique_negative_patterns = 0;
+    int priced_placements = 0, symmetry_classes = 0, workspace_builds = 0, workspace_reuses = 0;
+    std::string termination;
+    double elapsed = 0.0, workspace_build_seconds = 0.0, dynamic_refresh_seconds = 0.0;
+};
+RichPricingResult price_rich_group_dfs(const Problem& problem, int group_index,
+    const native_json::Value& pricing_config, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, const std::set<RichPlacementSignature>& forced,
+    const std::set<RichPlacementSignature>& forbidden, std::chrono::steady_clock::time_point deadline,
+    RichPricingCache& cache, bool exact, bool phase_one, bool stop_on_negative,
+    const std::vector<std::string>& active_ssr_types = {});
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

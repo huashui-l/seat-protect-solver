@@ -47,6 +47,66 @@ int main(int argc, char** argv) {
                         duals.baby_occupant_upper[pair] = e.array[4].number;
                     }
                     const auto baby = full_cpp::build_rich_baby_costs(problem);
+                    if (const auto* calls = request.find("dfs_calls")) {
+                        const auto read_signatures = [&](const native_json::Value* input) {
+                            std::vector<full_cpp::RichPlacementSignature> signatures;
+                            if (input) for (const auto& e : input->array) {
+                                std::vector<int> blocked;
+                                for (const auto& s : e.array[2].array) blocked.push_back(problem.seat_index.at(s.string));
+                                signatures.emplace_back(static_cast<int>(e.array[0].number), problem.seat_index.at(e.array[1].string), blocked);
+                            }
+                            return signatures;
+                        };
+                        const auto emit_signatures = [&](const std::vector<full_cpp::RichPlacementSignature>& signatures) {
+                            std::cout << '[';
+                            for (size_t i = 0; i < signatures.size(); ++i) {
+                                if (i) std::cout << ',';
+                                const auto& s = signatures[i];
+                                std::cout << '[' << std::get<0>(s) << ",\"" << problem.seats[std::get<1>(s)].id << "\",";
+                                emit_seats(std::get<2>(s)); std::cout << ']';
+                            }
+                            std::cout << ']';
+                        };
+                        const auto emit_number = [&](double value) { if (std::isfinite(value)) std::cout << value; else std::cout << "null"; };
+                        std::cout << '[';
+                        bool first_call = true;
+                        for (const auto& call : calls->array) {
+                            if (!first_call) std::cout << ',';
+                            first_call = false;
+                            if (call.find("history")) cache.historical_start = read_signatures(call.find("history"));
+                            const auto forced = read_signatures(call.find("forced")), forbidden = read_signatures(call.find("forbidden"));
+                            const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                std::chrono::duration<double>(call.at("deadline_seconds").number));
+                            const bool phase_one = call.at("phase_one").bool_or();
+                            const auto result = full_cpp::price_rich_group_dfs(problem, g, call.at("pricing_config"), duals, baby,
+                                {forced.begin(), forced.end()}, {forbidden.begin(), forbidden.end()}, deadline, cache,
+                                call.at("exact").bool_or(), phase_one, call.at("stop_on_negative").bool_or());
+                            std::cout << "{\"reduced_cost\":"; emit_number(result.reduced_cost);
+                            std::cout << ",\"lower_bound\":"; emit_number(result.lower_bound);
+                            std::cout << ",\"proven_optimal\":" << (result.proven_optimal ? "true" : "false")
+                                << ",\"incumbent_seeded\":" << (result.incumbent_seeded ? "true" : "false")
+                                << ",\"nodes\":" << result.nodes << ",\"priced_placements\":" << result.priced_placements
+                                << ",\"bound_prunes\":" << result.bound_prunes << ",\"resource_prunes\":" << result.resource_prunes
+                                << ",\"symmetry_prunes\":" << result.symmetry_prunes << ",\"symmetry_classes\":" << result.symmetry_classes
+                                << ",\"negative_patterns_seen\":" << result.negative_patterns_seen << ",\"unique_negative_patterns\":" << result.unique_negative_patterns
+                                << ",\"workspace_builds\":" << result.workspace_builds << ",\"workspace_reuses\":" << result.workspace_reuses
+                                << ",\"termination\":\"" << result.termination << "\",\"history\":";
+                            emit_signatures(cache.historical_start);
+                            std::cout << ",\"patterns\":[";
+                            for (size_t i = 0; i < result.patterns.size(); ++i) {
+                                if (i) std::cout << ',';
+                                const auto& pattern = result.patterns[i];
+                                std::vector<full_cpp::RichPlacementSignature> signatures;
+                                for (const auto& o : pattern.placements) signatures.emplace_back(o.passenger_index, o.seat, o.blocked);
+                                std::cout << "{\"signature\":"; emit_signatures(signatures);
+                                std::cout << ",\"master_cost\":" << pattern.master_cost << ",\"rc\":";
+                                emit_number(full_cpp::rich_pattern_reduced_cost(pattern, duals, baby, phase_one)); std::cout << '}';
+                            }
+                            std::cout << "]}";
+                        }
+                        std::cout << ']';
+                        continue;
+                    }
                     const auto workspace = full_cpp::build_rich_pricing_workspace(problem, g, cache);
                     const bool phase_one = request.at("phase_one").bool_or();
                     const auto costs = full_cpp::build_rich_pricing_costs(problem.groups[g].id, cache, workspace, duals, baby, phase_one);

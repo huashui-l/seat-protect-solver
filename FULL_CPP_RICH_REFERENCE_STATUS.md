@@ -816,6 +816,42 @@ native/state-replay-enabled regression passed 127 tests and 15,338 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for the dynamic-cost checkpoint.
 
+The native `price_rich_group_dfs` now connects the verified pricing prerequisites
+into the frozen full-domain search. It preserves forced/forbidden domain filtering,
+stable base and historical branch ordering, passenger priority, rectangle/independent
+bounds, first-activation flag costs, resource and symmetry rejection, caregiver
+reachability, and the full depth/resource/occupancy/infant/flag/care dominance key.
+Historical patterns are reconstructed and validated before incumbent seeding.
+Negative columns retain insertion order across replacements; pool overflow evicts
+the first worst-cost entry. Returned columns are stably sorted by reduced cost.
+
+Pricing caches now retain historical starts and reusable static workspaces. Legacy
+mode does not save a newly built workspace, matching Python; a workspace already
+present can still be reused. Search checks negative refinement, then node limit,
+then local deadline after incrementing the node count. Exact large-group limits,
+early infeasible branches, root lower bounds on interrupted search and all search
+count diagnostics follow the frozen function. The implementation remains outside
+the production structured stage until orchestration and recording are integrated.
+
+Direct calls to the complete frozen `_price_group_exact_dfs` validate four public
+fixtures plus ordinary-symmetry, protection and caregiver/infant/flag synthetics.
+The replay covers structured large group duals, signed seat duals, nonzero SSR/baby
+duals, legacy builds, workspace reuse, node-limit clamping, exact large-group
+overrides, Phase-I, expired deadlines, zero-time negative refinement, conflicting
+forced/forbidden domains, historical reuse/rejection, disabled symmetry and actual
+negative-pool eviction. All returned signatures/order, history updates, search
+counters and termination classifications match exactly in 786 subtests. Costs and
+bounds use an absolute tolerance of max(1e-8, eight ULPs), including 1e12 group-dual
+cases; pattern master costs use eight decimal places. Timing measurements are not
+equated across languages, and nonbinding/expired budgets isolate deterministic
+termination behavior. Structured integration and the full Rich gate remain open.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 128 tests and 16,124 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for the standalone DFS checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

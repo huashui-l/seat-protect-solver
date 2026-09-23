@@ -12,6 +12,8 @@
 #include <stdexcept>
 #include <charconv>
 #include <cstring>
+#include <functional>
+#include <numeric>
 
 namespace full_cpp {
 namespace {
@@ -1584,6 +1586,250 @@ double rich_pattern_reduced_cost(const RichExactPattern& pattern, const RichPric
         value -= get(duals.baby_occupant_upper, key) * occupied;
     }
     return value;
+}
+
+RichPricingResult price_rich_group_dfs(const Problem& problem, int group_index,
+    const native_json::Value& cfg, const RichPricingDuals& duals,
+    const std::vector<RichBabyCost>& baby_cost, const std::set<RichPlacementSignature>& forced,
+    const std::set<RichPlacementSignature>& forbidden, std::chrono::steady_clock::time_point deadline,
+    RichPricingCache& cache, bool exact, bool phase_one, bool stop_on_negative,
+    const std::vector<std::string>& active_ssr_types
+) {
+    using Clock = std::chrono::steady_clock;
+    const auto started = Clock::now();
+    const auto number = [&](const char* key, double fallback) { return cfg.find(key) ? optional_number(cfg, key) : fallback; };
+    const auto boolean = [&](const char* key, bool fallback) { return cfg.find(key) ? optional_bool(cfg, key) : fallback; };
+    const auto after = [](Clock::time_point origin, double seconds) { return origin + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(seconds)); };
+    const auto seconds = [](Clock::time_point from) { return std::chrono::duration<double>(Clock::now() - from).count(); };
+    const auto signature = [](const RichPlacement& o) { return RichPlacementSignature{o.passenger_index, o.seat, o.blocked}; };
+    const auto pattern_signature = [&](const RichExactPattern& pattern) {
+        std::vector<RichPlacementSignature> result;
+        for (const auto& o : pattern.placements) result.push_back(signature(o));
+        return result;
+    };
+    const auto intersects = [](const RichPricingMask& a, const RichPricingMask& b) {
+        for (size_t i = 0; i < a.size(); ++i) if (a[i] & b[i]) return true;
+        return false;
+    };
+    const auto unite = [](RichPricingMask a, const RichPricingMask& b) {
+        for (size_t i = 0; i < a.size(); ++i) a[i] |= b[i];
+        return a;
+    };
+    const auto& group = problem.groups[group_index];
+    const int n = static_cast<int>(group.passengers.size());
+    const double tolerance = number("tolerance", 1e-7);
+    const bool legacy = boolean("benchmark_legacy_pricing", false);
+    const int pool_limit = legacy ? 1 : std::max(1, static_cast<int>(number(exact ? "exact_pricing_columns_per_group" : "quick_pricing_columns_per_group",
+        number("pricing_columns_per_group", exact ? 4 : 3))));
+    RichPricingResult result;
+    std::map<int, RichPlacementSignature> forced_by_passenger;
+    for (const auto& item : forced) forced_by_passenger[std::get<0>(item)] = item;
+    if (forced_by_passenger.size() != forced.size()) {
+        result.termination = "infeasible_branch"; result.elapsed = seconds(started); return result;
+    }
+    double time_limit = std::max(0.0, number(exact ? "dfs_exact_time_limit" : "dfs_discovery_time_limit", exact ? 15.0 : 1.0));
+    long long node_limit = std::max(1LL, static_cast<long long>(number("dfs_node_limit", 2000000)));
+    if (exact && n >= std::max(2, static_cast<int>(number("dfs_large_group_min_size", 9)))) {
+        time_limit = std::max(time_limit, number("dfs_large_group_exact_time_limit", 15.0));
+        node_limit = std::max(node_limit, static_cast<long long>(number("dfs_large_group_node_limit", 5000000)));
+    }
+    const auto local_deadline = std::min(deadline, after(started, time_limit));
+    const auto workspace_started = Clock::now();
+    const bool reused = static_cast<bool>(cache.dfs_workspace);
+    auto workspace = cache.dfs_workspace;
+    if (!workspace) {
+        workspace = std::make_shared<RichPricingWorkspace>(build_rich_pricing_workspace(problem, group_index, cache));
+        if (!legacy) cache.dfs_workspace = workspace;
+    }
+    const double workspace_seconds = seconds(workspace_started);
+    const auto dynamic_started = Clock::now();
+    const auto costs = build_rich_pricing_costs(group.id, cache, *workspace, duals, baby_cost, phase_one);
+    RichPricingCache domains = cache;
+    RichPricingWorkspace domain_workspace = *workspace;
+    std::vector<std::vector<double>> base(n);
+    for (const auto& options : cache.all_options) result.priced_placements += static_cast<int>(options.size());
+    for (int p = 0; p < n; ++p) {
+        std::vector<int> indexes;
+        const auto required = forced_by_passenger.find(p);
+        for (size_t i = 0; i < cache.all_options[p].size(); ++i) {
+            const auto sig = signature(cache.all_options[p][i]);
+            if (!forbidden.count(sig) && (required == forced_by_passenger.end() || required->second == sig)) indexes.push_back(static_cast<int>(i));
+        }
+        if (indexes.empty()) { result.termination = "infeasible_branch"; result.elapsed = seconds(started); return result; }
+        const auto key = [&](int i) {
+            const auto& o = cache.all_options[p][i];
+            std::vector<std::string> blocked;
+            for (int s : o.blocked) blocked.push_back(problem.seats[s].id);
+            return std::make_tuple(costs.base[p][i], o.resources.size(), problem.seats[o.seat].id, blocked);
+        };
+        std::stable_sort(indexes.begin(), indexes.end(), [&](int a, int b) { return key(a) < key(b); });
+        domains.all_options[p].clear(); domain_workspace.resource_masks[p].clear();
+        domain_workspace.flag_masks[p].clear(); domain_workspace.option_flag_indexes[p].clear();
+        for (int i : indexes) {
+            domains.all_options[p].push_back(cache.all_options[p][i]); base[p].push_back(costs.base[p][i]);
+            domain_workspace.resource_masks[p].push_back(workspace->resource_masks[p][i]);
+            domain_workspace.flag_masks[p].push_back(workspace->flag_masks[p][i]);
+            domain_workspace.option_flag_indexes[p].push_back(workspace->option_flag_indexes[p][i]);
+        }
+    }
+    result.workspace_builds = !reused; result.workspace_reuses = reused;
+    result.workspace_build_seconds = reused ? 0.0 : workspace_seconds;
+    std::vector<int> order(n); std::iota(order.begin(), order.end(), 0);
+    std::set<int> cared;
+    for (const auto& spec : workspace->caregiver_specs) cared.insert(spec.passenger_index);
+    const auto priority = [&](int p) {
+        const auto& passenger = problem.passengers[group.passengers[p]];
+        return std::make_tuple(!forced_by_passenger.count(p), !(passenger.need_both_empty || passenger.need_single_empty),
+            !cared.count(p), domains.all_options[p].size(), p);
+    };
+    std::sort(order.begin(), order.end(), [&](int a, int b) { return priority(a) < priority(b); });
+    const std::set<RichPlacementSignature> historical(cache.historical_start.begin(), cache.historical_start.end());
+    std::vector<std::vector<int>> branch(n);
+    for (int p : order) {
+        branch[p].resize(domains.all_options[p].size()); std::iota(branch[p].begin(), branch[p].end(), 0);
+        const auto key = [&](int i) { const auto& o = domains.all_options[p][i]; return std::make_tuple(!historical.count(signature(o)), base[p][i], problem.seats[o.seat].id); };
+        std::stable_sort(branch[p].begin(), branch[p].end(), [&](int a, int b) { return key(a) < key(b); });
+    }
+    const auto& geometry = workspace->geometry;
+    const auto bounds = build_rich_pricing_bounds(domains, geometry, order, base,
+        phase_one ? 0.0 : -problem.weight_c * problem.group_centroid_y_factor / 2.0,
+        phase_one ? 0.0 : -problem.weight_c * problem.group_centroid_x_factor / 2.0);
+    const auto group_dual_entry = duals.group.find(group.id);
+    const double group_dual = group_dual_entry == duals.group.end() ? 0.0 : group_dual_entry->second;
+    std::vector<int> selected(n, -1);
+    RichExactPattern best_pattern;
+    bool have_best = false;
+    std::vector<RichExactPattern> negative;
+    std::set<std::vector<RichPlacementSignature>> seen;
+    const auto reduced_cost = [&](const RichExactPattern& pattern) { return rich_pattern_reduced_cost(pattern, duals, baby_cost, phase_one); };
+    const auto retain = [&](const RichExactPattern& pattern) {
+        ++result.negative_patterns_seen;
+        const auto sig = pattern_signature(pattern); seen.insert(sig);
+        auto found = std::find_if(negative.begin(), negative.end(), [&](const auto& item) { return pattern_signature(item) == sig; });
+        if (found == negative.end()) negative.push_back(pattern); else *found = pattern;
+        if (static_cast<int>(negative.size()) > pool_limit) {
+            auto worst = negative.begin();
+            for (auto it = negative.begin() + 1; it != negative.end(); ++it) if (reduced_cost(*it) > reduced_cost(*worst)) worst = it;
+            negative.erase(worst);
+        }
+    };
+    if (boolean("dfs_use_historical_incumbent", true)) {
+        std::map<int, RichPlacementSignature> by_passenger;
+        for (const auto& sig : cache.historical_start) by_passenger[std::get<0>(sig)] = sig;
+        if (static_cast<int>(by_passenger.size()) == n) {
+            std::vector<RichPlacement> chosen;
+            std::set<int> used;
+            bool valid = true;
+            for (int p = 0; p < n; ++p) {
+                const auto sig = by_passenger.find(p);
+                if (sig == by_passenger.end()) { valid = false; break; }
+                const auto entry = workspace->option_by_signature.find(sig->second);
+                if (entry == workspace->option_by_signature.end()) { valid = false; break; }
+                const auto& option = cache.all_options[entry->second.first][entry->second.second];
+                chosen.push_back(option);
+                for (int seat : option.resources) if (!used.insert(seat).second) valid = false;
+            }
+            if (valid && rich_placements_caregiver_ok(problem, group_index, chosen)) {
+                best_pattern = build_rich_exact_pattern(problem, group_index, chosen, active_ssr_types);
+                result.reduced_cost = reduced_cost(best_pattern); have_best = true; result.incumbent_seeded = true;
+                if (result.reduced_cost < -tolerance) retain(best_pattern);
+            }
+        }
+    }
+    const auto symmetry = build_rich_pricing_symmetry(problem, group_index, domains, boolean("dfs_symmetry_breaking_enabled", true));
+    result.symmetry_classes = symmetry.class_count;
+    const auto unset_time = Clock::time_point::max();
+    auto negative_stop = unset_time;
+    const auto set_negative_stop = [&]() { negative_stop = std::min(local_deadline, after(Clock::now(), std::max(0.0, number("dfs_negative_refinement_time", 0.25)))); };
+    if (stop_on_negative && result.reduced_cost < -tolerance) set_negative_stop();
+    const auto lower_bound = [&](int depth, const RichPricingMask& used, const RichPricingMask& flags, double additive,
+        int row_low, int row_high, int x_low, int x_high) {
+        double remaining_flags = 0.0;
+        for (size_t bit = 0; bit < costs.flags.size(); ++bit) if (costs.flags[bit] < 0.0 && !(flags[bit / 64] & (std::uint64_t{1} << (bit % 64)))) remaining_flags += costs.flags[bit];
+        const double constant = additive + remaining_flags + costs.baby_relaxation - group_dual;
+        double span, coupled;
+        if (row_low >= 0) {
+            const size_t cell = geometry.rectangle_index(row_low, row_high, x_low, x_high);
+            span = bounds.span[cell]; coupled = bounds.suffix[depth][cell];
+        } else { span = bounds.root_span; coupled = *std::min_element(bounds.suffix[depth].begin(), bounds.suffix[depth].end()); }
+        double independent = constant + span;
+        for (int d = depth; d < n; ++d) {
+            const int p = order[d]; double minimum = std::numeric_limits<double>::infinity();
+            for (size_t i = 0; i < domains.all_options[p].size(); ++i) if (!intersects(domain_workspace.resource_masks[p][i], used)) { minimum = base[p][i]; break; }
+            if (!std::isfinite(minimum)) return std::numeric_limits<double>::infinity();
+            independent += minimum;
+        }
+        return std::max(independent, constant + coupled);
+    };
+    using State = std::tuple<int, RichPricingMask, RichPricingMask, RichPricingMask, RichPricingMask, std::vector<RichPricingMask>>;
+    std::map<State, double> best_cost;
+    std::string aborted;
+    std::function<bool(int, const RichPricingMask&, const RichPricingMask&, const RichPricingMask&, const RichPricingMask&, double, int, int, int, int)> search;
+    search = [&](int depth, const RichPricingMask& used, const RichPricingMask& occupied, const RichPricingMask& infants,
+        const RichPricingMask& flags, double additive, int row_low, int row_high, int x_low, int x_high) {
+        ++result.nodes;
+        if (negative_stop != unset_time && Clock::now() >= negative_stop) { aborted = "dfs_negative_refinement_limit"; return true; }
+        if (result.nodes > node_limit) { aborted = "dfs_node_limit"; return true; }
+        if (Clock::now() >= local_deadline) { aborted = "dfs_time_limit"; return true; }
+        State state{depth, used, occupied, infants, flags, rich_pricing_caregiver_state(problem, domains, domain_workspace, selected)};
+        const auto previous = best_cost.find(state);
+        if (previous != best_cost.end() && previous->second <= additive + tolerance) return false;
+        best_cost[std::move(state)] = additive;
+        const double bound = lower_bound(depth, used, flags, additive, row_low, row_high, x_low, x_high);
+        double cutoff = result.reduced_cost - tolerance;
+        if (stop_on_negative) cutoff = -tolerance;
+        else if (result.reduced_cost < -tolerance) {
+            if (static_cast<int>(negative.size()) < pool_limit) cutoff = -tolerance;
+            else { cutoff = -std::numeric_limits<double>::infinity(); for (const auto& pattern : negative) cutoff = std::max(cutoff, reduced_cost(pattern)); cutoff -= tolerance; }
+        }
+        if (bound >= cutoff) { ++result.bound_prunes; return false; }
+        if (depth == n) {
+            std::vector<RichPlacement> chosen;
+            for (int p = 0; p < n; ++p) if (selected[p] >= 0) chosen.push_back(domains.all_options[p][selected[p]]);
+            if (static_cast<int>(chosen.size()) != n || !rich_placements_caregiver_ok(problem, group_index, chosen)) return false;
+            const auto pattern = build_rich_exact_pattern(problem, group_index, chosen, active_ssr_types);
+            const double rc = reduced_cost(pattern);
+            if (rc < result.reduced_cost) {
+                result.reduced_cost = rc; best_pattern = pattern; have_best = true; cache.historical_start = pattern_signature(pattern);
+                if (stop_on_negative && rc < -tolerance && negative_stop == unset_time) set_negative_stop();
+            }
+            if (rc < -tolerance) retain(pattern);
+            return false;
+        }
+        const int p = order[depth];
+        for (int i : branch[p]) {
+            const auto& option = domains.all_options[p][i];
+            if (intersects(domain_workspace.resource_masks[p][i], used)) { ++result.resource_prunes; continue; }
+            if (!rich_pricing_symmetry_ok(symmetry, selected, p, i)) { ++result.symmetry_prunes; continue; }
+            selected[p] = i;
+            const auto next_used = unite(used, domain_workspace.resource_masks[p][i]);
+            if (!rich_pricing_caregiver_possible(problem, domains, domain_workspace, selected, next_used)) { selected[p] = -1; continue; }
+            const int row = geometry.seat_row_index.at(option.seat), x = geometry.seat_x_index.at(option.seat);
+            double new_flag_cost = 0.0;
+            for (int bit : domain_workspace.option_flag_indexes[p][i]) if (!(flags[bit / 64] & (std::uint64_t{1} << (bit % 64)))) new_flag_cost += costs.flags[bit];
+            auto next_occupied = occupied, next_infants = infants;
+            next_occupied[option.seat / 64] |= std::uint64_t{1} << (option.seat % 64);
+            if (option.is_infant) next_infants[option.seat / 64] |= std::uint64_t{1} << (option.seat % 64);
+            const bool stopped = search(depth + 1, next_used, next_occupied, next_infants, unite(flags, domain_workspace.flag_masks[p][i]),
+                additive + base[p][i] + new_flag_cost, row_low < 0 ? row : std::min(row_low, row), row_low < 0 ? row : std::max(row_high, row),
+                x_low < 0 ? x : std::min(x_low, x), x_low < 0 ? x : std::max(x_high, x));
+            selected[p] = -1;
+            if (stopped) return true;
+        }
+        return false;
+    };
+    result.dynamic_refresh_seconds = seconds(dynamic_started);
+    const RichPricingMask empty_seats((problem.seats.size() + 63) / 64, 0), empty_flags((workspace->flag_locations.size() + 63) / 64, 0);
+    const double root_bound = lower_bound(0, empty_seats, empty_flags, 0.0, -1, -1, -1, -1);
+    search(0, empty_seats, empty_seats, empty_seats, empty_flags, 0.0, -1, -1, -1, -1);
+    result.proven_optimal = aborted.empty();
+    result.termination = aborted == "dfs_negative_refinement_limit" ? "dfs_negative" : !aborted.empty() ? aborted : result.reduced_cost < -tolerance ? "dfs_negative" : "dfs_optimal";
+    std::stable_sort(negative.begin(), negative.end(), [&](const auto& a, const auto& b) { return reduced_cost(a) < reduced_cost(b); });
+    if (negative.empty() && have_best) negative.push_back(best_pattern);
+    result.patterns = std::move(negative); result.unique_negative_patterns = static_cast<long long>(seen.size());
+    result.lower_bound = result.proven_optimal ? result.reduced_cost : root_bound;
+    result.elapsed = seconds(started);
+    return result;
 }
 
 RichStageBudgets calculate_rich_stage_budgets(
