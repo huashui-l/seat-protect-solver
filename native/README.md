@@ -103,8 +103,12 @@ remains untouched. Its original results remain in
 and config snapshot are also preserved in that directory's `runtime/` (ignored
 local artifacts). The original config's relative seatmap paths still resolve
 from the reference directory; the copied snapshot records provenance.
-Use separate output directories for every benchmark. See the existing Rich
-status ledger for the measured 5s acceptance result and 60s comparison.
+Use separate output directories for every benchmark. Frozen `d4b3379` Formal24
+passes 24/24 complete/legal/evaluator-consistent checks with process mean/median/
+max 1.247/1.052/2.784s; every case is below 5s. Mean score loss versus the saved
+C++ 60s run is 24.154 points (mean normalized per-case loss 4.34%). All 24 scores
+are lower; this profile is a speed/quality tradeoff. See the existing Rich status
+ledger for per-case results, provenance and retained acceptance boundaries.
 
 ## Build
 

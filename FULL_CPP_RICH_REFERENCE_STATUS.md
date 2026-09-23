@@ -51,8 +51,61 @@ Release /O2 build passed with the two existing conversion warnings. The directed
 multi-cabin operation, direct negative-score acceptance without Q0, and the
 on-demand Q0 fallback. The complete native/state-replay regression passed:
 167 tests, 9 skips, 37,241 subtests in 338.33s, including the existing 60s-mode
-component and schedule regressions. `git diff --check` passed. Frozen Formal24
-5s acceptance is pending.
+component and schedule regressions. `git diff --check` passed.
+
+Frozen implementation `d4b3379`, result
+`outputs/research/full_cpp_rich_5s_d4b3379/summary.json`: **5s acceptance PASS**.
+24/24 complete/legal/evaluator-consistent, zero unassigned and hard violations,
+zero total-score error, max individual error 4.55e-13. All 24 process invocations
+(including executable startup, input parsing and JSON output) finished below 5s:
+mean / median / max 1.246704 / 1.052101 / 2.784321 seconds. These are measured
+results on this machine, not a hard real-time guarantee for arbitrary instances.
+All 48 cabin Rich candidates completed without Q0; the fallback remains covered
+by the public dense-protection fixture. Summary construction counters are the
+legacy Q1/Q2A counters (zero by design); actual Rich DFS/Beam diagnostics are in
+the nested cabin results. No best-of-runs selection or 5s parameter sweep was used.
+
+Binary SHA-256: `485f9b959607ff2d55afc61ea436d6abd74f6c77cba1758de234a98bc4fd367b`.
+Executed config SHA-256: `8f56fa76ae684088af9ef6eac2e86a2a3a61b6999af89709351c5740689b17f0`.
+The executed config differs from the tracked profile only in external seatmap
+paths. Exact 5s runtime and config are preserved under this result's `runtime/`.
+
+Against the preserved C++ 60s `c6a41f3` result: 0 improve / 0 tie / 24 regress;
+mean score -607.887210 versus -583.733236, mean delta -24.153973, worst delta
+-62.253333 (`forward:150_stress`). Mean per-case normalized loss is 4.336013%,
+using `100 * (F_60s - F_5s) / max(1, abs(F_60s))`; this is not a CG/LP gap.
+Input and old/new seatmap SHA identities match in all 24 paired rows. Measured
+mean process time falls from 39.325649s to 1.246704s (31.54x ratio between the
+recorded runs). Against frozen Python 60s: 7 improve / 0 tie / 17 regress,
+mean delta -10.381278. Score loss is permitted by the user's 5s acceptance scope.
+CG integer and certified LP references remain unavailable, with no new CG run.
+
+| Case | F_5s - F_CPP_60s | 5s process wall (s) |
+| --- | ---: | ---: |
+| forward:100_edge | -11.350000 | 0.909 |
+| forward:100_normal | -26.698276 | 0.741 |
+| forward:100_stress | -28.875000 | 0.748 |
+| forward:150_edge | -50.250000 | 1.613 |
+| forward:150_normal | -42.900000 | 1.032 |
+| forward:150_stress | -62.253333 | 1.639 |
+| forward:50_edge | -2.533333 | 0.303 |
+| forward:50_normal | -6.200000 | 0.210 |
+| forward:50_stress | -10.072838 | 0.344 |
+| forward:full_edge | -18.151328 | 1.903 |
+| forward:full_normal | -7.640248 | 1.304 |
+| forward:full_stress | -26.303465 | 1.884 |
+| reverse:100_edge | -54.302160 | 1.072 |
+| reverse:100_normal | -43.970000 | 0.790 |
+| reverse:100_stress | -55.013233 | 0.954 |
+| reverse:150_edge | -31.855714 | 2.067 |
+| reverse:150_normal | -5.735000 | 1.335 |
+| reverse:150_stress | -27.315000 | 2.319 |
+| reverse:50_edge | -0.400000 | 0.419 |
+| reverse:50_normal | -0.600000 | 0.296 |
+| reverse:50_stress | -3.920000 | 0.409 |
+| reverse:full_edge | -11.775000 | 2.755 |
+| reverse:full_normal | -43.760000 | 2.091 |
+| reverse:full_stress | -7.821429 | 2.784 |
 
 ## Rich Python
 
