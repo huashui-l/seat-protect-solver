@@ -107,7 +107,7 @@ def main() -> None:
                         help="validate all reference inputs, seatmaps and allocations without launching the solver")
     parser.add_argument(
         "--construction-objective",
-        choices=("feasibility", "individual-soft", "group-soft", "group-first"),
+        choices=("feasibility", "individual-soft", "group-soft", "group-first", "rich-fast"),
         required=True,
     )
     args = parser.parse_args()

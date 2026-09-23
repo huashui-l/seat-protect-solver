@@ -103,6 +103,7 @@ RichSpecialPricingDiagnostics generate_rich_special_pricing_stage(const Problem&
     std::chrono::steady_clock::time_point deadline, bool enabled, GroupConstructionResult& result);
 
 enum class ConstructionObjective {
+    RichFast,
     Feasibility,
     IndividualSoft,
     GroupSoft,

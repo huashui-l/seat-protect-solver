@@ -981,7 +981,9 @@ GroupConstructionResult construct_rich_m1(
     result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
     result.rich_candidate_complete = validate_complete_assignment(problem, state.passenger_to_seat) == 0;
     // Q0/Q1/Q2A stay independent fallbacks, never the construction stage input.
-    if (result.rich_candidate_complete && result.rich_repair_score > result.group_construction_score + kTolerance) {
+    if (result.rich_candidate_complete
+        && (validate_complete_assignment(problem, result.passenger_to_seat) != 0
+            || result.rich_repair_score > result.group_construction_score + kTolerance)) {
         result.passenger_to_seat = state.passenger_to_seat;
         result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
         result.group_construction_score = result.rich_repair_score;

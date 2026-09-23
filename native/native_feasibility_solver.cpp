@@ -100,6 +100,7 @@ ConstructionObjective parse_construction_objective(const std::string& value) {
     if (value == "feasibility") return ConstructionObjective::Feasibility;
     if (value == "individual-soft") return ConstructionObjective::IndividualSoft;
     if (value == "group-soft") return ConstructionObjective::GroupSoft;
+    if (value == "rich-fast") return ConstructionObjective::RichFast;
     if (value == "group-first") return ConstructionObjective::GroupFirst;
     throw std::runtime_error("unknown construction objective: " + value);
 }
@@ -107,6 +108,7 @@ ConstructionObjective parse_construction_objective(const std::string& value) {
 const char* construction_objective_name(ConstructionObjective objective) {
     if (objective == ConstructionObjective::IndividualSoft) return "individual-soft";
     if (objective == ConstructionObjective::GroupSoft) return "group-soft";
+    if (objective == ConstructionObjective::RichFast) return "rich-fast";
     if (objective == ConstructionObjective::GroupFirst) return "group-first";
     return "feasibility";
 }
@@ -117,7 +119,8 @@ FeasibilityResult solve_feasibility_mip(
 ) {
     const auto started = std::chrono::steady_clock::now();
     if (objective == ConstructionObjective::GroupSoft
-        || objective == ConstructionObjective::GroupFirst) {
+        || objective == ConstructionObjective::GroupFirst
+        || objective == ConstructionObjective::RichFast) {
         using Clock = std::chrono::steady_clock;
         const auto elapsed = [&]() { return std::chrono::duration<double>(Clock::now() - started).count(); };
         const auto at = [&](double seconds) { return started
@@ -128,15 +131,28 @@ FeasibilityResult solve_feasibility_mip(
         const double search_seconds = std::min(budgets.usable_time,
             time_limit_seconds - std::min(budgets.scoring_reserve, time_limit_seconds * 0.2));
         const auto search_deadline = at(search_seconds);
-        FeasibilityResult result = solve_feasibility_mip(
-            problem, std::max(0.0, search_seconds - elapsed()), seed, ConstructionObjective::IndividualSoft
-        );
+        // Short-budget mode spends its budget on the independent Rich heuristic.
+        // The original group-first/Q0 route remains available for the 60s profile.
+        const bool rich_fast = objective == ConstructionObjective::RichFast;
+        FeasibilityResult result;
+        if (rich_fast) {
+            result.passenger_to_seat.assign(problem.passengers.size(), -1);
+            result.native_hard_violations = static_cast<int>(problem.passengers.size());
+            result.status = "NotRun";
+        } else {
+            result = solve_feasibility_mip(problem, std::max(0.0, search_seconds - elapsed()),
+                seed, ConstructionObjective::IndividualSoft);
+        }
         result.rich_stage_budgets = budgets;
         result.rich_search_deadline = search_seconds;
         result.q0_solver_status = result.status;
-        if (result.native_hard_violations == 0) {
+        if (result.native_hard_violations == 0 || rich_fast) {
             GroupConstructionResult group_result;
-            if (objective == ConstructionObjective::GroupFirst) {
+            if (rich_fast) {
+                group_result.passenger_to_seat = result.passenger_to_seat;
+                group_result.selected_incumbent = "none";
+                group_result.q1_selected_incumbent = "NotRun";
+            } else if (objective == ConstructionObjective::GroupFirst) {
                 group_result.passenger_to_seat = result.passenger_to_seat;
                 group_result.q0_components = evaluate_score_components(problem, result.passenger_to_seat);
                 group_result.selected_components = group_result.q0_components;
@@ -156,6 +172,22 @@ FeasibilityResult solve_feasibility_mip(
             group_result = construct_rich_m1(
                 problem, result.passenger_to_seat, group_result, started, schedule
             );
+            // A dense protection layout can defeat greedy construction/repair.
+            // Only then spend remaining time on a legal Q0 fallback.
+            if (rich_fast && !group_result.rich_candidate_complete && Clock::now() < search_deadline) {
+                const auto fallback = solve_feasibility_mip(problem,
+                    std::max(0.0, search_seconds - elapsed()), seed, ConstructionObjective::IndividualSoft);
+                result.q0_solver_status = fallback.status;
+                if (fallback.native_hard_violations == 0) {
+                    group_result.passenger_to_seat = fallback.passenger_to_seat;
+                    group_result.q0_components = evaluate_score_components(problem, fallback.passenger_to_seat);
+                    group_result.selected_components = group_result.q0_components;
+                    group_result.q0_score = group_result.q0_components.total();
+                    group_result.group_construction_score = group_result.q0_score;
+                    group_result.selected_incumbent = "q0";
+                    group_result.fallback_reason = "rich_incomplete";
+                }
+            }
             result.rich_m1_elite_store = group_result.rich_elite_store;
             result.rich_m1_selected_score = group_result.group_construction_score;
             // A failed construction/repair candidate leaves the legal fallback

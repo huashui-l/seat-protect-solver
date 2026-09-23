@@ -61,6 +61,51 @@ with 21 improve / 0 tie / 3 regress. On 2026-09-24 the user accepted these small
 regressions for migration completion; strict score nonregression remains failed.
 See the root gate documents for evidence and known trajectory/timing boundaries.
 
+## Independent 5-second Rich profile
+
+Use `--construction-objective rich-fast --time-limit 5` with
+`configs/config_native_rich_5s.json`. The `input_contract` seatmap paths are
+relative to that config (`../data/...`); supply those external seatmaps or use
+a local copy with absolute paths. Private Formal24 inputs are not bundled.
+
+```powershell
+./build/native/seat_protect_cpp.exe --input CASE.json `
+  --config configs/config_native_rich_5s.json --output RESULT.json `
+  --construction-objective rich-fast --time-limit 5 --seed 0
+```
+
+The short profile begins directly with fixed/SSR/caregiver Rich construction and
+relocation repair, followed by VND, a bounded structured pattern pool and up to
+two restricted MIP/local-branching attempts. Protected MIP, special pricing and
+conflict LNS are disabled. Q0 individual-soft MIP runs only if construction/repair
+is incomplete and time remains; Q1/Q2A do not run. A complete legal candidate is
+accepted even when its score is negative and there is no previous incumbent.
+All subsequent replacements still require a strict score improvement.
+
+Nominal single-cabin stage budgets are construction 2.4s, repair 0.3s, VND 0.7s,
+patterns 0.8s, restricted MIP 0.4s, with 0.4s scoring/overhead reserve. Existing
+carry and incomplete-repair borrowing apply; cabin budgets scale these windows.
+Per-group pattern DFS is capped at 0.02s, with four windows and six patterns per
+group. The configuration targets a 5s invocation; measured process time must
+still be checked because native setup and solver termination have overhead.
+
+For single-cabin diagnostics, `q0_solver_status=NotRun` means the Q0 score and
+Q0-relative delta fields have no baseline interpretation (their numeric defaults
+are not an objective reference). `q1_selected_incumbent=NotRun` marks omitted
+Q1/Q2A. For multiple cabins, inspect each nested result. Infeasible/incomplete
+outputs retain nonzero exit status and cannot pass the Formal24 legality gate.
+
+The accepted 60s route remains `group-first`. `configs/config_native_rich_60s.json`
+preserves the external frozen `rich_python_reference_config.json` settings,
+changing only relative seatmap paths for its location. The external original
+remains untouched. Its original results remain in
+`outputs/research/full_cpp_rich_60s_c6a41f3`; the exact old executable, HiGHS DLL
+and config snapshot are also preserved in that directory's `runtime/` (ignored
+local artifacts). The original config's relative seatmap paths still resolve
+from the reference directory; the copied snapshot records provenance.
+Use separate output directories for every benchmark. See the existing Rich
+status ledger for the measured 5s acceptance result and 60s comparison.
+
 ## Build
 
 Windows x64, PowerShell, Visual Studio C++ tools, and an externally obtained

@@ -17,6 +17,42 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
 
+    def test_rich_fast_profile_uses_rich_first_and_q0_only_on_failure(self):
+        profile = json.loads((Path(__file__).resolve().parents[1]
+                             / "configs/config_native_rich_5s.json").read_text(encoding="utf-8"))
+        fallback_count = 0
+        native_count = 0
+        for case_id in self.cases:
+            if case_id.endswith("_invalid"):
+                continue
+            with self.subTest(case=case_id):
+                result = self.run_case(case_id, "rich-fast", algorithm=profile["algorithm"])
+                self.assertTrue(result["complete"])
+                self.assertEqual("HeuristicComplete", result["status"])
+                cabins = result.get("cabin_decomposition", {}).get("cabins", {})
+                results = [cabin["result"] for cabin in cabins.values()] if cabins else [result]
+                for cabin in results:
+                    self.assertEqual("NotRun", cabin["q1_selected_incumbent"])
+                    if cabin["rich_candidate_complete"]:
+                        native_count += 1
+                        self.assertEqual("NotRun", cabin["q0_solver_status"])
+                        self.assertTrue(cabin["selected_incumbent"].startswith("rich-"))
+                        self.assertGreaterEqual(cabin["native_score"], cabin["rich_repair_score"] - 1e-8)
+                    else:
+                        fallback_count += 1
+                        self.assertEqual("q0", cabin["selected_incumbent"])
+                        self.assertEqual("rich_incomplete", cabin["fallback_reason"])
+                        self.assertNotEqual("NotRun", cabin["q0_solver_status"])
+                        self.assertEqual(cabin["native_score"], cabin["q0_score"])
+                    self.assertEqual(0, cabin["dfs_nodes"] + cabin["beam_nodes"])
+                    self.assertEqual(0, cabin["from_scratch_dfs_nodes"] + cabin["from_scratch_beam_nodes"])
+                    self.assertFalse(cabin["rich_multigroup_lns"]["enabled"])
+                    for timing in cabin["rich_stage_timing"].values():
+                        self.assertLessEqual(timing["deadline"], cabin["rich_search_deadline"])
+
+        self.assertGreater(native_count, 0)
+        self.assertGreater(fallback_count, 0)
+
     def test_group_first_defers_fallback_search_until_after_rich(self):
         result = self.run_case("shrink_small_blockers", "group-first", algorithm={
             "enable_conflict_component_lns": False,

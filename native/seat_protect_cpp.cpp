@@ -350,7 +350,8 @@ int main(int argc, char** argv) {
             output = &file;
         }
         if (construction_objective == full_cpp::ConstructionObjective::GroupFirst
-            || construction_objective == full_cpp::ConstructionObjective::GroupSoft) {
+            || construction_objective == full_cpp::ConstructionObjective::GroupSoft
+            || construction_objective == full_cpp::ConstructionObjective::RichFast) {
             std::map<std::string, std::set<int>> cabins;
             for (const auto& group : problem.groups) {
                 std::set<std::string> classes;

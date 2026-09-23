@@ -14,6 +14,46 @@ Known boundaries remain visible: wall-clock DFS and LNS set traversal can change
 
 The historical checkpoints below retain their original strict verdicts and earlier pending-work descriptions. This acceptance decision governs the current migration status.
 
+## Independent 5-second profile (2026-09-24)
+
+The user subsequently requested a 5s C++ heuristic, explicitly accepting score
+loss and authorizing component retention/removal. This is a separate short-budget
+profile; the accepted 60s reference and its recorded results remain unchanged.
+The previous prohibition on 5s compression is superseded for this work only.
+
+A diagnostic run using the unchanged 60s config and `group-first --time-limit 5`
+failed at the 22nd case (`reverse:full_edge`) with no complete legal assignment;
+the first 21 completed cases passed legality, but observed process time reached
+5.291s. Q0 consumed most or all of the search window on difficult cases, and its
+MIP limit excluded model construction. The failed attempt is preserved under
+`outputs/research/full_cpp_rich_5s_baseline_779b92b`; it has no completed summary
+and is not a 24-case accepted baseline.
+
+The separate `rich-fast` entry starts with Rich construction/repair, then VND,
+bounded structured patterns and restricted MIP/local branching. The 5s config
+disables protected MIP, special pricing and LNS; Q1/Q2A do not run. A public dense
+protection fixture demonstrated that removing Q0 entirely would lose completeness,
+so Q0 remains an on-demand fallback only when Rich construction/repair is incomplete
+and search time remains. No complete/legal incumbent is replaced by an incomplete
+candidate. The existing `group-first` schedule is unchanged.
+
+Tracked profiles: `configs/config_native_rich_5s.json` and
+`configs/config_native_rich_60s.json`. The 60s profile is the frozen config with
+only relative seatmap paths adjusted. The 5s profile preserves objective weights,
+hard rules, seat geometry and reference seatmap identity. Private run configs
+only resolve external seatmap paths. The original 60s executable (SHA-256
+`2f0852a75ab5660ab0dcfb4a3478a5149f0351e9949a0982133cde3fd188602e`), DLL and exact
+config snapshot are retained in `outputs/research/full_cpp_rich_60s_c6a41f3/runtime`.
+These are local ignored artifacts, not redistributed toolchains or private data.
+
+Release /O2 build passed with the two existing conversion warnings. The directed
+5s test checks 11 legal public fixtures with external evaluation, including
+multi-cabin operation, direct negative-score acceptance without Q0, and the
+on-demand Q0 fallback. The complete native/state-replay regression passed:
+167 tests, 9 skips, 37,241 subtests in 338.33s, including the existing 60s-mode
+component and schedule regressions. `git diff --check` passed. Frozen Formal24
+5s acceptance is pending.
+
 ## Rich Python
 
 - selected budget: 60 seconds

@@ -48,6 +48,18 @@ the acceptance decision and retained timing/trajectory boundaries.
 The V1R flow below is the historical preprocessed-input release path and remains
 separate from the raw Rich migration.
 
+## Independent short-budget native path
+
+The `rich-fast` entry and `configs/config_native_rich_5s.json` retain the same
+hard constraints, objective and native Rich implementations while changing the
+schedule for 5 seconds: construction/repair -> VND -> bounded structured patterns
+-> restricted MIP/local branching. Q0 is an on-demand fallback for incomplete
+Rich construction/repair, using only remaining search time. Q1/Q2A, protected
+MIP, special pricing and LNS are omitted in this profile. The 60s `group-first`
+configuration, frozen results and archived runtime remain separately available.
+The user's 5s request authorizes this component reduction and score loss; it does
+not change the earlier 60s acceptance or waive legal/complete output checks.
+
 ## Historical V1R production call boundary
 
 ```text
