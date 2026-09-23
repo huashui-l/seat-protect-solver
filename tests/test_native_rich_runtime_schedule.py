@@ -147,7 +147,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 timings = result["rich_stage_timing"]
                 stages = ["construction", "repair", "vnd"]
                 if result["rich_candidate_complete"]:
-                    stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing", "lns"))
+                    stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing", "lns", "restricted_mip"))
                 self.assertEqual(set(timings), set(stages))
                 replay = dict(allocation_start=0.0, search_deadline_limit=search_limit,
                               construction_unassigned=result["rich_construction_unassigned"],

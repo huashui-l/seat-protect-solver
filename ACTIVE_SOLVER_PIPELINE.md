@@ -24,7 +24,22 @@ Source of truth: frozen Heuristic V1R configuration and `run_heuristic_v1r.py --
 | MLP/GNN ranking | DEAD | disabled; research-only |
 | Exact column generation | DEAD | offline reference/teacher/audit only |
 
-## Current production call boundary
+## Raw Rich migration path
+
+On `feat/full-cpp-rich-m1`, the raw `seat_protect_cpp.exe` path now runs native
+Q0/Q1/Q2A fallbacks and an independent Rich construction/repair trajectory,
+followed by VND, structured patterns, protected MIP, special pricing, LNS and
+Rich restricted MIP/local branching. The restricted stage consumes the complete
+Rich elite store; raw Rich no longer calls the separate RR adapter/master.
+All these stages use the shared native deadline and carry scheduler. Raw input
+and seatmaps are JSON; this path has no Python callback or `.native_v2` input.
+Component integration is not the Formal24 quality-parity gate. See
+`FULL_CPP_RICH_REFERENCE_STATUS.md` for differential evidence and remaining audit.
+
+The V1R flow below is the historical preprocessed-input release path and remains
+separate from the raw Rich migration.
+
+## Historical V1R production call boundary
 
 ```text
 Python selects/prepares HEADER_V2 input

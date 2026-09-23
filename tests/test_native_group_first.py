@@ -24,7 +24,7 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                     escaped_q1_stall += result["q1_selected_incumbent"] == "q0"
                     self.assertTrue(result["from_scratch_complete"])
                     self.assertGreater(result["from_scratch_score"], result["q1_score"])
-                elif result["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master"}:
+                elif result["selected_incumbent"] in {"rich-m2-vnd", "rich-m3-pattern-master", "rich-m4-protected-mip", "rich-m5-lns", "rich-m6-restricted-mip"}:
                     self.assertGreaterEqual(result["native_score"], result["q1_score"])
                 else:
                     self.assertIn(result["selected_incumbent"], {"q0", "group-aware"})
@@ -45,10 +45,8 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                 self.assertGreater(result["rich_selected_pattern_count"], 0)
                 self.assertGreaterEqual(result["rich_pattern_score"], result["rich_vnd_score"] - 1e-8)
                 self.assertAlmostEqual(result["rich_master_score"], result["rich_pattern_score"], places=8)
-                if case_id == "caregiver_and_ssr":
-                    self.assertGreater(result["rich_baby_pair_count"], 0)
-                else:
-                    self.assertEqual(result["rich_baby_pair_count"], 0)
+                self.assertEqual(result["rich_baby_pair_count"], 0)  # Legacy RR linearization is no longer used.
+                self.assertGreater(result["rich_restricted_pattern_mip"]["usable_columns"], 0)
 
     def test_group_first_replay_is_deterministic_and_bounded(self):
         first = self.run_group_first("large_groups_9_10")
@@ -73,11 +71,9 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertNotEqual("q2a-group-first", result["selected_incumbent"])
         self.assertAlmostEqual(result["native_score"], result["q1_score"])
 
-    def test_restricted_master_disabled_or_zero_budget_preserves_vnd(self):
+    def test_restricted_master_disabled_preserves_vnd(self):
         for algorithm in (
             {"enable_restricted_pattern_mip": False},
-            {"restricted_pattern_mip_time_budget": 0.0,
-             "restricted_pattern_mip_tail_budget": 0.0},
         ):
             with self.subTest(algorithm=algorithm):
                 algorithm = {**algorithm, "enable_conflict_component_lns": False}
@@ -183,7 +179,10 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                     "restricted_pattern_mip_time_budget": base,
                     "restricted_pattern_mip_tail_budget": tail,
                 })
-                self.assertAlmostEqual(result["rich_master_time_limit"], max(base, tail))
+                timing = result["rich_stage_timing"]["restricted_mip"]
+                lns = result["rich_stage_timing"]["lns"]
+                self.assertAlmostEqual(timing["effective_budget"], max(timing["base_budget"], tail) + max(0.0, lns["deadline"] - timing["started"]))
+                self.assertAlmostEqual(result["rich_master_time_limit"], max(0.0, timing["deadline"] - timing["started"]))
                 self.assertGreater(result["rich_selected_pattern_count"], 0)
                 self.assertAlmostEqual(result["rich_master_score"], result["rich_pattern_score"])
 

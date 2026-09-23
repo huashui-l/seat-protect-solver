@@ -242,9 +242,19 @@ int main(int argc, char** argv) {
                     elite.insert_relocation(entry.first, entry.second, [&]() { return entry.second.local_score; });
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(input->at("deadline_seconds").number));
-                const auto stats = full_cpp::improve_rich_restricted_mip(problem, state, elite, deadline);
+                full_cpp::RichRestrictedDiagnostics stats;
+                full_cpp::GroupConstructionResult result;
+                const bool stage = input->find("protected_stage") && input->at("protected_stage").bool_or();
+                if (stage) {
+                    result.rich_candidate_complete = true;
+                    result.rich_state = state.save(); result.rich_elite_store = elite;
+                    result.group_construction_score = full_cpp::evaluate_soft_score(problem, state.passenger_to_seat);
+                    stats = full_cpp::improve_rich_restricted_stage(problem, deadline, result);
+                    state.restore(result.rich_state);
+                } else stats = full_cpp::improve_rich_restricted_mip(problem, state, elite, deadline);
                 std::cout << std::setprecision(17) << "],\"diagnostics\":";
                 full_cpp::write_rich_restricted_diagnostics(std::cout, stats);
+                if (stage) std::cout << ",\"selected_score\":" << result.group_construction_score << ",\"selected_count\":" << result.passenger_to_seat.size();
                 std::cout << ",\"elite\":"; full_cpp::write_rich_elite_store(std::cout, elite);
                 std::cout << ",\"state\":"; write_snapshot(state.save());
                 std::cout << "}\n";

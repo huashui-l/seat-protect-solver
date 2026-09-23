@@ -187,6 +187,7 @@ class NativeRichPatternContextTests(unittest.TestCase):
         if stage:
             self.assertAlmostEqual(actual["selected_score"], max(initial_score, final_score), places=8)
             self.assertEqual(actual["selected_count"], len(keys) if final_score > initial_score + 1e-9 else 0)
+        if stage and not restricted:
             actual["special"].pop("seconds"); expected_special.pop("seconds")
             self.assertEqual(len(actual["special"]["accepted_patterns"]), len(expected_special["accepted_patterns"]))
             for a, b in zip(actual["special"]["accepted_patterns"], expected_special["accepted_patterns"]):
@@ -227,6 +228,12 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 accepted += result["diagnostics"]["accepted"]
         self.assertGreater(attempts, 0)
         self.assertGreater(accepted, 0)
+
+    def test_rich_restricted_production_wrapper_uses_rich_state(self):
+        for case in self.cases[:11]:
+            with self.subTest(case=case["id"]): self.protected_replay(case, {}, restricted=True, stage=True)
+        self.protected_replay(self.cases[0], {}, variant="expired", restricted=True, stage=True)
+        self.protected_replay(self.cases[0], {"enable_restricted_pattern_mip": False}, restricted=True, stage=True)
 
     def test_rich_restricted_branching_and_early_returns(self):
         case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),

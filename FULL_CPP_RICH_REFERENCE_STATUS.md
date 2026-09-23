@@ -1225,6 +1225,41 @@ conditional cuts, rebuild failures and hard-invalid rejections asserted. Full
 native/state-replay-enabled regression passed 156 tests and 37,217 subtests with
 9 skips. `git diff --check` passed. No Formal24 or profiling run was made.
 
+### Production Rich restricted stage integration
+
+The raw Rich trajectory now ends with the Rich restricted MIP over the complete
+elite store, after special pricing and LNS. The legacy RR adapter/master call was
+removed from this production path; its standalone sources remain available for
+historical replay. The stage restores the saved Rich state, preserves the elite
+store, and replaces the independently selected fallback only on a legal strict
+improvement. Restricted time is the maximum of base and tail budgets plus LNS
+remaining time, clipped by the shared search deadline.
+
+Output includes `rich_restricted_pattern_mip` diagnostics and the actual
+`restricted_mip` timing window. Compatibility fields `rich_pattern_count`,
+`rich_master_attempts` and radius now describe this Rich consumer; pattern/master
+score is its final Rich state score, selected-pattern count is the group count
+when a full master attempt occurs, and the obsolete RR baby-pair count stays zero.
+This consumer evaluates infant effects through the native full scorer rather
+than the old RR pair-variable model. No final-state recapture is introduced,
+matching the frozen Python restricted-stage call site.
+
+Wrapper replay starts with an empty selected fallback assignment to verify that
+continuation uses `rich_state`; it compares final state, diagnostics, elite store
+and strict selection against Python. Runtime replay includes the restricted
+window at actual stage timestamps. Native production tests continue to audit
+complete legality and external score consistency. The final coverage/diagnostics
+audit and Formal24 60-second per-case quality gate have not yet passed; no
+profiling or 5-second compression is authorized by this integration alone.
+
+Validation: Release /O2 build passed with two existing conversion warnings.
+Production-path tests passed 26 tests and 31 subtests. Full regression, including
+restricted wrapper differential and native state replay, passed 157 tests and
+37,227 subtests with 9 skips. `git diff --check` passed. The existing
+`native/run_native_formal24.py` still uses the historical `gap_I` field and lacks
+a per-case Python-60s gate; it must be audited and corrected before final use.
+No Formal24 run or performance compression was performed at this checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

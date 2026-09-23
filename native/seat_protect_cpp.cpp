@@ -188,6 +188,8 @@ int main(int argc, char** argv) {
         full_cpp::write_rich_special_pricing_diagnostics(*output, problem, result.rich_special_pricing);
         *output << ",\"rich_multigroup_lns\":";
         full_cpp::write_rich_lns_diagnostics(*output, result.rich_lns);
+        *output << ",\"rich_restricted_pattern_mip\":";
+        full_cpp::write_rich_restricted_diagnostics(*output, result.rich_restricted);
         *output << ",\"rich_conflict_diversity_active\":" << (result.rich_conflict_diversity_active ? "true" : "false");
         *output << ",\"rich_construction_repair_queue\":";
         full_cpp::write_rich_repair_queue(*output, result.rich_construction_repair_queue, 20);

@@ -1,6 +1,5 @@
 #include "native_feasibility_solver.hpp"
 
-#include "native_rich_pattern_adapter.hpp"
 #include "native_group_constructor.hpp"
 
 #include "interfaces/highs_c_api.h"
@@ -203,28 +202,22 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.rich_stage_timing["lns"] = {
                         budgets.stages.at("lns"), lns_window.effective_budget, lns_started, lns_finished, lns_window.deadline,
                         schedule.carry(), schedule.pricing_reserve()};
-                }
-                const RichPatternResult pattern_result = run_rich_pattern_master(
-                    problem, group_result.passenger_to_seat,
-                    search_deadline
-                );
-                result.rich_pattern_count = pattern_result.pattern_count;
-                result.rich_selected_pattern_count = pattern_result.selected_pattern_count;
-                result.rich_pattern_score = pattern_result.score;
-                result.rich_baby_pair_count = pattern_result.baby_pair_count;
-                result.rich_master_score = pattern_result.master_score;
-                result.rich_master_time_limit = pattern_result.master_time_limit;
-                result.rich_master_attempts = pattern_result.master_attempts;
-                result.rich_master_last_radius = pattern_result.master_last_radius;
-                if (pattern_result.complete
-                    && pattern_result.score > group_result.group_construction_score + 1e-9) {
-                    group_result.passenger_to_seat = pattern_result.passenger_to_seat;
-                    group_result.group_construction_score = pattern_result.score;
-                    group_result.selected_components = evaluate_score_components(
-                        problem, pattern_result.passenger_to_seat
-                    );
-                    group_result.selected_incumbent = "rich-m3-pattern-master";
-                    group_result.score_delta = pattern_result.score - group_result.q0_score;
+                    const double restricted_started = elapsed();
+                    const auto restricted_window = schedule.begin("restricted_mip", restricted_started);
+                    result.rich_restricted = improve_rich_restricted_stage(problem, at(restricted_window.deadline), group_result);
+                    const double restricted_finished = elapsed();
+                    schedule.finish("restricted_mip", restricted_window, restricted_finished);
+                    group_result.rich_stage_timing["restricted_mip"] = {
+                        budgets.stages.at("restricted_mip"), restricted_window.effective_budget,
+                        restricted_started, restricted_finished, restricted_window.deadline,
+                        schedule.carry(), schedule.pricing_reserve()};
+                    result.rich_pattern_count = result.rich_restricted.patterns;
+                    result.rich_selected_pattern_count = result.rich_restricted.attempts ? static_cast<int>(problem.groups.size()) : 0;
+                    result.rich_pattern_score = evaluate_rich_group_score(problem, group_result.rich_state.passenger_to_seat, -1).total();
+                    result.rich_master_score = result.rich_pattern_score;
+                    result.rich_master_time_limit = result.rich_restricted.enabled ? std::max(0.0, restricted_window.deadline - restricted_started) : 0.0;
+                    result.rich_master_attempts = result.rich_restricted.attempts;
+                    result.rich_master_last_radius = result.rich_restricted.radius_history.empty() ? -1 : result.rich_restricted.radius_history.back();
                 }
             }
             result.rich_elite_store = group_result.rich_elite_store;
@@ -822,6 +815,24 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
     d.score_improvement = best_score - initial_score;
     d.seconds = elapsed(); d.stopped_by_deadline = Clock::now() >= deadline;
     return d;
+}
+
+RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result
+) {
+    if (!result.rich_candidate_complete) return {};
+    AssignmentState state(problem); state.restore(result.rich_state);
+    const auto diagnostics = improve_rich_restricted_mip(problem, state, result.rich_elite_store, deadline);
+    result.rich_state = state.save();
+    const double score = evaluate_soft_score(problem, state.passenger_to_seat);
+    if (validate_complete_assignment(problem, state.passenger_to_seat) == 0 && score > result.group_construction_score + 1e-9) {
+        result.passenger_to_seat = state.passenger_to_seat;
+        result.group_construction_score = score;
+        result.selected_components = evaluate_score_components(problem, state.passenger_to_seat);
+        result.selected_incumbent = "rich-m6-restricted-mip";
+        result.score_delta = score - result.q0_score;
+    }
+    return diagnostics;
 }
 
 RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, AssignmentState& state,

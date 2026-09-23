@@ -29,6 +29,8 @@ struct RichRestrictedDiagnostics {
 RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, AssignmentState& state,
     const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline);
 void write_rich_restricted_diagnostics(std::ostream& output, const RichRestrictedDiagnostics& diagnostics);
+RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result);
 
 struct RichLnsAcceptedComponent {
     std::vector<int> groups;
@@ -117,6 +119,7 @@ struct FeasibilityResult {
     RichProtectedMipDiagnostics rich_protected;
     RichSpecialPricingDiagnostics rich_special_pricing;
     RichLnsDiagnostics rich_lns;
+    RichRestrictedDiagnostics rich_restricted;
     bool rich_conflict_diversity_active = false;
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;
