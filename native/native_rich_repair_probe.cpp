@@ -9,6 +9,78 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* records = replay.find("elite_records")) {
+            full_cpp::RichEliteStore store(static_cast<int>(replay.at("elite_limit").number));
+            std::cout << std::setprecision(17) << "{\"snapshots\":[";
+            bool first_snapshot = true;
+            for (const auto& record : records->array) {
+                full_cpp::RichElitePattern pattern;
+                for (const auto& entry : record.at("assignments").array)
+                    pattern.assignments.emplace_back(static_cast<int>(entry.array[0].number), entry.array[1].string);
+                for (const auto& entry : record.at("blocked_by_host").array) {
+                    std::vector<std::string> seats;
+                    for (const auto& seat : entry.array[1].array) seats.push_back(seat.string);
+                    pattern.blocked_by_host.emplace_back(static_cast<int>(entry.array[0].number), seats);
+                }
+                pattern.local_score = record.at("local_score").number;
+                pattern.source = record.at("source").string;
+                pattern.pinned = record.at("pinned").bool_or();
+                std::map<std::string, int> owners;
+                for (const auto& entry : record.at("owners").object)
+                    owners[entry.first] = static_cast<int>(entry.second.number);
+                store.record(static_cast<int>(record.at("group_id").number), std::move(pattern), owners,
+                             record.at("conflict_diversity_active").bool_or());
+                if (!first_snapshot) std::cout << ',';
+                first_snapshot = false;
+                std::cout << '{';
+                bool first_group = true;
+                for (const auto& group : store.groups()) {
+                    if (!first_group) std::cout << ',';
+                    first_group = false;
+                    std::cout << std::quoted(std::to_string(group.first)) << ":[";
+                    bool first_pattern = true;
+                    for (const auto& item : group.second) {
+                        if (!first_pattern) std::cout << ',';
+                        first_pattern = false;
+                        std::cout << "{\"assignments\":[";
+                        for (size_t i = 0; i < item.assignments.size(); ++i) {
+                            if (i) std::cout << ',';
+                            std::cout << '[' << item.assignments[i].first << ',' << std::quoted(item.assignments[i].second) << ']';
+                        }
+                        std::cout << "],\"blocked_by_host\":[";
+                        const auto strings = [](const auto& values) {
+                            std::cout << '[';
+                            for (size_t i = 0; i < values.size(); ++i) {
+                                if (i) std::cout << ',';
+                                std::cout << std::quoted(values[i]);
+                            }
+                            std::cout << ']';
+                        };
+                        for (size_t i = 0; i < item.blocked_by_host.size(); ++i) {
+                            if (i) std::cout << ',';
+                            std::cout << '[' << item.blocked_by_host[i].first << ',';
+                            strings(item.blocked_by_host[i].second);
+                            std::cout << ']';
+                        }
+                        std::cout << "],\"occupied_seats\":"; strings(item.occupied_seats);
+                        std::cout << ",\"blocked_seats\":"; strings(item.blocked_seats);
+                        std::cout << ",\"seat_resources\":"; strings(item.seat_resources);
+                        std::cout << ",\"conflict_groups\":[";
+                        for (size_t i = 0; i < item.conflict_groups.size(); ++i) {
+                            if (i) std::cout << ',';
+                            std::cout << item.conflict_groups[i];
+                        }
+                        std::cout << "],\"local_score\":" << item.local_score
+                            << ",\"source\":" << std::quoted(item.source)
+                            << ",\"pinned\":" << (item.pinned ? "true" : "false") << '}';
+                    }
+                    std::cout << ']';
+                }
+                std::cout << '}';
+            }
+            std::cout << "]}\n";
+            return 0;
+        }
         const auto* pipeline_mode = replay.find("construction_pipeline");
         const bool pipeline = pipeline_mode && pipeline_mode->bool_or();
         auto state = pipeline ? full_cpp::initialize_rich_assignment(problem)

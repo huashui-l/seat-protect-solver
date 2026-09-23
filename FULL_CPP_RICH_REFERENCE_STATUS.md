@@ -335,6 +335,28 @@ Release MSVC build passed; the full native/state-replay-enabled public suite
 passed 95 tests, 12,527 subtests, 9 skips. Existing two conversion warnings remain.
 No Formal24 checkpoint or performance experiment was run for this change.
 
+The native core now supplies `RichEliteStore`, matching the frozen nested
+`record_elite_pattern` and `_elite_pattern_eviction_candidate` semantics. Identity
+contains host/seat assignments and per-host protected blocks; occupied, blocked
+and union resources are canonicalized separately. Conflict groups derive from
+current resource owners only when conflict diversity is active. Better-score
+replacement retains insertion order but takes the new pinned/source values;
+equal/worse pinned records only promote pinning. Eviction first prefers removable
+patterns in duplicated conflict classes, then the lowest local score with stable
+ties. Pinned entries are never evicted, so the per-group limit may be exceeded.
+
+The stage probe replays records through this core store. A differential oracle
+executes the actual nested Python function and compares every field and pattern
+order after 636 records across three limits (639 subtests including the limits).
+Coverage includes alternative protection choices, replacement/unpinning, stable
+ties, conflict diversity, all-pinned overflow and deterministic random records.
+This store is not yet wired to production stage capture: affected-group scoring,
+capture at construction/repair/VND, conflict-diversity activation, and subsequent
+structured/protected/restricted stage consumers remain required. No production
+elite-coverage or quality-parity claim follows from this isolated store test.
+Release build passed; the full native/state-replay-enabled suite passed 96 tests,
+13,166 subtests and 9 skips. No Formal24 or profiling run was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

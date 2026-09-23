@@ -286,4 +286,25 @@ double evaluate_soft_score(
     const std::vector<int>& passenger_to_seat
 );
 
+struct RichElitePattern {
+    std::vector<std::pair<int, std::string>> assignments;
+    std::vector<std::pair<int, std::vector<std::string>>> blocked_by_host;
+    std::vector<std::string> occupied_seats, blocked_seats, seat_resources;
+    std::vector<int> conflict_groups;
+    double local_score = 0.0;
+    std::string source;
+    bool pinned = false;
+};
+
+class RichEliteStore {
+public:
+    explicit RichEliteStore(int limit) : limit_(limit < 2 ? 2 : limit) {}
+    void record(int group_id, RichElitePattern pattern,
+                const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active);
+    const std::map<int, std::vector<RichElitePattern>>& groups() const { return groups_; }
+private:
+    int limit_;
+    std::map<int, std::vector<RichElitePattern>> groups_;
+};
+
 }  // namespace full_cpp

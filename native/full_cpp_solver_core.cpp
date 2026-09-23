@@ -1003,4 +1003,47 @@ void AssignmentState::restore(AssignmentSnapshot snapshot) {
     seat_ssr_passenger = std::move(snapshot.seat_ssr_passenger);
 }
 
+void RichEliteStore::record(int group_id, RichElitePattern pattern,
+    const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active
+) {
+    std::sort(pattern.assignments.begin(), pattern.assignments.end());
+    pattern.blocked_by_host.erase(std::remove_if(pattern.blocked_by_host.begin(), pattern.blocked_by_host.end(),
+        [](const auto& entry) { return entry.second.empty(); }), pattern.blocked_by_host.end());
+    for (auto& entry : pattern.blocked_by_host) std::sort(entry.second.begin(), entry.second.end());
+    std::sort(pattern.blocked_by_host.begin(), pattern.blocked_by_host.end());
+    pattern.occupied_seats.clear();
+    for (const auto& entry : pattern.assignments) pattern.occupied_seats.push_back(entry.second);
+    std::sort(pattern.occupied_seats.begin(), pattern.occupied_seats.end());
+    std::set<std::string> blocked;
+    for (const auto& entry : pattern.blocked_by_host) blocked.insert(entry.second.begin(), entry.second.end());
+    pattern.blocked_seats.assign(blocked.begin(), blocked.end());
+    blocked.insert(pattern.occupied_seats.begin(), pattern.occupied_seats.end());
+    pattern.seat_resources.assign(blocked.begin(), blocked.end());
+    std::set<int> conflicts;
+    if (conflict_diversity_active) for (const auto& seat : pattern.seat_resources) {
+        const auto owner = owner_by_resource.find(seat);
+        if (owner != owner_by_resource.end() && owner->second != group_id) conflicts.insert(owner->second);
+    }
+    pattern.conflict_groups.assign(conflicts.begin(), conflicts.end());
+    auto& patterns = groups_[group_id];
+    const auto existing = std::find_if(patterns.begin(), patterns.end(), [&](const auto& old) {
+        return old.assignments == pattern.assignments && old.blocked_by_host == pattern.blocked_by_host;
+    });
+    if (existing == patterns.end()) patterns.push_back(std::move(pattern));
+    else if (pattern.local_score > existing->local_score) *existing = std::move(pattern);
+    else if (pattern.pinned) existing->pinned = true;
+    if (patterns.size() <= static_cast<size_t>(limit_)) return;
+    std::map<std::vector<int>, int> conflict_counts;
+    for (const auto& item : patterns) ++conflict_counts[item.conflict_groups];
+    bool has_duplicate_conflict = false;
+    for (const auto& item : patterns)
+        if (!item.pinned && conflict_counts[item.conflict_groups] > 1) has_duplicate_conflict = true;
+    auto worst = patterns.end();
+    for (auto item = patterns.begin(); item != patterns.end(); ++item) {
+        if (item->pinned || (has_duplicate_conflict && conflict_counts[item->conflict_groups] <= 1)) continue;
+        if (worst == patterns.end() || item->local_score < worst->local_score) worst = item;
+    }
+    if (worst != patterns.end()) patterns.erase(worst);
+}
+
 }  // namespace full_cpp
