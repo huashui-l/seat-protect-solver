@@ -91,6 +91,22 @@ int main(int argc, char** argv) {
             << "\"native_score\":" << native_score << ','
             << "\"individual_score\":" << individual_score << ','
             << "\"wall_seconds\":" << result.wall_seconds << ','
+            << "\"selected_incumbent\":\"" << result.selected_incumbent << "\","
+            << "\"q0_score\":" << result.q0_score << ','
+            << "\"group_construction_score\":" << result.group_construction_score << ','
+            << "\"score_delta\":" << result.score_delta << ','
+            << "\"component_deltas\":{"
+            << "\"score_s\":" << result.selected_components.score_s - result.q0_components.score_s << ','
+            << "\"score_v\":" << result.selected_components.score_v - result.q0_components.score_v << ','
+            << "\"score_p\":" << result.selected_components.score_p - result.q0_components.score_p << ','
+            << "\"score_c\":" << result.selected_components.score_c - result.q0_components.score_c << ','
+            << "\"score_b\":" << result.selected_components.score_b - result.q0_components.score_b << "},"
+            << "\"dfs_nodes\":" << result.dfs_nodes << ','
+            << "\"beam_nodes\":" << result.beam_nodes << ','
+            << "\"dfs_groups\":" << result.dfs_groups << ','
+            << "\"beam_groups\":" << result.beam_groups << ','
+            << "\"groups_improved\":" << result.groups_improved << ','
+            << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;
         for (int passenger = 0;
