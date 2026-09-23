@@ -20,11 +20,11 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | unassigned repair | relocation-chain repair | none | PYTHON_ONLY | no | ACTIVE |
 | protection exchange | protected multi-group pattern MIP | none | PYTHON_ONLY | no | ACTIVE |
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
-| group matching | exact bitmask matching | none | PYTHON_ONLY | no | ACTIVE |
+| group matching | exact bitmask matching | bounded two-group bitmask matching over the current occupied seat union | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
-| 1-opt / 2-swap | VND | none | PYTHON_ONLY | no | ACTIVE |
-| 3-cycle | VND explicit cycle | none | PYTHON_ONLY | no | ACTIVE |
-| caregiver rebuild | VND joint rebuild | none | PYTHON_ONLY | no | ACTIVE |
+| 1-opt / 2-swap | VND | native strict-improvement moves with shared deadline and full validator | PARTIAL_CPP | no | ACTIVE |
+| 3-cycle | VND explicit cycle | native strict-improvement cycles with shared deadline and full validator | PARTIAL_CPP | no | ACTIVE |
+| caregiver rebuild | VND joint rebuild | PYTHON_ONLY; native caregiver legality is preserved by the validator | PARTIAL_CPP | no | ACTIVE |
 | RR/search generation | separate orchestration | native task/Beam/commit/deadline | FULL_CPP | yes | Rich INACTIVE |
 | simulated annealing | none active | none | DEAD/UNUSED | no | Rich INACTIVE |
 | structured pattern handling | elite store, structured/special pricing | RR stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |

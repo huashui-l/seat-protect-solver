@@ -13,6 +13,14 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in pro
 
 The raw-native feasibility path now includes parsing, indexed problem/topology, fixed preprocessing, native legal domains and joint hard constraints, complete-incumbent construction, native feasibility validation, scoring, and serialization. Rich construction ordering, DFS/Beam, repair, VND/LNS/pattern stages, and Rich master semantics remain partial or Python-only. The raw feasibility production path has zero Python callbacks, but Rich active-stage native coverage is not yet 100%.
 
+The M1/M2 migration branch now also contains a native Rich construction entry,
+configuration-driven DFS/Beam limits, bounded direct repair, VND 1-opt/2-swap/
+3-cycle moves, and bounded two-group bitmask rebuild. These stages require a
+complete legal incumbent, use the shared deadline, and accept only strict score
+improvements. They are implementation progress, not a Rich quality-parity gate;
+the Python relocation-chain repair, caregiver rebuild, pattern stages, LNS, and
+restricted/protected master semantics remain outstanding.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

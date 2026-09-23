@@ -914,12 +914,12 @@ void improve_rich_vnd_m2(
                 std::vector<double> dp(1u << n, -std::numeric_limits<double>::infinity());
                 std::vector<int> parent(1u << n, -1);
                 dp[0] = 0.0;
-                for (int mask = 0; mask < (1 << n); ++mask) {
+                for (unsigned mask = 0; mask < (1u << n); ++mask) {
                     const int index = popcount(static_cast<unsigned>(mask));
                     if (index >= n || !std::isfinite(dp[mask])) continue;
                     for (int seat_index = 0; seat_index < n; ++seat_index) {
-                        if (mask & (1 << seat_index)) continue;
-                        const int next = mask | (1 << seat_index);
+                        if (mask & (1u << seat_index)) continue;
+                        const unsigned next = mask | (1u << seat_index);
                         const double value = dp[mask]
                             + evaluate_individual_score(problem, passengers[index], seats[seat_index]).total();
                         if (value > dp[next]) {
@@ -929,20 +929,20 @@ void improve_rich_vnd_m2(
                     }
                 }
                 std::vector<int> chosen(n, -1);
-                int mask = static_cast<int>((1u << n) - 1u);
+                unsigned mask = (1u << n) - 1u;
                 for (int index = n - 1; index >= 0; --index) {
                     const int seat_index = parent[mask];
                     if (seat_index < 0) return std::vector<int>();
                     chosen[index] = seats[seat_index];
-                    mask ^= 1 << seat_index;
+                    mask ^= 1u << seat_index;
                 }
                 return chosen;
             };
-            for (int mask = 1; mask < mask_limit - 1; ++mask) {
+            for (unsigned mask = 1; mask < mask_limit - 1; ++mask) {
                 if (popcount(static_cast<unsigned>(mask)) != left_size) continue;
                 std::vector<int> left_seats, right_seats;
                 for (int index = 0; index < total; ++index) {
-                    (mask & (1 << index) ? left_seats : right_seats).push_back(union_seats[index]);
+                    (mask & (1u << index) ? left_seats : right_seats).push_back(union_seats[index]);
                 }
                 std::vector<int> left_match = match_group(left_group.passengers, left_seats);
                 std::vector<int> right_match = match_group(right_group.passengers, right_seats);
