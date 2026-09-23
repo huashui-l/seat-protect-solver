@@ -12,6 +12,49 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* mode = replay.find("structured_generation"); mode && mode->bool_or()) {
+            std::vector<int> assignment(problem.passengers.size(), -1);
+            for (const auto& entry : replay.at("assignments").array)
+                assignment.at(static_cast<size_t>(entry.array[0].number)) = problem.seat_index.at(entry.array[1].string);
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(replay.at("deadline_seconds").number));
+            std::cout << std::setprecision(17) << "{\"candidates\":[";
+            bool first = true;
+            const auto stats = full_cpp::generate_rich_structured_patterns(problem, assignment, deadline,
+                [&](int g, const full_cpp::RichTieredPattern& item, double score, bool pinned) {
+                    if (!first) std::cout << ','; first = false;
+                    std::cout << "{\"group_id\":" << problem.groups[g].id << ",\"source\":\"structured_" << item.source
+                        << "\",\"local_score\":" << score << ",\"pinned\":" << (pinned ? "true" : "false") << ",\"assignments\":[";
+                    for (size_t i = 0; i < item.pattern.assignments.size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& a = item.pattern.assignments[i];
+                        std::cout << "[[" << problem.groups[g].id << ',' << problem.passengers[a.first].hostnum << "],\"" << problem.seats[a.second].id << "\"]";
+                    }
+                    std::map<int, std::vector<std::string>> blocked;
+                    for (const auto& entry : item.pattern.blocked_by) blocked[problem.passengers[entry.second].hostnum].push_back(problem.seats[entry.first].id);
+                    std::cout << "],\"blocked_by_host\":[";
+                    bool first_host = true;
+                    for (const auto& entry : blocked) {
+                        if (!first_host) std::cout << ','; first_host = false;
+                        std::cout << '[' << entry.first << ",[";
+                        for (size_t i = 0; i < entry.second.size(); ++i) { if (i) std::cout << ','; std::cout << '"' << entry.second[i] << '"'; }
+                        std::cout << "]]";
+                    }
+                    std::cout << "]}";
+                });
+            std::cout << "],\"diagnostics\":{\"enabled\":" << (stats.enabled ? "true" : "false")
+                << ",\"stopped_by_deadline\":" << (stats.stopped_by_deadline ? "true" : "false")
+                << ",\"three_tier_active\":" << (stats.three_tier_active ? "true" : "false")
+                << ",\"groups_attempted\":" << stats.groups_attempted << ",\"groups_with_patterns\":" << stats.groups_with_patterns
+                << ",\"patterns_generated\":" << stats.patterns_generated << ",\"row_windows_attempted\":" << stats.row_windows_attempted
+                << ",\"dfs_nodes\":" << stats.dfs_nodes << ",\"extreme_groups_attempted\":" << stats.extreme_groups_attempted
+                << ",\"span_reducing_patterns\":" << stats.span_reducing_patterns << ",\"tier_counts\":{";
+            bool first_tier = true;
+            for (const auto& entry : stats.tier_counts) { if (!first_tier) std::cout << ','; first_tier = false; std::cout << '"' << entry.first << "\":" << entry.second; }
+            std::cout << "},\"repair_queue\":"; full_cpp::write_rich_repair_queue(std::cout, stats.repair_queue, 20);
+            std::cout << "}}\n";
+            return 0;
+        }
         if (const auto* requests = replay.find("pricing_cache")) {
             const auto fixed = full_cpp::preprocess_fixed_seats(problem);
             const auto emit_seats = [&](const std::vector<int>& seats) {

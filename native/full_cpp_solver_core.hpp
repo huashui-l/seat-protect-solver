@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <set>
+#include <functional>
 
 namespace full_cpp {
 
@@ -72,6 +73,9 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
+    bool enable_structured_pattern_generation = true;
+    double structured_pattern_dfs_per_group = 0.08;
+    int structured_patterns_per_group = 12;
     int elite_patterns_per_group = 12;
     int structured_pattern_min_group_size = 5;
     int structured_rigid_shift_rows = 3;
@@ -154,6 +158,7 @@ struct Problem {
     double group_centroid_y_factor = 1.0;
     double baby_front_back_factor = 1.0;
     RichConstructionConfig rich;
+    native_json::Value rich_pricing_config;
     RichStageBudgets rich_stage_budgets;
     bool rich_quality_repair_active = false;
     bool rich_conflict_diversity_time_active = false;
@@ -372,6 +377,19 @@ RichPricingResult price_rich_group_dfs(const Problem& problem, int group_index,
     const std::set<RichPlacementSignature>& forbidden, std::chrono::steady_clock::time_point deadline,
     RichPricingCache& cache, bool exact, bool phase_one, bool stop_on_negative,
     const std::vector<std::string>& active_ssr_types = {});
+
+struct RichStructuredDiagnostics {
+    bool enabled = false, stopped_by_deadline = false, three_tier_active = false;
+    int groups_attempted = 0, groups_with_patterns = 0, patterns_generated = 0;
+    int row_windows_attempted = 0, extreme_groups_attempted = 0, span_reducing_patterns = 0;
+    long long dfs_nodes = 0;
+    double seconds = 0.0;
+    std::vector<RichGroupRepairMetric> repair_queue;
+    std::map<std::string, int> tier_counts{{"rigid", 0}, {"relaxed", 0}, {"value_block", 0}, {"global_value_block", 0}, {"rebuilt", 0}};
+};
+RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& problem,
+    const std::vector<int>& assignment, std::chrono::steady_clock::time_point deadline,
+    const std::function<void(int, const RichTieredPattern&, double, bool)>& recorder);
 
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm

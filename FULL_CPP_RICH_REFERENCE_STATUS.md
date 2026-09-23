@@ -852,6 +852,37 @@ native/state-replay-enabled regression passed 128 tests and 16,124 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for the standalone DFS checkpoint.
 
+`generate_rich_structured_patterns` now connects all structured generation layers
+and the native DFS in frozen group/window order. It applies activation and difficult
+group rules, initializes active SSR types, preserves group/window time limits,
+skips empty window domains, replaces duplicate sources without moving their first
+insertion position, and synchronously records each candidate with affected-group
+score, protection ownership, source and global-value pinning. Diagnostics include
+repair ordering, window/node totals, extreme/span-reducing counts and every tier.
+The function is verified through the probe; production scheduler and elite-store
+callback wiring are the next integration step, and special pricing remains open.
+
+Complete-function differential uses actual public construction assignments across
+eleven fixtures, plus disabled, already-expired and partial-assignment scenarios.
+Nonbinding stage/window budgets and a fixed DFS node cap isolate deterministic
+semantics. All candidate contents/order, sources, protection lists, pins and count
+diagnostics match; scores/repair metrics use eight decimal places. Fourteen
+scenarios passed. The test explicitly requires rebuilt and global-value candidates.
+
+This combined test exposed an existing scoring boundary: a hypothetical structured
+proposal can overlap another group's occupied seat. Python's infant interaction
+function returns zero for the same physical seat; native scoring had charged the
+same-subrow penalty. Native scoring now excludes identical physical seats, and the
+full-function test explicitly asserts that overlapping-infant candidates occur.
+Legal complete assignments retain their prior scoring behavior. This change is
+required for candidate scoring parity; it does not legalize overlapping proposals.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 129 tests and 16,138 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed for this structured orchestration checkpoint.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

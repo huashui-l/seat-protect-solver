@@ -73,6 +73,80 @@ class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
 
+    def test_complete_structured_generation_matches_frozen_function(self):
+        prefix = construction_prefix()
+        sources = set()
+        overlapping_infant_seen = False
+        for original in self.cases[:11]:
+            config = copy.deepcopy(self.config)
+            config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
+                                       construction_time_budget=60.0, small_group_dfs_time_limit=20.0,
+                                       structured_pattern_dfs_per_group=120.0)
+            config.setdefault("column_generation", {})["dfs_node_limit"] = 100
+            assignments = prefix(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                                 original["groupsData"], config["weights"], config)["context"].assigned_seats
+            variants = ("active", "disabled", "expired", "partial") if original is self.cases[0] else ("active",)
+            for variant in variants:
+                with self.subTest(case=original["id"], variant=variant):
+                    current = dict(assignments)
+                    variant_config = copy.deepcopy(config)
+                    if variant == "disabled": variant_config["algorithm"]["enable_structured_pattern_generation"] = False
+                    if variant == "partial":
+                        current.pop(next(iter(current)))
+                        variant_config["algorithm"]["structured_pattern_min_group_size"] = 1
+                    variant_config["input_contract"] = {"seatmaps_by_direction": {
+                        "public-test": {"old": "old.json", "new": "new.json"}}}
+                    duration = -1.0 if variant == "expired" else 120.0
+                    records = []
+                    def record(gid, placements, score, source, blocked, pinned):
+                        records.append(dict(group_id=gid, assignments=placements, local_score=score, source=source,
+                                            blocked_by_host=sorted(blocked.items()), pinned=pinned))
+                    scorer = evaluator.IncrementalSoftScorer(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                                                           original["groupsData"], variant_config["weights"], variant_config)
+                    diagnostics = rich.generate_structured_group_patterns(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                        original["groupsData"], types.SimpleNamespace(assigned_seats=current), scorer,
+                        variant_config["weights"], variant_config, rich.time.perf_counter() + duration, record)
+                    diagnostics.pop("seconds")
+                    initial = [[i, current[g["groupId"], p["hostnum"]]]
+                               for i, (g, p) in enumerate((g, p) for g in original["groupsData"] for p in g["psrs"])
+                               if (g["groupId"], p["hostnum"]) in current]
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": original["id"], "direction": "public-test", "groups": original["groupsData"]},
+                            "old.json": original["oldSeatmapData"], "new.json": original["newSeatmapData"], "config.json": variant_config,
+                            "replay.json": {"structured_generation": True, "assignments": initial, "deadline_seconds": duration},
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    expected = json.loads(json.dumps(dict(candidates=records, diagnostics=diagnostics)))
+                    self.assertEqual(len(actual["candidates"]), len(expected["candidates"]))
+                    for native, python in zip(actual["candidates"], expected["candidates"]):
+                        proposal = dict(current)
+                        proposal.update((tuple(k), s) for k, s in python["assignments"])
+                        for group in original["groupsData"]:
+                            for p in group["psrs"]:
+                                infant = (group["groupId"], p["hostnum"])
+                                if p.get("ssr") == "BSCT" and infant in proposal:
+                                    overlapping_infant_seen |= any(k[0] != infant[0] and s == proposal[infant]
+                                                                   for k, s in proposal.items())
+                        self.assertAlmostEqual(native.pop("local_score"), python.pop("local_score"), places=8)
+                        sources.add(native["source"])
+                        self.assertEqual(native, python)
+                    native_queue = actual["diagnostics"].pop("repair_queue")
+                    python_queue = expected["diagnostics"].pop("repair_queue")
+                    self.assertEqual(len(native_queue), len(python_queue))
+                    for native, python in zip(native_queue, python_queue):
+                        self.assertEqual(native.keys(), python.keys())
+                        for key in python: self.assertAlmostEqual(native[key], python[key], places=8)
+                    self.assertEqual(actual["diagnostics"], expected["diagnostics"])
+        self.assertIn("structured_rebuilt", sources)
+        self.assertIn("structured_global_value_block", sources)
+        self.assertTrue(overlapping_infant_seen)
+
     def test_complete_pricing_dfs_matches_frozen_search(self):
         ordinary = self.synthetic([(101, {})] * 3)
         ordinary["id"] = "dfs_identical_ordinary"
