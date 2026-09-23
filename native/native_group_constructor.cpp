@@ -950,7 +950,11 @@ GroupConstructionResult construct_rich_m1(
         ++result.rich_paired_ssr_passes;
         if (added <= 0) break;
     }
-    // Failed paired-SSR joint rescue remains a separate pending migration.
+    const auto rescue = rescue_rich_paired_ssrs(problem, state, cache, construction_deadline);
+    result.rich_paired_rescue_attempted = static_cast<int>(rescue.attempted.size());
+    result.rich_paired_rescue_rescued = static_cast<int>(rescue.rescued.size());
+    result.rich_paired_rescue_unresolved = static_cast<int>(rescue.unresolved.size());
+    result.rich_paired_joint_rebuilds = rescue.joint_rebuilds;
     capture(assign_rich_remaining(problem, state, cache, groups, construction_deadline));
     const auto construction_finished = std::chrono::steady_clock::now();
     result.rich_construction_seconds = std::chrono::duration<double>(construction_finished - started).count();

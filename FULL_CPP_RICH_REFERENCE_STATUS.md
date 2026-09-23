@@ -102,8 +102,7 @@ ranking cache to repair. Q0/Q1/Q2A are selection fallbacks rather than construct
 input. Construction timing/counts are captured before repair, and raw CLI output
 includes Rich DFS/Beam counters. A production regression forces Q2A and Rich DFS
 failure but observes successful independent Rich Beam completion without repair.
-Failed-pair joint rescue (between paired and remaining passes), complete
-adaptive/carry runtime scheduling, and full-pipeline quality parity are still pending;
+Complete adaptive/carry runtime scheduling and full-pipeline quality parity are still pending;
 repair is not claimed as an equivalent substitute for those missing stages.
 
 Direct replay calls actual Python `assign_remaining_passengers` and the production
@@ -137,9 +136,7 @@ Python assignments, blocked resources and newly assigned count. Tests cover
 11 public fixtures, assigned/unassigned care combinations, fixed unsatisfied
 passengers, single/both-empty partner exclusions and the 500-feasible-seat cutoff.
 The production caregiver/SSR fixture completes construction without relocation
-repair. Dedicated `rescue_failed_paired_ssrs` (fixed-neighbor displacement,
-bounded multi-task plans and complete care-group joint rebuild) is still pending;
-paired construction alone is not claimed to replace it.
+repair. Dedicated failed-pair rescue now follows these paired passes, as described below.
 Release build passed, followed by the full native/state-replay-enabled public
 suite: 87 tests, 12,379 subtests, 9 skips. The existing two conversion warnings
 remain. No Formal24 or default-budget quality-parity claim is made at this stage.
@@ -241,6 +238,25 @@ counted as executed, and no Formal24 quality claim follows from these clock test
 Release MSVC build passed (the two pre-existing integer-to-double warnings
 remain). Native-enabled public tests passed: 67 tests, 274 subtests, 10 skips.
 The separately enabled state-replay test passed all 12,000 operation subtests.
+
+`rescue_rich_paired_ssrs` now implements Python `rescue_failed_paired_ssrs`
+and runs before remaining construction. Fixed cared passengers can obtain a
+neighboring caregiver by moving an ordinary nonfixed occupant, including one
+from another group. Missing cared passengers use capped options and a 1,000-node
+search maximizing the paired count before cost; unresolved tasks can trigger a
+bounded whole-care-group rebuild with fixed seats retained and Python's restore
+ordering. Candidate costs preserve the initial owner regrets. The raw CLI emits
+attempted/rescued/unresolved counts and joint rebuilds; the shared stage probe
+also exposes the exact ordered external passenger-key lists.
+
+Differential tests compare actual Python assignments, protection blocks and all
+rescue diagnostics on 11 public fixtures plus fixed-neighbor displacement,
+immovable fixed neighbors, bounded joint-rebuild rollback/success, and two cared
+passengers sharing one adult. Release build and the complete native/state-replay
+public suite passed: 92 tests, 12,392 subtests, 9 skips. Isolated rescue parity and
+production integration are established for these scenarios; combined construction
+checkpoints, adaptive runtime scheduling and Formal24 parity remain outstanding.
+No Formal24 checkpoint or quality claim accompanies this change.
 
 ## Correctness
 

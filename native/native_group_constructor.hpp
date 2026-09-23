@@ -41,6 +41,7 @@ struct GroupConstructionResult {
     int rich_paired_rescue_attempted = 0;
     int rich_paired_rescue_rescued = 0;
     int rich_paired_rescue_unresolved = 0;
+    int rich_paired_joint_rebuilds = 0;
     long long rich_dfs_nodes = 0;
     long long rich_beam_nodes = 0;
     int rich_dfs_attempted = 0;
@@ -101,6 +102,16 @@ RichRemainingDiagnostics assign_rich_remaining(
 );
 
 int assign_rich_paired_ssrs(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    std::chrono::steady_clock::time_point deadline
+);
+
+struct RichPairedRescueDiagnostics {
+    std::vector<int> attempted, rescued, unresolved;
+    int joint_rebuilds = 0;
+};
+
+RichPairedRescueDiagnostics rescue_rich_paired_ssrs(
     const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
     std::chrono::steady_clock::time_point deadline
 );

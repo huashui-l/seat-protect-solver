@@ -46,7 +46,13 @@ int main(int argc, char** argv) {
         full_cpp::GroupConstructionResult diagnostics;
         full_cpp::RichRemainingDiagnostics construction;
         int paired_added = 0;
-        if (const auto* paired = replay.find("paired_ssrs"); paired && paired->bool_or()) {
+        full_cpp::RichPairedRescueDiagnostics rescue;
+        if (const auto* mode = replay.find("paired_rescue"); mode && mode->bool_or()) {
+            auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            cache.rankings = rankings;
+            rescue = full_cpp::rescue_rich_paired_ssrs(problem, state, cache,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60));
+        } else if (const auto* paired = replay.find("paired_ssrs"); paired && paired->bool_or()) {
             auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             cache.rankings = rankings;
             paired_added = full_cpp::assign_rich_paired_ssrs(problem, state, cache,
@@ -94,7 +100,20 @@ int main(int argc, char** argv) {
             }
             std::cout << ']';
         }
-        std::cout << "]}\n";
+        std::cout << "],\"rescue\":{\"joint_rebuilds\":" << rescue.joint_rebuilds;
+        const auto emit_keys = [&](const char* name, const std::vector<int>& keys) {
+            std::cout << ",\"" << name << "\":[";
+            for (size_t i = 0; i < keys.size(); ++i) {
+                if (i) std::cout << ',';
+                const auto& passenger = problem.passengers[keys[i]];
+                std::cout << '[' << passenger.group_id << ',' << passenger.hostnum << ']';
+            }
+            std::cout << ']';
+        };
+        emit_keys("attempted", rescue.attempted);
+        emit_keys("rescued", rescue.rescued);
+        emit_keys("unresolved", rescue.unresolved);
+        std::cout << "}}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
