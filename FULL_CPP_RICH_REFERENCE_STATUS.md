@@ -269,7 +269,7 @@ asserted absent at both checkpoints in these scenarios.
 
 These comparisons use generous nonbinding construction/repair times and do not
 establish wall-clock cutoff parity. Tail-stage runtime scheduling,
-construction repair queue/elite bookkeeping, and a frozen Formal24 M1 checkpoint
+elite bookkeeping and a frozen Formal24 M1 checkpoint
 are still outstanding. The earlier inconsistent all-missing repair reproduction
 remains a separate reference defect; these passing trajectories do not prove
 it unreachable for all inputs.
@@ -300,8 +300,8 @@ search-deadline cap. Unused duplicate direct stage-budget fields were removed.
 This is production integration of the first three stage windows, not complete
 runtime or quality parity. The Q0/Q1/Q2A prefix is an additional native fallback
 cost absent from Python and can consume the construction window. Raw parsing and
-topology currently occur before this solver clock. Construction repair-queue and
-elite capture bookkeeping are still absent, so timing overhead is not identical.
+topology currently occur before this solver clock. Construction repair-queue bookkeeping is now native as described below;
+elite capture is still absent, so timing overhead is not identical.
 The current RR pattern adapter remains clipped to the shared search deadline;
 it is not labeled as the missing structured/protected/pricing/LNS stages, and its
 restricted-master budget/carry semantics remain pending. Complete legal fallbacks
@@ -313,6 +313,27 @@ five production scenarios replay actual construction/repair/VND timestamps.
 Two existing fallback tests now assert the pre-VND M1 selection score and final
 non-regression, because zero VND base budget does not suppress carried time.
 No Formal24 checkpoint, tuning or profiling was performed.
+
+The construction repair queue now follows Python `_group_repair_metrics` and
+`_repair_priority_key`. Each group retains size/assigned counts, row span/count,
+centroid compactness penalty/score, value and preference losses, priority loss and
+extreme-dispersion flag. Quality losses activate at the configured business-time
+threshold; preference loss sums all toilet rules. Sorting uses descending priority
+loss, row span and compactness penalty, then ascending external group ID. The full
+queue is retained natively for later stage consumers; raw CLI diagnostics truncate
+to the first 20 groups and count extreme dispersion over every group, matching
+Python. Queue computation occurs before construction finish/carry accounting.
+
+Actual Python metrics/order match in 45 direct fixture/state/config scenarios,
+including the activation threshold, partial assignments, zero compactness weight
+and multiple toilet rules. All 33 combined construction/repair scenarios now also
+compare their construction repair queues. Production tests verify count consistency,
+sorting and extreme-dispersion diagnostics. The queue is not yet consumed by the
+unmigrated structured/protected/LNS algorithms; this change does not claim those
+stages implemented or Full C++ quality parity.
+Release MSVC build passed; the full native/state-replay-enabled public suite
+passed 95 tests, 12,527 subtests, 9 skips. Existing two conversion warnings remain.
+No Formal24 checkpoint or performance experiment was run for this change.
 
 ## Correctness
 

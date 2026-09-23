@@ -6,6 +6,8 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <ostream>
+#include <tuple>
 #include <stdexcept>
 
 namespace full_cpp {
@@ -307,6 +309,12 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     const Value* stage_algorithm = config.find("algorithm");
     problem.rich_stage_budgets = calculate_rich_stage_budgets(
         problem, stage_algorithm ? *stage_algorithm : Value{});
+    const auto setting = [&](const char* key, double fallback) {
+        const Value* item = stage_algorithm ? stage_algorithm->find(key) : nullptr;
+        return item ? item->number_or(fallback) : fallback;
+    };
+    problem.rich_quality_repair_active = setting("business_time_limit_seconds", 5.0)
+        >= setting("three_tier_min_business_time_seconds", 10.0);
     return problem;
 }
 
@@ -420,6 +428,88 @@ ScoreComponents evaluate_score_components(
 
 double evaluate_soft_score(const Problem& problem, const std::vector<int>& assignment) {
     return evaluate_score_components(problem, assignment).total();
+}
+
+std::vector<RichGroupRepairMetric> build_rich_repair_queue(
+    const Problem& problem, const std::vector<int>& assignment
+) {
+    std::vector<RichGroupRepairMetric> queue;
+    for (const auto& group : problem.groups) {
+        RichGroupRepairMetric metric;
+        metric.group_id = group.id;
+        metric.size = static_cast<int>(group.passengers.size());
+        std::vector<int> seats;
+        std::set<int> rows;
+        double sum_x = 0.0, sum_y = 0.0;
+        for (int p : group.passengers) {
+            const int s = assignment[p];
+            if (s < 0) continue;
+            seats.push_back(s);
+            rows.insert(problem.seats[s].row);
+            sum_x += problem.seats[s].x;
+            sum_y += problem.seats[s].y;
+            if (problem.rich_quality_repair_active) {
+                const auto parts = evaluate_individual_score(problem, p, s);
+                metric.value_mismatch_score += parts.score_v;
+                double preference = parts.score_p;
+                const auto& passenger = problem.passengers[p];
+                // The incremental evaluator sums all toilet preference rules;
+                // the older full-score path stores a single preference as well.
+                if (problem.old_seat_index.count(passenger.old_seat)) {
+                    if (passenger.has_near_toilet_preference
+                        && problem.seats[s].near_toilet != passenger.prefer_near_toilet)
+                        preference -= problem.weight_t * passenger.near_toilet_preference_weight;
+                    for (const auto& rule : passenger.rich_toilet_preferences)
+                        if (problem.seats[s].near_toilet != rule.first)
+                            preference += problem.weight_t * rule.second;
+                }
+                metric.preference_mismatch_score += preference;
+            }
+        }
+        metric.assigned = static_cast<int>(seats.size());
+        metric.row_count = static_cast<int>(rows.size());
+        if (!rows.empty()) metric.row_span = *rows.rbegin() - *rows.begin();
+        if (seats.size() > 1) {
+            double max_x = 0.0, max_y = 0.0;
+            for (int s : seats) {
+                max_x = std::max(max_x, std::abs(problem.seats[s].x - sum_x / seats.size()));
+                max_y = std::max(max_y, std::abs(problem.seats[s].y - sum_y / seats.size()));
+            }
+            metric.compactness_penalty = problem.group_centroid_x_factor * max_x
+                + problem.group_centroid_y_factor * max_y;
+        }
+        metric.compactness_score = problem.weight_c * metric.compactness_penalty;
+        metric.priority_loss = -(metric.compactness_score + metric.value_mismatch_score);
+        metric.extreme_dispersion = metric.row_span >= 2;
+        queue.push_back(metric);
+    }
+    std::stable_sort(queue.begin(), queue.end(), [](const auto& left, const auto& right) {
+        const auto key = [](const auto& m) {
+            return std::make_tuple(-m.priority_loss, -m.row_span, -m.compactness_penalty, m.group_id);
+        };
+        return key(left) < key(right);
+    });
+    return queue;
+}
+
+void write_rich_repair_queue(std::ostream& output,
+    const std::vector<RichGroupRepairMetric>& queue, size_t limit
+) {
+    output << '[';
+    for (size_t i = 0; i < std::min(limit, queue.size()); ++i) {
+        if (i) output << ',';
+        const auto& m = queue[i];
+        output << "{\"group_id\":" << m.group_id << ",\"size\":" << m.size
+            << ",\"assigned\":" << m.assigned << ",\"row_span\":" << m.row_span
+            << ",\"row_count\":" << m.row_count
+            << ",\"compactness_penalty\":" << m.compactness_penalty
+            << ",\"compactness_score\":" << m.compactness_score
+            << ",\"value_mismatch_score\":" << m.value_mismatch_score
+            << ",\"preference_mismatch_score\":" << m.preference_mismatch_score
+            << ",\"priority_loss\":" << m.priority_loss
+            << ",\"extreme_dispersion\":" << (m.extreme_dispersion ? "true" : "false") << '}';
+    }
+    output << ']';
 }
 
 FixedSeatContext preprocess_fixed_seats(const Problem& problem) {

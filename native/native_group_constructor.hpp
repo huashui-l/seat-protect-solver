@@ -35,6 +35,7 @@ struct GroupConstructionResult {
     int recovery_succeeded = 0;
     double rich_construction_score = 0.0;
     double rich_repair_score = 0.0;
+    std::vector<RichGroupRepairMetric> rich_construction_repair_queue;
     bool rich_candidate_complete = false;
     int rich_construction_assigned = 0;
     int rich_construction_unassigned = 0;

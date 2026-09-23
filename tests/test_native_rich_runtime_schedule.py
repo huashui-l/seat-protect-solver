@@ -29,6 +29,14 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 budgets = oracle(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
                                  case["groupsData"], config["weights"], config)
                 result = self.run_case(case["id"], "group-first", algorithm=variant)
+                queue = result["rich_construction_repair_queue"]
+                self.assertEqual(len(queue), len(case["groupsData"]))
+                self.assertEqual(sum(m["assigned"] for m in queue), result["rich_construction_assigned"])
+                self.assertEqual(result["rich_extreme_dispersion_group_count"],
+                                 sum(m["extreme_dispersion"] for m in queue))
+                priorities = [(-m["priority_loss"], -m["row_span"], -m["compactness_penalty"], m["group_id"])
+                              for m in queue]
+                self.assertEqual(priorities, sorted(priorities))
                 for stage, budget in budgets["stages"].items():
                     self.assertAlmostEqual(result["rich_stage_budgets"][stage], budget, places=10)
                 self.assertAlmostEqual(result["rich_business_time_limit"], budgets["business_time_limit"])

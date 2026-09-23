@@ -199,6 +199,7 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.score_delta = pattern_result.score - group_result.q0_score;
                 }
             }
+            result.rich_construction_repair_queue = group_result.rich_construction_repair_queue;
             result.rich_stage_timing = group_result.rich_stage_timing;
             result.passenger_to_seat = group_result.passenger_to_seat;
             result.selected_incumbent = group_result.selected_incumbent;

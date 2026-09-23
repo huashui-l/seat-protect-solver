@@ -3,6 +3,7 @@
 #include "native_json.hpp"
 
 #include <string>
+#include <iosfwd>
 #include <limits>
 #include <unordered_map>
 #include <vector>
@@ -140,7 +141,21 @@ struct Problem {
     double baby_front_back_factor = 1.0;
     RichConstructionConfig rich;
     RichStageBudgets rich_stage_budgets;
+    bool rich_quality_repair_active = false;
 };
+
+struct RichGroupRepairMetric {
+    int group_id = 0, size = 0, assigned = 0, row_span = 0, row_count = 0;
+    double compactness_penalty = 0.0, compactness_score = 0.0;
+    double value_mismatch_score = 0.0, preference_mismatch_score = 0.0;
+    double priority_loss = 0.0;
+    bool extreme_dispersion = false;
+};
+
+std::vector<RichGroupRepairMetric> build_rich_repair_queue(
+    const Problem& problem, const std::vector<int>& assignment);
+void write_rich_repair_queue(std::ostream& output,
+    const std::vector<RichGroupRepairMetric>& queue, size_t limit);
 
 struct FixedSeatContext {
     std::vector<int> owner_by_seat;

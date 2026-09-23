@@ -75,6 +75,10 @@ class NativeRichPipelineTests(unittest.TestCase):
                         scorer.components(context.assigned_seats))
 
             construction = checkpoint()
+            metrics = rich._group_repair_metrics(case["groupsData"], context.assigned_seats,
+                                                 scorer.new_topology, config["weights"], config,
+                                                 scorer.old_topology)
+            queue = sorted(metrics.values(), key=rich._repair_priority_key)
             repair = rich.repair_unassigned_by_local_relocation(
                 expected["groups"], context, expected["passenger_sorted_seats"], config)
             repaired = checkpoint()
@@ -90,6 +94,11 @@ class NativeRichPipelineTests(unittest.TestCase):
                                   str(work / "replay.json")], capture_output=True, text=True, timeout=180)
         self.assertEqual(run.returncode, 0, run.stderr)
         actual = json.loads(run.stdout)
+        self.assertEqual([m["group_id"] for m in actual["construction_repair_queue"]],
+                         [m["group_id"] for m in queue])
+        for native, reference in zip(actual["construction_repair_queue"], queue):
+            for key, value in reference.items():
+                self.assertAlmostEqual(native[key], value, places=8, msg=key)
         for prefix, reference, score_key in (("construction_", construction, "construction_score"),
                                               ("", repaired, "repair_score")):
             self.assertEqual(actual[prefix + "assignments"], reference[0], prefix + "assignments")

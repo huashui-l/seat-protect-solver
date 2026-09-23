@@ -20,6 +20,13 @@ int main(int argc, char** argv) {
                 ? problem.seat_index.at(entry.array[2].string) : -1;
             if (!state.assign(passenger, seat, block)) throw std::runtime_error("invalid replay assignment");
         }
+        if (const auto* mode = replay.find("repair_metrics_only"); mode && mode->bool_or()) {
+            std::cout << std::setprecision(17) << "{\"repair_queue\":";
+            full_cpp::write_rich_repair_queue(std::cout,
+                full_cpp::build_rich_repair_queue(problem, state.passenger_to_seat), problem.groups.size());
+            std::cout << "}\n";
+            return 0;
+        }
         std::vector<std::vector<int>> rankings;
         if (const auto* mode = replay.find("rank_only"); mode && mode->bool_or()) {
             const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
@@ -157,6 +164,9 @@ int main(int argc, char** argv) {
                     << ",\"score_c\":" << score.score_c << ",\"score_b\":" << score.score_b
                     << ",\"total_soft_score\":" << score.total() << '}';
             };
+            std::cout << ",\"construction_repair_queue\":";
+            full_cpp::write_rich_repair_queue(std::cout,
+                full_cpp::build_rich_repair_queue(problem, construction_state.passenger_to_seat), problem.groups.size());
             emit_score("construction_score", construction_score);
             emit_score("repair_score", full_cpp::evaluate_score_components(problem, state.passenger_to_seat));
         }

@@ -175,7 +175,11 @@ int main(int argc, char** argv) {
                 << ",\"deadline\":" << timing.deadline << ",\"carry\":" << timing.carry
                 << ",\"pricing_reserve\":" << timing.pricing_reserve << '}';
         }
-        *output << "},\"assignments\":[";
+        *output << "},\"rich_construction_repair_queue\":";
+        full_cpp::write_rich_repair_queue(*output, result.rich_construction_repair_queue, 20);
+        int extreme = 0;
+        for (const auto& metric : result.rich_construction_repair_queue) extreme += metric.extreme_dispersion;
+        *output << ",\"rich_extreme_dispersion_group_count\":" << extreme << ",\"assignments\":[";
         bool first = true;
         for (int passenger = 0;
              passenger < static_cast<int>(result.passenger_to_seat.size()); ++passenger) {
