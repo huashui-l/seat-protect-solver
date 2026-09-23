@@ -143,7 +143,8 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertTrue(result["rich_candidate_complete"])
         self.assertGreater(result["rich_repair_repaired"], 0)
         self.assertLess(result["rich_repair_score"], result["q1_score"])
-        self.assertAlmostEqual(result["native_score"], result["q1_score"])
+        self.assertAlmostEqual(result["rich_m1_selected_score"], result["q1_score"])
+        self.assertGreaterEqual(result["native_score"], result["rich_m1_selected_score"])
 
     def test_partial_fixed_state_survives_disabled_repair(self):
         result = self.run_case("fixed_and_protected", "group-first", algorithm={
@@ -158,7 +159,8 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertFalse(result["rich_candidate_complete"])
         self.assertEqual(result["rich_repair_attempted"], 0)
         self.assertEqual(result["rich_repair_nodes"], 0)
-        self.assertAlmostEqual(result["native_score"], result["q1_score"])
+        self.assertAlmostEqual(result["rich_m1_selected_score"], result["q1_score"])
+        self.assertGreaterEqual(result["native_score"], result["rich_m1_selected_score"])
 
     def test_restricted_master_uses_configured_budget_and_tail_floor(self):
         for base, tail in ((0.2, 0.0), (0.0, 0.15), (0.2, 0.1)):

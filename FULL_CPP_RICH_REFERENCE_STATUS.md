@@ -214,10 +214,9 @@ tail/special-pricing activation. The oracle executes the actual Python prefix
 without running search. All 52 fixture/config scenarios matched to 10 decimal
 places, including absent settings, negative budgets, threshold boundaries,
 shrink/expand layouts, and protected demand. MSVC and the native-enabled suite
-passed: 67 tests, 118 subtests, 10 skips. Production stage orchestration does not
-yet consume this calculation; replacing its existing limits and implementing
-unused-budget carry remain required. This checkpoint is budget-calculation
-parity, not runtime scheduling or 60-second quality parity.
+passed: 67 tests, 118 subtests, 10 skips. This initial checkpoint established budget-calculation parity; production
+construction/repair/VND now consume it as described below. It does not establish
+60-second quality parity.
 
 The native core now also supplies `RichStageSchedule`, with caller-supplied
 monotonic timestamps and a `--schedule-replay` core-probe mode. It preserves
@@ -231,9 +230,8 @@ Python allocation function, including its VND augmented assignment. Across 52
 fixture/config scenarios, 156 virtual-clock traces matched to 10 decimal places;
 these include early finishes, incomplete construction, overruns, negative tail
 budgets, nonzero clock origins, and active/inactive pricing reserve.
-Production does not yet call this scheduler: its Q0/Q1/Q2A fallback orchestration
-and partial Rich construction/repair boundaries still need separation before
-wiring in the frozen stage schedule. No absent protected/LNS/pricing stage is
+Production now calls this scheduler for construction, repair and VND, as
+described below. The full protected/LNS/pricing schedule still needs integration. No absent protected/LNS/pricing stage is
 counted as executed, and no Formal24 quality claim follows from these clock tests.
 Release MSVC build passed (the two pre-existing integer-to-double warnings
 remain). Native-enabled public tests passed: 67 tests, 274 subtests, 10 skips.
@@ -254,7 +252,7 @@ rescue diagnostics on 11 public fixtures plus fixed-neighbor displacement,
 immovable fixed neighbors, bounded joint-rebuild rollback/success, and two cared
 passengers sharing one adult. Release build and the complete native/state-replay
 public suite passed: 92 tests, 12,392 subtests, 9 skips. Isolated rescue parity and
-production integration are established for these scenarios; adaptive runtime
+production integration are established for these scenarios; full runtime
 scheduling and Formal24 parity remain outstanding.
 No Formal24 checkpoint or quality claim accompanies this change.
 
@@ -270,7 +268,7 @@ construction counters and four repair counters. Python orphan occupancy is
 asserted absent at both checkpoints in these scenarios.
 
 These comparisons use generous nonbinding construction/repair times and do not
-establish wall-clock cutoff parity. The production adaptive stage scheduler,
+establish wall-clock cutoff parity. Tail-stage runtime scheduling,
 construction repair queue/elite bookkeeping, and a frozen Formal24 M1 checkpoint
 are still outstanding. The earlier inconsistent all-missing repair reproduction
 remains a separate reference defect; these passing trajectories do not prove
@@ -279,6 +277,42 @@ Release MSVC build and the full native/state-replay-enabled public suite passed:
 93 tests, 12,425 subtests, 9 skips. This includes the 12,000-operation state replay
 and the existing raw-native external legality/score audits. Only the two existing
 integer-to-double conversion warnings remain; no Formal24 run was performed.
+
+Production construction/repair/VND now use the native adaptive budget calculator
+and `RichStageSchedule`. All three share the solver-entry monotonic origin;
+Q0/Q1/Q2A fallback work is charged to that origin rather than resetting the Rich
+construction deadline. The search deadline reserves scoring time and respects
+both the configured business limit and the CLI outer cap. Incomplete construction
+lends the remaining search window to repair, while the repair function retains
+its own configured time/node cap. Construction and repair carry feed the next
+stage, including VND's post-protected pricing reservation. A zero VND base budget
+therefore does not disable VND when carry is positive.
+
+The raw CLI reports configured/scaled budgets, search deadline, and actual
+construction/repair/VND start, finish, deadline, carry and pricing reserve. It also
+reports `rich_m1_selected_score`, allowing fallback acceptance to be audited before
+later VND improvements. Actual production timestamps are replayed through the
+frozen Python schedule expressions for adaptive/nonadaptive settings, negative
+construction budget, incomplete/disabled repair and CLI clipping of a 60-second
+configuration. The virtual-clock suite additionally covers an explicit outer
+search-deadline cap. Unused duplicate direct stage-budget fields were removed.
+
+This is production integration of the first three stage windows, not complete
+runtime or quality parity. The Q0/Q1/Q2A prefix is an additional native fallback
+cost absent from Python and can consume the construction window. Raw parsing and
+topology currently occur before this solver clock. Construction repair-queue and
+elite capture bookkeeping are still absent, so timing overhead is not identical.
+The current RR pattern adapter remains clipped to the shared search deadline;
+it is not labeled as the missing structured/protected/pricing/LNS stages, and its
+restricted-master budget/carry semantics remain pending. Complete legal fallbacks
+remain eligible for the existing partial VND even when the Rich candidate fails.
+Validation: frozen-source Release rebuild passed; the complete native/state-replay
+suite passed 94 tests, 12,482 subtests and 9 skips. The budget oracle covers 52
+fixture/config scenarios with four clock traces each, including outer-cap cases;
+five production scenarios replay actual construction/repair/VND timestamps.
+Two existing fallback tests now assert the pre-VND M1 selection score and final
+non-regression, because zero VND base budget does not suppress carried time.
+No Formal24 checkpoint, tuning or profiling was performed.
 
 ## Correctness
 

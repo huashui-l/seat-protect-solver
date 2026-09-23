@@ -64,9 +64,6 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
-    double construction_time_budget = 16.51276595744681;
-    double repair_time_budget = 3.175531914893617;
-    double scoring_time_reserve = 0.25;
     double stage3_time_budget = 20.0;
     bool enable_restricted_pattern_mip = true;
     double restricted_pattern_mip_time_budget = 0.0;
@@ -95,11 +92,20 @@ struct RichConstructionConfig {
     long long paired_joint_rebuild_node_limit = 50000;
     int final_repair_node_limit = 20000;
     double final_repair_time_limit = 2.0;
-    double vnd_time_budget = 6.351063829787234;
     int local_search_candidate_cap = 32;
     int local_search_cycle_candidate_cap = 12;
     int local_search_related_candidate_cap = 64;
     int local_search_related_group_cap = 8;
+};
+
+struct RichStageBudgets {
+    double business_time_limit = 0.0;
+    double scoring_reserve = 0.0;
+    double usable_time = 0.0;
+    int seat_demand = 0;
+    bool post_protected_tail_reserve_active = false;
+    bool post_protected_special_pricing_active = false;
+    std::map<std::string, double> stages;
 };
 
 struct Problem {
@@ -133,21 +139,12 @@ struct Problem {
     double group_centroid_y_factor = 1.0;
     double baby_front_back_factor = 1.0;
     RichConstructionConfig rich;
+    RichStageBudgets rich_stage_budgets;
 };
 
 struct FixedSeatContext {
     std::vector<int> owner_by_seat;
     std::vector<bool> deterministic_blocked;
-};
-
-struct RichStageBudgets {
-    double business_time_limit = 0.0;
-    double scoring_reserve = 0.0;
-    double usable_time = 0.0;
-    int seat_demand = 0;
-    bool post_protected_tail_reserve_active = false;
-    bool post_protected_special_pricing_active = false;
-    std::map<std::string, double> stages;
 };
 
 RichStageBudgets calculate_rich_stage_budgets(
@@ -159,11 +156,18 @@ struct RichStageWindow {
     double deadline = 0.0;
 };
 
+struct RichStageTiming {
+    double base_budget = 0.0, effective_budget = 0.0;
+    double started = 0.0, finished = 0.0, deadline = 0.0;
+    double carry = 0.0, pricing_reserve = 0.0;
+};
+
 // Times use one monotonic clock origin, supplied by the caller for replay tests.
 class RichStageSchedule {
 public:
     RichStageSchedule(const RichStageBudgets& budgets, double allocation_start,
-                      double restricted_tail_budget);
+                      double restricted_tail_budget,
+                      double search_deadline_limit = std::numeric_limits<double>::infinity());
     RichStageWindow begin(const std::string& stage, double now,
                           int construction_unassigned = 0);
     void finish(const std::string& stage, const RichStageWindow& window, double now);

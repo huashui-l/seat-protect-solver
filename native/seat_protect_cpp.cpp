@@ -140,6 +140,7 @@ int main(int argc, char** argv) {
             << "\"rich_paired_rescue_unresolved\":" << result.rich_paired_rescue_unresolved << ','
             << "\"rich_paired_joint_rebuilds\":" << result.rich_paired_joint_rebuilds << ','
             << "\"rich_repair_score\":" << result.rich_repair_score << ','
+            << "\"rich_m1_selected_score\":" << result.rich_m1_selected_score << ','
             << "\"rich_repair_repaired\":" << result.rich_repair_repaired << ','
             << "\"rich_repair_unresolved\":" << result.rich_repair_unresolved << ','
             << "\"rich_repair_nodes\":" << result.rich_repair_nodes << ','
@@ -152,7 +153,29 @@ int main(int argc, char** argv) {
             << "\"rich_master_attempts\":" << result.rich_master_attempts << ','
             << "\"rich_master_last_radius\":" << result.rich_master_last_radius << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
-            << "\"assignments\":[";
+            << "\"rich_business_time_limit\":" << result.rich_stage_budgets.business_time_limit << ','
+            << "\"rich_scoring_reserve\":" << result.rich_stage_budgets.scoring_reserve << ','
+            << "\"rich_search_deadline\":" << result.rich_search_deadline << ','
+            << "\"rich_stage_budgets\":{";
+        bool first_budget = true;
+        for (const auto& entry : result.rich_stage_budgets.stages) {
+            if (!first_budget) *output << ',';
+            first_budget = false;
+            *output << '"' << entry.first << "\":" << entry.second;
+        }
+        *output << "},\"rich_stage_timing\":{";
+        bool first_stage = true;
+        for (const auto& entry : result.rich_stage_timing) {
+            if (!first_stage) *output << ',';
+            first_stage = false;
+            const auto& timing = entry.second;
+            *output << '"' << entry.first << "\":{\"base_budget\":" << timing.base_budget
+                << ",\"effective_budget\":" << timing.effective_budget
+                << ",\"started\":" << timing.started << ",\"finished\":" << timing.finished
+                << ",\"deadline\":" << timing.deadline << ",\"carry\":" << timing.carry
+                << ",\"pricing_reserve\":" << timing.pricing_reserve << '}';
+        }
+        *output << "},\"assignments\":[";
         bool first = true;
         for (int passenger = 0;
              passenger < static_cast<int>(result.passenger_to_seat.size()); ++passenger) {

@@ -119,46 +119,53 @@ FeasibilityResult solve_feasibility_mip(
     const auto started = std::chrono::steady_clock::now();
     if (objective == ConstructionObjective::GroupSoft
         || objective == ConstructionObjective::GroupFirst) {
+        using Clock = std::chrono::steady_clock;
+        const auto elapsed = [&]() { return std::chrono::duration<double>(Clock::now() - started).count(); };
+        const auto at = [&](double seconds) { return started
+            + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(seconds)); };
+        const auto& budgets = problem.rich_stage_budgets;
+        // The CLI is an additional outer limit; the frozen configuration still
+        // determines stage budgets. Charge fallback work to this same origin.
+        const double search_seconds = std::min(budgets.usable_time,
+            time_limit_seconds - std::min(budgets.scoring_reserve, time_limit_seconds * 0.2));
+        const auto search_deadline = at(search_seconds);
+        RichStageSchedule schedule(budgets, 0.0,
+            problem.rich.restricted_pattern_mip_tail_budget, search_seconds);
         FeasibilityResult result = solve_feasibility_mip(
-            problem, time_limit_seconds, seed, ConstructionObjective::IndividualSoft
+            problem, std::max(0.0, search_seconds - elapsed()), seed, ConstructionObjective::IndividualSoft
         );
+        result.rich_stage_budgets = budgets;
+        result.rich_search_deadline = search_seconds;
         result.q0_solver_status = result.status;
         if (result.native_hard_violations == 0) {
             GroupConstructionResult group_result = construct_group_aware(
                 problem, result.passenger_to_seat,
-                started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                    std::chrono::duration<double>(time_limit_seconds)
-                )
+                search_deadline
             );
             if (objective == ConstructionObjective::GroupFirst) {
                 group_result = construct_group_first(
                     problem, result.passenger_to_seat, group_result,
-                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                        std::chrono::duration<double>(time_limit_seconds)
-                    )
+                    search_deadline
                 );
             }
             group_result = construct_rich_m1(
-                problem, result.passenger_to_seat, group_result,
-                started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                    std::chrono::duration<double>(time_limit_seconds)
-                )
+                problem, result.passenger_to_seat, group_result, started, schedule
             );
+            result.rich_m1_selected_score = group_result.group_construction_score;
             // A failed construction/repair candidate leaves the legal fallback
             // selected. Never confuse candidate completeness with that incumbent.
             if (validate_complete_assignment(problem, group_result.passenger_to_seat) == 0) {
-                const auto vnd_deadline = std::min(
-                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                        std::chrono::duration<double>(time_limit_seconds)
-                    ),
-                    std::chrono::steady_clock::now()
-                        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                            std::chrono::duration<double>(problem.rich.vnd_time_budget)
-                        )
-                );
+                const double vnd_started = elapsed();
+                const auto vnd_window = schedule.begin("vnd", vnd_started);
                 improve_rich_vnd_m2(
-                    problem, group_result.passenger_to_seat, vnd_deadline, group_result
+                    problem, group_result.passenger_to_seat, at(vnd_window.deadline), group_result
                 );
+                const double vnd_finished = elapsed();
+                schedule.finish("vnd", vnd_window, vnd_finished);
+                group_result.rich_stage_timing["vnd"] = {
+                    budgets.stages.at("vnd"), vnd_window.effective_budget,
+                    vnd_started, vnd_finished, vnd_window.deadline,
+                    schedule.carry(), schedule.pricing_reserve()};
                 group_result.group_construction_score =
                     evaluate_soft_score(problem, group_result.passenger_to_seat);
                 group_result.selected_components = evaluate_score_components(
@@ -171,9 +178,7 @@ FeasibilityResult solve_feasibility_mip(
                 }
                 const RichPatternResult pattern_result = run_rich_pattern_master(
                     problem, group_result.passenger_to_seat,
-                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                        std::chrono::duration<double>(time_limit_seconds)
-                    )
+                    search_deadline
                 );
                 result.rich_pattern_count = pattern_result.pattern_count;
                 result.rich_selected_pattern_count = pattern_result.selected_pattern_count;
@@ -194,6 +199,7 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.score_delta = pattern_result.score - group_result.q0_score;
                 }
             }
+            result.rich_stage_timing = group_result.rich_stage_timing;
             result.passenger_to_seat = group_result.passenger_to_seat;
             result.selected_incumbent = group_result.selected_incumbent;
             result.fallback_reason = group_result.fallback_reason;

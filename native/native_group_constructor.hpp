@@ -9,6 +9,7 @@
 namespace full_cpp {
 
 struct GroupConstructionResult {
+    std::map<std::string, RichStageTiming> rich_stage_timing;
     std::vector<int> passenger_to_seat;
     std::string selected_incumbent = "q0";
     std::string fallback_reason;
@@ -79,7 +80,8 @@ GroupConstructionResult construct_rich_m1(
     const Problem& problem,
     const std::vector<int>& q0_assignment,
     const GroupConstructionResult& q2a_result,
-    std::chrono::steady_clock::time_point global_deadline
+    std::chrono::steady_clock::time_point allocation_start,
+    RichStageSchedule& schedule
 );
 
 void repair_rich_assignment(

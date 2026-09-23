@@ -30,7 +30,8 @@ def python_schedule_replay(budgets, replay):
         exec(compile(ast.Module(body=selected, type_ignores=[]), "frozen_schedule", "exec"), namespace)
 
     namespace = dict(stage_budgets=budgets["stages"], allocation_start=replay["allocation_start"],
-                     search_deadline=replay["allocation_start"] + budgets["usable_time"],
+                     search_deadline=min(replay["allocation_start"] + budgets["usable_time"],
+                                         replay.get("search_deadline_limit", float("inf"))),
                      carry=0.0, post_protected_pricing_reserve=0.0,
                      post_protected_tail_reserve_active=budgets["post_protected_tail_reserve_active"],
                      construction_unassigned=replay["construction_unassigned"],
@@ -163,13 +164,16 @@ class NativeStageBudgetTests(unittest.TestCase):
                 # exhaustion, incomplete construction, and negative tail settings.
                 stages = ["construction", "repair", "vnd", "pattern_generation",
                           "protected_multigroup_mip", "special_pricing", "lns", "restricted_mip"]
-                for unassigned, step, tail in [(0, 0.01, 0.1), (1, 0.3, -1.0), (0, 10.0, 2.0)]:
+                for unassigned, step, tail, cap in [(0, 0.01, 0.1, None), (1, 0.3, -1.0, None),
+                                                    (0, 10.0, 2.0, None), (1, 0.3, 0.1, 123.5)]:
                     with self.subTest(unassigned=unassigned, step=step, tail=tail):
                         replay = dict(allocation_start=123.0, construction_unassigned=unassigned,
                                       tail_budget=tail, events=[
                                           dict(stage=stage, started=123.0 + i * step + step * 0.1,
                                                finished=123.0 + i * step + step * 0.8)
                                           for i, stage in enumerate(stages)])
+                        if cap is not None:
+                            replay["search_deadline_limit"] = cap
                         replay_path = work / "schedule.json"
                         replay_path.write_text(json.dumps(replay), encoding="utf-8")
                         run = subprocess.run([str(probe), "--input", str(work / "case.json"),

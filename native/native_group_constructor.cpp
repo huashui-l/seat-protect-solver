@@ -926,16 +926,20 @@ AssignmentState initialize_rich_assignment(const Problem& problem) {
 GroupConstructionResult construct_rich_m1(
     const Problem& problem, const std::vector<int>& q0_assignment,
     const GroupConstructionResult& q2a_result,
-    std::chrono::steady_clock::time_point global_deadline
+    std::chrono::steady_clock::time_point allocation_start,
+    RichStageSchedule& schedule
 ) {
     (void)q0_assignment;
-    const auto started = std::chrono::steady_clock::now();
+    using Clock = std::chrono::steady_clock;
+    const auto elapsed = [&]() { return std::chrono::duration<double>(Clock::now() - allocation_start).count(); };
+    const auto at = [&](double seconds) { return allocation_start
+        + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(seconds)); };
+    const double construction_started = elapsed();
+    const auto construction_window = schedule.begin("construction", construction_started);
     GroupConstructionResult result = q2a_result;
     AssignmentState state = initialize_rich_assignment(problem);
     const auto cache = build_rich_candidate_cache(problem, state);
-    const auto construction_deadline = std::min(global_deadline, started
-        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-            std::chrono::duration<double>(problem.rich.construction_time_budget)));
+    const auto construction_deadline = at(construction_window.deadline);
     const auto diagnostics = construct_rich_assignment(problem, state, cache, construction_deadline);
     result.rich_dfs_attempted = diagnostics.search.dfs_attempted;
     result.rich_dfs_succeeded = diagnostics.search.dfs_succeeded;
@@ -946,17 +950,27 @@ GroupConstructionResult construct_rich_m1(
     result.rich_paired_rescue_rescued = static_cast<int>(diagnostics.rescue.rescued.size());
     result.rich_paired_rescue_unresolved = static_cast<int>(diagnostics.rescue.unresolved.size());
     result.rich_paired_joint_rebuilds = diagnostics.rescue.joint_rebuilds;
-    const auto construction_finished = std::chrono::steady_clock::now();
-    result.rich_construction_seconds = std::chrono::duration<double>(construction_finished - started).count();
-    result.rich_construction_carry_seconds = std::max(0.0,
-        std::chrono::duration<double>(construction_deadline - construction_finished).count());
+    const double construction_finished = elapsed();
+    schedule.finish("construction", construction_window, construction_finished);
+    result.rich_construction_seconds = construction_finished;
+    result.rich_construction_carry_seconds = schedule.carry();
+    result.rich_stage_timing["construction"] = {
+        problem.rich_stage_budgets.stages.at("construction"), construction_window.effective_budget,
+        construction_started, construction_finished, construction_window.deadline,
+        schedule.carry(), schedule.pricing_reserve()};
     result.rich_construction_unassigned = static_cast<int>(std::count(
         state.passenger_to_seat.begin(), state.passenger_to_seat.end(), -1));
     result.rich_construction_assigned = static_cast<int>(problem.passengers.size()) - result.rich_construction_unassigned;
     result.rich_construction_score = evaluate_soft_score(problem, state.passenger_to_seat);
-    if (result.rich_construction_unassigned > 0) {
-        repair_rich_assignment(problem, state, cache.rankings, global_deadline, result);
-    }
+    const double repair_started = elapsed();
+    const auto repair_window = schedule.begin("repair", repair_started, result.rich_construction_unassigned);
+    repair_rich_assignment(problem, state, cache.rankings, at(repair_window.deadline), result);
+    const double repair_finished = elapsed();
+    schedule.finish("repair", repair_window, repair_finished);
+    result.rich_stage_timing["repair"] = {
+        problem.rich_stage_budgets.stages.at("repair"), repair_window.effective_budget,
+        repair_started, repair_finished, repair_window.deadline,
+        schedule.carry(), schedule.pricing_reserve()};
     result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
     result.rich_candidate_complete = validate_complete_assignment(problem, state.passenger_to_seat) == 0;
     // Q0/Q1/Q2A stay independent fallbacks, never the construction stage input.

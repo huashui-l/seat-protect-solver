@@ -186,7 +186,9 @@ int main(int argc, char** argv) {
         if (!schedule_path.empty()) {
             const auto replay = native_json::parse_file(schedule_path);
             full_cpp::RichStageSchedule schedule(budgets,
-                replay.at("allocation_start").number, replay.at("tail_budget").number);
+                replay.at("allocation_start").number, replay.at("tail_budget").number,
+                replay.find("search_deadline_limit") ? replay.at("search_deadline_limit").number
+                    : std::numeric_limits<double>::infinity());
             *output << ",\"stage_schedule\":[";
             bool first = true;
             for (const auto& event : replay.at("events").array) {

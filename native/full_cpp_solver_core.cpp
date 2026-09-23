@@ -187,9 +187,6 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = algorithm->find("group_centroid_x_factor")) problem.group_centroid_x_factor = item->number_or(problem.group_centroid_x_factor);
         if (const Value* item = algorithm->find("group_centroid_y_factor")) problem.group_centroid_y_factor = item->number_or(problem.group_centroid_y_factor);
         if (const Value* item = algorithm->find("baby_front_back_factor")) problem.baby_front_back_factor = item->number_or(problem.baby_front_back_factor);
-        if (const Value* item = algorithm->find("construction_time_budget")) problem.rich.construction_time_budget = item->number_or(problem.rich.construction_time_budget);
-        if (const Value* item = algorithm->find("repair_time_budget")) problem.rich.repair_time_budget = item->number_or(problem.rich.repair_time_budget);
-        if (const Value* item = algorithm->find("scoring_time_reserve")) problem.rich.scoring_time_reserve = item->number_or(problem.rich.scoring_time_reserve);
         if (const Value* item = algorithm->find("stage3_time_budget")) problem.rich.stage3_time_budget = item->number_or(problem.rich.stage3_time_budget);
         if (const Value* item = algorithm->find("enable_restricted_pattern_mip")) problem.rich.enable_restricted_pattern_mip = item->bool_or(problem.rich.enable_restricted_pattern_mip);
         if (const Value* item = algorithm->find("restricted_pattern_mip_time_budget")) problem.rich.restricted_pattern_mip_time_budget = item->number_or(problem.rich.restricted_pattern_mip_time_budget);
@@ -221,7 +218,6 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         if (const Value* item = algorithm->find("paired_joint_rebuild_node_limit")) problem.rich.paired_joint_rebuild_node_limit = static_cast<long long>(item->number_or(problem.rich.paired_joint_rebuild_node_limit));
         if (const Value* item = algorithm->find("final_repair_node_limit")) problem.rich.final_repair_node_limit = static_cast<int>(item->number_or(problem.rich.final_repair_node_limit));
         if (const Value* item = algorithm->find("final_repair_time_limit")) problem.rich.final_repair_time_limit = item->number_or(problem.rich.final_repair_time_limit);
-        if (const Value* item = algorithm->find("vnd_time_budget")) problem.rich.vnd_time_budget = item->number_or(problem.rich.vnd_time_budget);
         if (const Value* item = algorithm->find("local_search_candidate_cap")) problem.rich.local_search_candidate_cap = static_cast<int>(item->number_or(problem.rich.local_search_candidate_cap));
         if (const Value* item = algorithm->find("local_search_cycle_candidate_cap")) problem.rich.local_search_cycle_candidate_cap = static_cast<int>(item->number_or(problem.rich.local_search_cycle_candidate_cap));
         if (const Value* item = algorithm->find("local_search_related_candidate_cap")) problem.rich.local_search_related_candidate_cap = static_cast<int>(item->number_or(problem.rich.local_search_related_candidate_cap));
@@ -308,6 +304,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         }
         problem.groups.push_back(std::move(group));
     }
+    const Value* stage_algorithm = config.find("algorithm");
+    problem.rich_stage_budgets = calculate_rich_stage_budgets(
+        problem, stage_algorithm ? *stage_algorithm : Value{});
     return problem;
 }
 
@@ -715,9 +714,10 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
 }
 
 RichStageSchedule::RichStageSchedule(const RichStageBudgets& budgets,
-                                     double allocation_start, double restricted_tail_budget)
+                                     double allocation_start, double restricted_tail_budget,
+                                     double search_deadline_limit)
     : budgets_(budgets), allocation_start_(allocation_start),
-      search_deadline_(allocation_start + budgets.usable_time),
+      search_deadline_(std::min(allocation_start + budgets.usable_time, search_deadline_limit)),
       restricted_tail_budget_(std::max(0.0, restricted_tail_budget)) {}
 
 RichStageWindow RichStageSchedule::begin(const std::string& stage, double now,
