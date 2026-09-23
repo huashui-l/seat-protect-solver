@@ -10,6 +10,60 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* mode = replay.find("placement_options"); mode && mode->bool_or()) {
+            const auto fixed = full_cpp::preprocess_fixed_seats(problem);
+            const auto seats = [&](const std::vector<int>& indices) {
+                std::cout << '[';
+                for (size_t i = 0; i < indices.size(); ++i) {
+                    if (i) std::cout << ',';
+                    std::cout << '"' << problem.seats[indices[i]].id << '"';
+                }
+                std::cout << ']';
+            };
+            const auto location = [&](const full_cpp::RichSsrLocation& item) {
+                if (item.subrow < 0) std::cout << "\"row\"," << item.row;
+                else std::cout << "\"subrow\",[" << item.row << ',' << item.subrow << ']';
+            };
+            std::cout << std::setprecision(17) << '{';
+            for (int g = 0; g < static_cast<int>(problem.groups.size()); ++g) {
+                if (g) std::cout << ',';
+                std::cout << '"' << problem.groups[g].id << "\":[";
+                const auto options = full_cpp::build_rich_placement_options(problem, g, fixed);
+                for (size_t p = 0; p < options.size(); ++p) {
+                    if (p) std::cout << ',';
+                    std::cout << '[';
+                    for (size_t i = 0; i < options[p].size(); ++i) {
+                        if (i) std::cout << ',';
+                        const auto& option = options[p][i];
+                        std::cout << "{\"passenger_index\":" << option.passenger_index
+                            << ",\"passenger_key\":[" << problem.groups[g].id << ',' << problem.passengers[option.passenger].hostnum
+                            << "],\"seat_id\":\"" << problem.seats[option.seat].id << "\",\"blocked\":";
+                        seats(option.blocked);
+                        std::cout << ",\"resources\":";
+                        seats(option.resources);
+                        std::cout << ",\"individual_cost\":" << option.individual_cost << ",\"ssr_resources\":[";
+                        for (size_t j = 0; j < option.ssr_resources.size(); ++j) {
+                            if (j) std::cout << ',';
+                            std::cout << '[';
+                            location(option.ssr_resources[j].location);
+                            std::cout << ",\"" << option.ssr_resources[j].ssr << "\"]";
+                        }
+                        std::cout << "],\"ssr_flag_locations\":[";
+                        for (size_t j = 0; j < option.ssr_flag_locations.size(); ++j) {
+                            if (j) std::cout << ',';
+                            std::cout << '[';
+                            location(option.ssr_flag_locations[j]);
+                            std::cout << ']';
+                        }
+                        std::cout << "],\"is_infant\":" << (option.is_infant ? "true" : "false") << '}';
+                    }
+                    std::cout << ']';
+                }
+                std::cout << ']';
+            }
+            std::cout << "}\n";
+            return 0;
+        }
         if (const auto* records = replay.find("elite_records")) {
             full_cpp::RichEliteStore store(static_cast<int>(replay.at("elite_limit").number));
             std::cout << std::setprecision(17) << "{\"snapshots\":[";

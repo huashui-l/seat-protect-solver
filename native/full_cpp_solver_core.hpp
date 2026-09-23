@@ -169,6 +169,30 @@ struct FixedSeatContext {
     std::vector<bool> deterministic_blocked;
 };
 
+struct RichSsrLocation {
+    int row = 0;
+    int subrow = -1;  // -1 denotes the whole row.
+};
+
+struct RichSsrResource {
+    RichSsrLocation location;
+    std::string ssr;
+};
+
+struct RichPlacement {
+    int passenger_index = -1;  // Within the group, matching Python Placement.
+    int passenger = -1;
+    int seat = -1;
+    std::vector<int> blocked, resources;
+    double individual_cost = 0.0;
+    std::vector<RichSsrResource> ssr_resources;
+    std::vector<RichSsrLocation> ssr_flag_locations;
+    bool is_infant = false;
+};
+
+std::vector<std::vector<RichPlacement>> build_rich_placement_options(
+    const Problem& problem, int group_index, const FixedSeatContext& fixed);
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 );

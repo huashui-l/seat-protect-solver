@@ -524,6 +524,34 @@ native/state-replay-enabled regression passed 107 tests and 13,264 subtests, wit
 9 skips, including the 12,000-operation state differential and raw-native external
 legality/scoring checks. `git diff --check` passed.
 
+The native `build_rich_placement_options` now implements the full placement domain
+used by structured generation's Python pricing cache. It enumerates seats in input
+order and all legal single-side protection choices in neighbor order, preserving
+lexicographically sorted protection/resource signatures, exact individual costs
+(including multiple toilet preferences), passenger identity, SSR row/subrow
+resources, conditional flags and infant markers. It uses the existing native
+fixed-seat preprocessor. Fixed single-side protection remains a choice rather than
+an arbitrary global reservation. Overlapping deterministic protection resources
+remain in placement options where Python defers rejection to the joint combination;
+ordinary occupancy still excludes all globally reserved seats. Empty domains fail
+explicitly, as in Python.
+
+A direct oracle compares every field and candidate order against the frozen
+`exact_column_generation._placement_options`, including 22 public/input-order
+scenarios, protection cross-aisle and neighbor-count variants, multiple preferences,
+SSR flags, unknown SSRs, reversed 2-4-2 and 3-4-3 layouts, fixed single-side choices,
+deferred protection overlap and invalid/empty domains. The targeted suite passed
+6 tests and 31 subtests. This native API is available to the next structured
+migration step; the production structured generator, pricing cache metadata and
+pattern assembly have not yet been migrated. No end-to-end M3 or Formal24 parity
+claim follows from domain parity.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 113 tests and 13,295 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
+was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

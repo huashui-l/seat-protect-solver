@@ -680,6 +680,66 @@ FixedSeatContext preprocess_fixed_seats(const Problem& problem) {
     return context;
 }
 
+std::vector<std::vector<RichPlacement>> build_rich_placement_options(
+    const Problem& problem, int group_index, const FixedSeatContext& fixed
+) {
+    const auto& group = problem.groups[group_index];
+    std::vector<std::vector<RichPlacement>> result;
+    std::vector<int> isolated(problem.passengers.size(), -1);
+    const auto seat_less = [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; };
+    for (int p : group.passengers) {
+        const auto& passenger = problem.passengers[p];
+        const auto rule = ssr_rule(problem, passenger);
+        std::vector<RichPlacement> options;
+        for (int s = 0; s < static_cast<int>(problem.seats.size()); ++s) {
+            const auto& seat = problem.seats[s];
+            if (!passenger.fixed_seat.empty() && seat.id != passenger.fixed_seat) continue;
+            if (passenger.fixed_seat.empty() && (fixed.owner_by_seat[s] >= 0 || fixed.deterministic_blocked[s])) continue;
+            if (!passenger.cabin.empty() && seat.cabin != passenger.cabin) continue;
+            if ((seat.exit_row && !rule.allow_exit_row) || (rule.requires_bassinet && !seat.bassinet)
+                || (rule.requires_aisle && !seat.aisle)) continue;
+            std::vector<std::vector<int>> modes(1);
+            if (passenger.need_both_empty) {
+                const auto& neighbors = problem.both_side_empty_allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
+                if ((problem.require_two_real_neighbors && neighbors.size() != 2) || neighbors.empty()) continue;
+                if (std::any_of(neighbors.begin(), neighbors.end(), [&](int n) { return fixed.owner_by_seat[n] >= 0; })) continue;
+                modes = {neighbors};
+            } else if (passenger.need_single_empty) {
+                modes.clear();
+                for (int neighbor : seat.same_block_neighbors)
+                    if (fixed.owner_by_seat[neighbor] < 0) modes.push_back({neighbor});
+                if (modes.empty()) continue;
+            }
+            isolated[p] = s;
+            const double cost = -evaluate_rich_group_score(problem, isolated, group_index).total();
+            for (auto& blocked : modes) {
+                RichPlacement option;
+                option.passenger_index = static_cast<int>(result.size());
+                option.passenger = p;
+                option.seat = s;
+                std::sort(blocked.begin(), blocked.end(), seat_less);
+                option.blocked = blocked;
+                option.resources = blocked;
+                option.resources.push_back(s);
+                std::sort(option.resources.begin(), option.resources.end(), seat_less);
+                option.individual_cost = cost;
+                if (!passenger.ssr.empty()) {
+                    option.ssr_resources = {{{seat.row, -1}, passenger.ssr}, {{seat.row, seat.subrow}, passenger.ssr}};
+                    if (passenger.same_row_no_other_ssr) option.ssr_flag_locations.push_back({seat.row, -1});
+                    if (passenger.same_subrow_no_other_ssr) option.ssr_flag_locations.push_back({seat.row, seat.subrow});
+                }
+                option.is_infant = passenger.ssr == "BSCT";
+                options.push_back(std::move(option));
+            }
+        }
+        isolated[p] = -1;
+        if (options.empty()) throw std::runtime_error("passenger has no legal Rich placement: "
+            + std::to_string(group.id) + ":" + std::to_string(passenger.hostnum));
+        result.push_back(std::move(options));
+    }
+    return result;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {
