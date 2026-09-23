@@ -13,7 +13,7 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in pro
 
 The raw Rich path now implements the full single-cabin stage inventory plus
 native outer cabin decomposition. Current 60-second quality parity **FAILS**:
-20 improve / 0 tie / 4 regress against the frozen Python result. Complete/legal
+21 improve / 0 tie / 3 regress against the frozen Python result. Complete/legal
 and evaluator gates pass 24/24, including complete Rich candidates in every case.
 No profiling or 5-second compression is permitted. The detailed sections below
 record historical component checkpoints; their earlier pending-work statements
@@ -1403,6 +1403,26 @@ Complete native/state-replay regression passed 166 tests / 37,230 subtests,
 with 9 skips, in 375.86 seconds. `git diff --check` passed.
 The quality gate must be rerun on this frozen implementation.
 
+### c6a41f3 acceptance after deferred Q1/Q2A
+
+Frozen result: `outputs/research/full_cpp_rich_60s_c6a41f3/summary.json`.
+24/24 complete/legal/evaluator-consistent, zero unassigned/hard violations,
+zero total-score error, max individual error 3.41e-13. Quality still FAILS:
+21 improve / 0 tie / 3 regress; mean delta +13.772696. Remaining regressions:
+forward:full_normal -3.05, reverse:50_normal -1.2, reverse:full_edge -4.554324.
+Process mean/median/max: 39.326/46.427/59.837 seconds. Frozen parameters and
+reference were unchanged; this is one run, not a best-of-runs selection.
+
+reverse:100_edge now executes five restricted attempts, gaining 29.259524,
+and no longer regresses. Its Rich start dropped to 2.744 seconds. However,
+reverse:full_edge still spends 14.987 seconds in Q0 before Rich. With the
+shifted stage origin, pattern/protected/LNS deadlines clip against the global
+limit and restricted MIP gets zero attempts. Deferring Q1/Q2A fixed part of
+the integration issue, but the stage-clock adjustment in 54f827c still needs
+review against the frozen budget/carry contract when Q0 is slow. The total
+60-second deadline must not be extended. No profiling or parameter tuning
+was performed and full parity remains unachieved.
+
 ## Correctness
 
 ### Follow-up regression isolation on the frozen 54f827c artifacts
@@ -1441,8 +1461,8 @@ changed during this isolation, and no new full Formal24 run was made.
 
 ## Quality parity
 
-Latest frozen implementation `54f827c`: **FAIL**, 20 improve / 0 tie / 4 regress.
-Mean delta +11.154328 does not satisfy the per-case nonregression requirement.
+Latest frozen implementation `c6a41f3`: **FAIL**, 21 improve / 0 tie / 3 regress.
+Mean delta +13.772696 does not satisfy the per-case nonregression requirement.
 See the acceptance checkpoint above for each case and diagnostic boundaries.
 
 ## Timing and profile
@@ -1452,7 +1472,7 @@ The earlier 1.668-second native-core smoke remains a solver-ready `.native_v2` t
 ## Required answer
 
 All named single-cabin ACTIVE stages and enabled outer cabin orchestration now
-have native implementations. Full C++ Rich parity is not certified: four frozen
+have native implementations. Full C++ Rich parity is not certified: three frozen
 Python regressions remain, including a reproduced wall-clock DFS trajectory
 boundary. Production Python callbacks and `.native_v2` dependencies are zero
 in the raw CLI call chain; the historical V1R callback path is separate.
