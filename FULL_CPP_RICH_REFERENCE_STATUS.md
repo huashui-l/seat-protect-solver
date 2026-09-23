@@ -37,9 +37,8 @@ External evaluator audits at a 20-second budget passed for
 `forward:50_normal`, `forward:full_edge`, and `reverse:full_edge`: all complete,
 zero hard violations, zero unassigned, and zero score error. These are three
 smoke cases, not the 24-case 60-second parity gate. The current adapter still
-uses the existing RR beam pattern semantics
-and a provisional 0.5-second master cap; exact ACTIVE stage orchestration
-and configuration budgets remain outstanding. Equal-score master results do
+uses the existing RR beam pattern semantics; exact ACTIVE stage orchestration
+and adaptive/carry budget semantics remain outstanding. Equal-score master results do
 not replace or relabel the incoming incumbent.
 
 The raw adapter now includes baby-pair objective terms and the kernel's same-group
@@ -50,6 +49,17 @@ external baby score (-0.6985902255639098); reconstructed master score
 (-8.19859022556391). The native-enabled public suite remains 56 passed,
 10 skipped, and 39 subtests passed. This verifies objective encoding on the
 fixture, not structured generation or full ACTIVE stage equivalence.
+
+Restricted-master configuration is now read from the raw algorithm config:
+`enable_restricted_pattern_mip`, `restricted_pattern_mip_time_budget`, and
+`restricted_pattern_mip_tail_budget` (Python defaults true, 0.0, 0.10).
+The provisional 0.5-second cap is removed. The current single master call uses
+max(base, nonnegative tail), clipped to remaining solver time. Disabled or zero
+budget calls preserve the VND incumbent while retaining generated pool diagnostics.
+Adaptive scaling, LNS unused-budget carry, repeated attempts, and local branching
+are not yet implemented. Native-enabled full-suite verification passed 58 tests
+and 44 subtests (10 skips); an additional remaining-time clipping regression and
+the affected group-first suite then passed (11 tests, 14 subtests).
 
 ## Correctness
 

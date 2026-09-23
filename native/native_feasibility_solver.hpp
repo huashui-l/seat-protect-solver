@@ -60,6 +60,7 @@ struct FeasibilityResult {
     double rich_pattern_score = 0.0;
     int rich_baby_pair_count = 0;
     double rich_master_score = 0.0;
+    double rich_master_time_limit = 0.0;
 };
 
 FeasibilityResult solve_feasibility_mip(

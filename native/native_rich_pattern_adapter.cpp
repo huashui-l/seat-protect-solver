@@ -38,6 +38,7 @@ RichPatternResult run_rich_pattern_master(
 ) {
     RichPatternResult result;
     result.passenger_to_seat = incumbent;
+    if (std::chrono::steady_clock::now() >= deadline) return result;
     if (validate_complete_assignment(problem, incumbent) != 0) return result;
 
     std::map<LocationKey, int> location_ids;
@@ -228,10 +229,15 @@ RichPatternResult run_rich_pattern_master(
     result.pattern_count = static_cast<int>(master.patterns.size());
     std::vector<uint64_t> selected;
     std::ostringstream master_output;
-    const double remaining = std::chrono::duration<double>(
-        deadline - std::chrono::steady_clock::now()).count();
-    if (remaining > 0.0
-        && native_master::solve(master, master_output, std::min(0.5, remaining), false, &selected) == 0) {
+    if (!problem.rich.enable_restricted_pattern_mip) return result;
+    const auto master_started = std::chrono::steady_clock::now();
+    const double budget = std::max({0.0,
+        problem.rich.restricted_pattern_mip_time_budget,
+        problem.rich.restricted_pattern_mip_tail_budget});
+    const double remaining = std::chrono::duration<double>(deadline - master_started).count();
+    result.master_time_limit = std::max(0.0, std::min(budget, remaining));
+    if (result.master_time_limit > 0.0
+        && native_master::solve(master, master_output, result.master_time_limit, false, &selected) == 0) {
         std::unordered_map<uint64_t, const native_solver::PatternRecord*> by_id;
         for (const auto& pattern : master.patterns) by_id[pattern.id] = &pattern;
         std::vector<int> candidate = incumbent;

@@ -26,7 +26,7 @@ class NativeGroupSoftTests(unittest.TestCase):
         )
         cls.cases = {case["id"]: case for case in materialize_cases()}
 
-    def run_case(self, case_id, objective="group-soft", groups=None):
+    def run_case(self, case_id, objective="group-soft", groups=None, algorithm=None):
         case = self.cases[case_id]
         groups = groups if groups is not None else case["groupsData"]
         with tempfile.TemporaryDirectory() as directory:
@@ -44,6 +44,8 @@ class NativeGroupSoftTests(unittest.TestCase):
                 "groups": groups,
             }), encoding="utf-8")
             config = dict(self.base_config)
+            if algorithm is not None:
+                config["algorithm"] = {**config["algorithm"], **algorithm}
             config["input_contract"] = {"seatmaps_by_direction": {
                 "public-test": {"old": "old.json", "new": "new.json"}
             }}

@@ -73,6 +73,40 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertNotEqual("q2a-group-first", result["selected_incumbent"])
         self.assertAlmostEqual(result["native_score"], result["q1_score"])
 
+    def test_restricted_master_disabled_or_zero_budget_preserves_vnd(self):
+        for algorithm in (
+            {"enable_restricted_pattern_mip": False},
+            {"restricted_pattern_mip_time_budget": 0.0,
+             "restricted_pattern_mip_tail_budget": 0.0},
+        ):
+            with self.subTest(algorithm=algorithm):
+                result = self.run_case("shrink_small_blockers", "group-first", algorithm=algorithm)
+                self.assertGreater(result["rich_pattern_count"], 0)
+                self.assertEqual(result["rich_master_time_limit"], 0.0)
+                self.assertEqual(result["rich_selected_pattern_count"], 0)
+                self.assertNotEqual(result["selected_incumbent"], "rich-m3-pattern-master")
+                self.assertAlmostEqual(result["native_score"], result["rich_vnd_score"])
+
+    def test_restricted_master_uses_configured_budget_and_tail_floor(self):
+        for base, tail in ((0.2, 0.0), (0.0, 0.15), (0.2, 0.1)):
+            with self.subTest(base=base, tail=tail):
+                result = self.run_case("caregiver_and_ssr", "group-first", algorithm={
+                    "restricted_pattern_mip_time_budget": base,
+                    "restricted_pattern_mip_tail_budget": tail,
+                })
+                self.assertAlmostEqual(result["rich_master_time_limit"], max(base, tail))
+                self.assertGreater(result["rich_selected_pattern_count"], 0)
+                self.assertAlmostEqual(result["rich_master_score"], result["rich_pattern_score"])
+
+    def test_restricted_master_budget_is_clipped_to_remaining_solver_time(self):
+        result = self.run_case("caregiver_and_ssr", "group-first", algorithm={
+            "restricted_pattern_mip_time_budget": 100.0,
+            "restricted_pattern_mip_tail_budget": 0.0,
+        })
+        self.assertGreater(result["rich_master_time_limit"], 0.0)
+        self.assertLess(result["rich_master_time_limit"], 5.0)
+        self.assertGreater(result["rich_selected_pattern_count"], 0)
+
 
 if __name__ == "__main__":
     import unittest

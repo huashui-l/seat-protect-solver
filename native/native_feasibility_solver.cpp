@@ -178,6 +178,7 @@ FeasibilityResult solve_feasibility_mip(
                 result.rich_pattern_score = pattern_result.score;
                 result.rich_baby_pair_count = pattern_result.baby_pair_count;
                 result.rich_master_score = pattern_result.master_score;
+                result.rich_master_time_limit = pattern_result.master_time_limit;
                 if (pattern_result.complete
                     && pattern_result.score > group_result.group_construction_score + 1e-9) {
                     group_result.passenger_to_seat = pattern_result.passenger_to_seat;

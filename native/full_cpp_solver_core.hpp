@@ -66,6 +66,9 @@ struct RichConstructionConfig {
     double repair_time_budget = 3.175531914893617;
     double scoring_time_reserve = 0.25;
     double stage3_time_budget = 20.0;
+    bool enable_restricted_pattern_mip = true;
+    double restricted_pattern_mip_time_budget = 0.0;
+    double restricted_pattern_mip_tail_budget = 0.10;
     int candidate_cap = 48;
     int candidate_cap_retry = 64;
     int candidate_cap_full_retry = 128;
