@@ -194,6 +194,14 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     const std::filesystem::path config_path(config_path_raw);
     const Value case_json = native_json::parse_file(case_path.string());
     const Value config = native_json::parse_file(config_path.string());
+    const auto& direction = required(required(required(config, "input_contract"), "seatmaps_by_direction"),
+        optional_string(case_json, "direction"));
+    return make_problem(case_json, config,
+        native_json::parse_file(resolve_from_config(config_path, required(direction, "new").string_or()).string()),
+        native_json::parse_file(resolve_from_config(config_path, required(direction, "old").string_or()).string()));
+}
+
+Problem make_problem(const Value& case_json, const Value& config, const Value& seatmap, const Value& old_seatmap) {
     Problem problem;
     if (const auto* pricing = config.find("column_generation")) problem.rich_pricing_config = *pricing;
     problem.case_id = optional_string(case_json, "caseId");
@@ -318,22 +326,12 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
             problem.ssr_rules.emplace(item.first, rule);
         }
     }
-    const Value& contract = required(config, "input_contract");
-    const Value& directions = required(contract, "seatmaps_by_direction");
-    const Value& direction = required(directions, problem.direction);
-    const std::filesystem::path seatmap_path = resolve_from_config(
-        config_path, required(direction, "new").string_or()
-    );
-    const Value seatmap = native_json::parse_file(seatmap_path.string());
     load_seats(seatmap, problem);
-    const std::filesystem::path old_seatmap_path = resolve_from_config(
-        config_path, required(direction, "old").string_or()
-    );
     Problem old_problem;
     old_problem.seat_spacing = problem.seat_spacing;
     old_problem.aisle_gap = problem.aisle_gap;
     old_problem.row_spacing = problem.row_spacing;
-    load_seats(native_json::parse_file(old_seatmap_path.string()), old_problem);
+    load_seats(old_seatmap, old_problem);
     problem.old_seats = std::move(old_problem.seats);
     problem.old_seat_index = std::move(old_problem.seat_index);
 

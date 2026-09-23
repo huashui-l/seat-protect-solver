@@ -525,6 +525,9 @@ private:
     std::map<std::vector<int>, double> compact_cache_;
 };
 
+Problem make_problem(const native_json::Value& raw_case, const native_json::Value& config,
+    const native_json::Value& new_seatmap, const native_json::Value& old_seatmap);
+
 Problem load_problem(
     const std::string& case_path,
     const std::string& config_path

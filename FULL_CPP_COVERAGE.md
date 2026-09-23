@@ -4,7 +4,7 @@
 > internal research archive. The data, binaries, and result artifacts are not
 > distributed in this repository.
 
-Current status: **NATIVE-FEASIBLE-CONSTRUCTION PASS; FULL-CPP-CORRECTNESS remains in progress**.
+Current status: **NATIVE Rich pipeline implemented; FULL-CPP-CORRECTNESS remains in progress**.
 
 This file is a gate ledger, not a declaration of completion.
 
@@ -14,9 +14,9 @@ This file is a gate ledger, not a declaration of completion.
 | raw official JSON/config input | yes | `seat_protect_cpp.exe --input raw_case.json --config ...` executes the raw-native path; `.native_v2` is not read or generated |
 | topology and immutable indices | yes | native constructs row/subrow indices, coordinates, cross-aisle boundaries, seat attributes, and both adjacency relations directly from the seatmap |
 | fixed/reserved preprocessing | yes | native validates fixed-seat identity/uniqueness, SSR seat rules, deterministic two-sided blocks, single-side availability, caregiver prerequisites, and conditional SSR resources |
-| mutable assignment state | partial | indexed state operations are native; feasibility construction currently uses the direct native MIP rather than this state as its search engine |
+| mutable assignment state | yes | indexed native state operations, snapshots, rollback, resource ownership, and Rich stages |
 | complete per-passenger legal domain | yes for feasibility | native domains include cabin, fixed seat, SSR eligibility, exit/bassinet/aisle, and protection topology; caregiver and conditional SSR interactions are native joint constraints |
-| complete feasible construction without supplied incumbent | yes | raw-native HiGHS feasibility construction produced 24/24 complete legal Formal24 incumbents |
+| complete feasible construction without supplied incumbent | yes | native Q0 plus Rich construction/repair and enabled cabin decomposition |
 | RR/Beam pattern generation | yes | native and active |
 | restricted master | yes | native and active |
 | optional production memory | no | current reconstruction callback is Python |

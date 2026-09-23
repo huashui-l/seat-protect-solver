@@ -10,4 +10,10 @@ Status: **NATIVE-FEASIBLE-CONSTRUCTION PASS**. This is not yet `FULL-CPP-CORRECT
 - provenance: input/config/binary SHA-256, commit `6252bd7e2cad551d0f6bef7ea9467ca7dd349734`, MSVC `19.40.33813`, `/O2`, seed `0`, 60-second feasibility limit
 - quality record only: mean/median gap to the current best-known integer reference `188.235% / 182.872%`; this intentionally untuned feasibility solution is not a Rich-quality result
 
-Remaining production work: migrate Rich construction ordering and DFS/Beam, repair, protected/intra-group exchanges, group matching, VND 1-opt/2-swap/3-cycle, caregiver rebuild, multi-group LNS/pattern stages, and the Rich restricted/protected master semantics. No profiling or 5-second compression is authorized yet.
+The raw Rich production path now contains native construction/repair, VND,
+structured and special pricing, protected MIP, conflict LNS, restricted MIP,
+native validation/serialization, and the enabled outer cabin decomposition.
+The first full 60-second Formal24 attempt still failed its quality gate: one
+HiGHS LNS solve error aborted the run and one completed case regressed Python.
+The LNS error is now contained and counted; the next full gate is required.
+No profiling or 5-second compression is authorized yet.

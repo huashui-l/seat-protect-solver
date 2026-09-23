@@ -1,4 +1,11 @@
 import copy
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+from src import heuristic_seat_allocator as rich
 import unittest
 
 from tests import test_native_group_soft as group_tests
@@ -9,6 +16,71 @@ from tests.test_native_rich_elite import python_conflict_activation
 class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
+
+    def test_cabin_wrapper_matches_frozen_order_filtering_and_budget(self):
+        case = self.cases["two_cabin_valid_groups"]
+        for minimum in (.1, 4.0):
+            algorithm = {"business_time_limit_seconds": 5.0, "cabin_min_time_seconds": minimum}
+            result = self.run_case(case["id"], "group-first", algorithm=algorithm)
+            diagnostics = result["cabin_decomposition"]
+            order = diagnostics["solve_order"]
+            runs = diagnostics["cabins"]
+            config = copy.deepcopy(self.base_config)
+            config["algorithm"].update(algorithm)
+            times = [0.0]
+            for cabin in order:
+                run = runs[cabin]
+                times.extend((run["budget_started"], run["budget_started"], run["finished"]))
+            times.append(result["wall_seconds"])
+            calls = []
+            def single(new, old, groups, weights, subconfig):
+                cabin = order[len(calls)]
+                run = runs[cabin]
+                self.assertEqual({s["seatClass"] for s in new}, {cabin})
+                self.assertEqual({s["seatClass"] for s in old}, {cabin})
+                self.assertAlmostEqual(subconfig["algorithm"]["business_time_limit_seconds"], run["time_budget_seconds"])
+                native = run["result"]
+                self.assertAlmostEqual(native["rich_business_time_limit"], run["time_budget_seconds"])
+                budgets = python_budget_prefix()(new, old, groups, weights, subconfig)
+                for stage, budget in budgets["stages"].items():
+                    self.assertAlmostEqual(native["rich_stage_budgets"][stage], budget)
+                calls.append(cabin)
+                assignments = {(a["groupId"], a["hostnum"]): a["seatId"] for a in native["assignments"]}
+                return {"assigned_seats": assignments, "score_detail": {"total_soft_score": native["native_score"]}}, native["native_score"]
+            with patch.object(rich.time, "perf_counter", side_effect=times), patch.object(rich, "_run_allocation_single_cabin", side_effect=single):
+                expected, _ = rich.run_allocation(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                    case["groupsData"], config["weights"], config)
+            self.assertEqual(calls, order)
+            self.assertAlmostEqual(expected["score_detail"]["total_soft_score"], result["native_score"])
+            self.assertTrue(expected["score_detail"]["soft_score_validation"]["passed"])
+            self.assertTrue(result["rich_candidate_complete"])
+            self.assertEqual(result["rich_construction_assigned"], len(result["assignments"]))
+
+    def test_single_cabin_and_disabled_decomposition_keep_single_pipeline(self):
+        for case_id, algorithm in (("identity_keep_seats", {}),
+                                   ("two_cabin_valid_groups", {"cabin_decomposition_enabled": False})):
+            result = self.run_case(case_id, "group-first", algorithm=algorithm)
+            self.assertNotIn("cabin_decomposition", result)
+            self.assertIn("rich_stage_timing", result)
+
+    def test_rich_wrapper_rejects_mixed_cabin_group_even_when_disabled(self):
+        case = self.cases["mixed_cabin_group_invalid"]
+        for enabled in (True, False):
+            config = copy.deepcopy(self.base_config)
+            config["algorithm"]["cabin_decomposition_enabled"] = enabled
+            config["input_contract"] = {"seatmaps_by_direction": {"public-test": {"old": "old.json", "new": "new.json"}}}
+            with tempfile.TemporaryDirectory() as directory:
+                work = Path(directory)
+                for name, value in {
+                    "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                    "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                }.items():
+                    (work / name).write_text(json.dumps(value), encoding="utf-8")
+                run = subprocess.run([str(self.executable), "--input", str(work / "case.json"), "--config", str(work / "config.json"),
+                                      "--construction-objective", "group-first"], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 3)
+            self.assertIn("one booking cabin", run.stderr)
+            self.assertEqual(run.stdout, "")
 
     def test_raw_cli_lns_activation_capture_and_stage_window(self):
         for enabled in (True, False):

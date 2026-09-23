@@ -274,6 +274,7 @@ def main() -> None:
             "input_sha256": sha256(case_path),
             "violation_detail": violation_detail,
             "rich_candidate_complete": bool(result.get("rich_candidate_complete", False)),
+            "cabin_decomposition": result.get("cabin_decomposition"),
             "rich_stage_timing": result.get("rich_stage_timing", {}),
             "rich_stage_diagnostics": {key: result[key] for key in (
                 "rich_structured_pattern_generation", "rich_protected_multigroup_mip",
