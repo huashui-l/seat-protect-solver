@@ -10,6 +10,7 @@ namespace full_cpp {
 
 struct GroupConstructionResult {
     RichEliteStore rich_elite_store;
+    bool rich_conflict_diversity_active = false;
     AssignmentSnapshot rich_state;
     std::vector<std::vector<int>> rich_rankings;
     std::map<std::string, RichStageTiming> rich_stage_timing;

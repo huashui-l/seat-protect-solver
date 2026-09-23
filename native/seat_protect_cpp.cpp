@@ -180,6 +180,7 @@ int main(int argc, char** argv) {
         full_cpp::write_rich_elite_store(*output, result.rich_m1_elite_store);
         *output << ",\"rich_elite_store\":";
         full_cpp::write_rich_elite_store(*output, result.rich_elite_store);
+        *output << ",\"rich_conflict_diversity_active\":" << (result.rich_conflict_diversity_active ? "true" : "false");
         *output << ",\"rich_construction_repair_queue\":";
         full_cpp::write_rich_repair_queue(*output, result.rich_construction_repair_queue, 20);
         int extreme = 0;

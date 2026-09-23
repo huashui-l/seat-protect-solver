@@ -952,6 +952,7 @@ GroupConstructionResult construct_rich_m1(
     result.rich_paired_rescue_unresolved = static_cast<int>(diagnostics.rescue.unresolved.size());
     result.rich_paired_joint_rebuilds = diagnostics.rescue.joint_rebuilds;
     result.rich_construction_repair_queue = build_rich_repair_queue(problem, state.passenger_to_seat);
+    result.rich_conflict_diversity_active = rich_conflict_diversity_active(problem, result.rich_construction_repair_queue);
     result.rich_elite_store.capture(state, "construction");
     const double construction_finished = elapsed();
     schedule.finish("construction", construction_window, construction_finished);

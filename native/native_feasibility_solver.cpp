@@ -191,6 +191,7 @@ FeasibilityResult solve_feasibility_mip(
                 }
             }
             result.rich_elite_store = group_result.rich_elite_store;
+            result.rich_conflict_diversity_active = group_result.rich_conflict_diversity_active;
             result.rich_construction_repair_queue = group_result.rich_construction_repair_queue;
             result.rich_stage_timing = group_result.rich_stage_timing;
             result.passenger_to_seat = group_result.passenger_to_seat;

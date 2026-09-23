@@ -29,8 +29,20 @@ int main(int argc, char** argv) {
                 std::map<std::string, int> owners;
                 for (const auto& entry : record.at("owners").object)
                     owners[entry.first] = static_cast<int>(entry.second.number);
-                store.record(static_cast<int>(record.at("group_id").number), std::move(pattern), owners,
-                             record.at("conflict_diversity_active").bool_or());
+                if (const auto* assignments = record.find("state_assignments")) {
+                    full_cpp::AssignmentState state(problem);
+                    for (const auto& entry : assignments->array) {
+                        const int p = static_cast<int>(entry.array[0].number);
+                        const int seat = problem.seat_index.at(entry.array[1].string);
+                        const int block = entry.array.size() > 2 ? problem.seat_index.at(entry.array[2].string) : -1;
+                        if (!state.assign(p, seat, block)) throw std::runtime_error("invalid elite replay state");
+                    }
+                    store.record_candidate(static_cast<int>(record.at("group_id").number), std::move(pattern), state,
+                                           record.at("conflict_diversity_active").bool_or());
+                } else {
+                    store.record(static_cast<int>(record.at("group_id").number), std::move(pattern), owners,
+                                 record.at("conflict_diversity_active").bool_or());
+                }
                 if (!first_snapshot) std::cout << ',';
                 first_snapshot = false;
                 full_cpp::write_rich_elite_store(std::cout, store);
@@ -53,7 +65,8 @@ int main(int argc, char** argv) {
             std::cout << std::setprecision(17) << "{\"repair_queue\":";
             full_cpp::write_rich_repair_queue(std::cout,
                 full_cpp::build_rich_repair_queue(problem, state.passenger_to_seat), problem.groups.size());
-            std::cout << "}\n";
+            std::cout << ",\"conflict_diversity_active\":" << (full_cpp::rich_conflict_diversity_active(problem,
+                full_cpp::build_rich_repair_queue(problem, state.passenger_to_seat)) ? "true" : "false") << "}\n";
             return 0;
         }
         std::vector<std::vector<int>> rankings;

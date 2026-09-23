@@ -48,8 +48,60 @@ def python_capture_namespace(context, groups, scorer, limit):
     return namespace
 
 
+def python_conflict_activation(case, config, metrics):
+    tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
+    allocation = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                      and n.name == "_run_allocation_single_cabin")
+    names = {"business_time_limit", "elite_pattern_limit", "protected_empty_demand",
+             "free_after_demand", "diversity_resource_threshold", "structured_min_group_size",
+             "conflict_diversity_active"}
+    statements = [n for n in allocation.body if isinstance(n, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id in names for t in n.targets)]
+    namespace = dict(rich.__dict__, config=config, algorithm_config=config["algorithm"],
+                     groups_data=case["groupsData"], new_seats_data=case["newSeatmapData"]["seats"],
+                     old_seats_data=case["oldSeatmapData"]["seats"], construction_repair_metrics=metrics,
+                     seat_demand_total=rich._seat_demand_for_budgeting(case["groupsData"]),
+                     traveler_total=sum(len(g["psrs"]) for g in case["groupsData"]))
+    exec(compile(ast.Module(body=statements, type_ignores=[]), "frozen_conflict_activation", "exec"), namespace)
+    return namespace["conflict_diversity_active"]
+
+
 class NativeRichEliteTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
+    synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_candidate_conflicts_follow_current_occupied_and_protected_resources(self):
+        case = self.synthetic([(101, {"mandatoryRule": {"needSingleSideEmpty": "Y"}}), (202, {}), (303, {})])
+        records = []
+        for row, score, active, target_row in ((1, 1.0, True, 1), (2, 1.0, True, 1),
+                                               (2, 2.0, True, 1), (2, 3.0, True, 2),
+                                               (2, 4.0, False, 2)):
+            records.append(dict(group_id=303, assignments=[[1, f"{target_row}A"]],
+                                blocked_by_host=[[1, [f"{target_row}D"]]], local_score=score,
+                                source="structured_rigid", pinned=False, conflict_diversity_active=active,
+                                state_assignments=[[0, f"{row}B", f"{row}A"], [1, f"{row}D"]],
+                                owners={f"{row}A": 101, f"{row}B": 101, f"{row}D": 202}))
+        config = copy.deepcopy(self.config)
+        config["input_contract"] = {"seatmaps_by_direction": {
+            "public-test": {"old": "old.json", "new": "new.json"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                "replay.json": {"elite_limit": 12, "elite_records": records},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                  str(work / "replay.json")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)["snapshots"]
+        self.assertEqual(actual, python_records(records, 12))
+        self.assertEqual(actual[0]["303"][0]["conflict_groups"], [101, 202])
+        self.assertEqual(actual[1]["303"][0]["conflict_groups"], [101, 202])
+        self.assertEqual(actual[2]["303"][0]["conflict_groups"], [])
+        self.assertEqual(actual[3]["303"][1]["conflict_groups"], [101, 202])
+        self.assertEqual(actual[4]["303"][1]["conflict_groups"], [])
 
     def test_record_replace_pin_and_eviction_match_frozen_python(self):
         def entry(seat, score=-5.0, pinned=False, block=None, group=71, owners=None, active=True):

@@ -3,6 +3,7 @@ import unittest
 
 from tests import test_native_group_soft as group_tests
 from tests.test_native_stage_budgets import python_budget_prefix, python_schedule_replay
+from tests.test_native_rich_elite import python_conflict_activation
 
 
 class NativeRichRuntimeScheduleTests(unittest.TestCase):
@@ -47,6 +48,8 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                         self.assertEqual(pattern["conflict_groups"], [])
                         self.assertIn(pattern["source"], {"construction", "repair"})
                 queue = result["rich_construction_repair_queue"]
+                self.assertEqual(result["rich_conflict_diversity_active"],
+                                 python_conflict_activation(case, config, {m["group_id"]: m for m in queue}))
                 self.assertEqual(len(queue), len(case["groupsData"]))
                 self.assertEqual(sum(m["assigned"] for m in queue), result["rich_construction_assigned"])
                 self.assertEqual(result["rich_extreme_dispersion_group_count"],

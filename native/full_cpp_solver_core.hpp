@@ -39,6 +39,7 @@ struct Passenger {
     std::string ssr;
     std::string old_seat;
     std::string fixed_seat;
+    bool has_new_seat = false;
     double old_seat_value = std::numeric_limits<double>::quiet_NaN();
     bool has_near_toilet_preference = false;
     bool prefer_near_toilet = true;
@@ -66,6 +67,7 @@ struct SsrRule {
 
 struct RichConstructionConfig {
     int elite_patterns_per_group = 12;
+    int structured_pattern_min_group_size = 5;
     double stage3_time_budget = 20.0;
     bool enable_restricted_pattern_mip = true;
     double restricted_pattern_mip_time_budget = 0.0;
@@ -144,6 +146,7 @@ struct Problem {
     RichConstructionConfig rich;
     RichStageBudgets rich_stage_budgets;
     bool rich_quality_repair_active = false;
+    bool rich_conflict_diversity_time_active = false;
 };
 
 struct RichGroupRepairMetric {
@@ -158,6 +161,8 @@ std::vector<RichGroupRepairMetric> build_rich_repair_queue(
     const Problem& problem, const std::vector<int>& assignment);
 void write_rich_repair_queue(std::ostream& output,
     const std::vector<RichGroupRepairMetric>& queue, size_t limit);
+bool rich_conflict_diversity_active(const Problem& problem,
+    const std::vector<RichGroupRepairMetric>& construction_metrics);
 
 struct FixedSeatContext {
     std::vector<int> owner_by_seat;
@@ -308,6 +313,8 @@ public:
     void capture(const AssignmentState& state, const std::string& source);
     void record(int group_id, RichElitePattern pattern,
                 const std::map<std::string, int>& owner_by_resource, bool conflict_diversity_active);
+    void record_candidate(int group_id, RichElitePattern pattern,
+                          const AssignmentState& state, bool conflict_diversity_active);
     const std::map<int, std::vector<RichElitePattern>>& groups() const { return groups_; }
 private:
     int limit_;

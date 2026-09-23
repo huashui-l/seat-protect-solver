@@ -494,6 +494,36 @@ warnings). Full native/state-replay-enabled regression passed 105 tests and 13,2
 subtests, with 9 skips, including the 12,000-operation state differential and
 raw-CLI independent evaluator checks. `git diff --check` passed.
 
+Conflict-diversity activation is now computed once from construction repair metrics
+and retained across repair/VND in the production result. The CLI exposes
+`rich_conflict_diversity_active`. The native predicate matches the frozen Python
+business-time threshold, ordinary minimum-size group with negative value mismatch,
+protected-resource demand, free-after-demand and aircraft shrink conditions. Raw
+`newSeat` object presence is retained separately from fixed-seat identity because
+Python excludes a nonempty object from ordinary value-block groups even when its
+seat number is empty.
+
+`RichEliteStore::record_candidate` now builds resource ownership from the current
+AssignmentState's occupied seats followed by protected empty seats, then delegates
+to the already verified identity/replacement/pinning/eviction implementation. It
+uses the frozen activation flag without recomputing it after repair or VND. Direct
+replay verifies moved resource ownership, single-side protection, combined occupied
+and blocked conflicts, equal-score retention of old metadata, strictly better
+replacement and disabled diversity. Thirteen activation-boundary scenarios execute
+the actual frozen Python AST predicate and match native results; the runtime
+scheduler test also checks the production CLI flag against construction metrics.
+
+This is the structured-generation recording prerequisite, not completed M3.
+Rigid/relaxed/value-block/rebuilt generation and special dual pricing still require
+native implementation and integration; the new candidate API is differential-tested
+but is not yet called by a production structured generator. No Formal24 gate,
+profiling or 5-second compression was performed.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 107 tests and 13,264 subtests, with
+9 skips, including the 12,000-operation state differential and raw-native external
+legality/scoring checks. `git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

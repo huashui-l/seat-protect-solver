@@ -185,6 +185,7 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     }
     if (const Value* algorithm = config.find("algorithm")) {
         if (const Value* item = algorithm->find("elite_patterns_per_group")) problem.rich.elite_patterns_per_group = std::max(2, static_cast<int>(item->number_or(12)));
+        if (const Value* item = algorithm->find("structured_pattern_min_group_size")) problem.rich.structured_pattern_min_group_size = std::max(1, static_cast<int>(item->number_or(5)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);
         if (const Value* item = algorithm->find("back_penalty_factor")) problem.back_penalty_factor = item->number_or(problem.back_penalty_factor);
@@ -283,7 +284,10 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
             passenger.need_cared = yes(raw, "needCared");
             if (const Value* old_seat = raw.find("oldSeat")) passenger.old_seat = optional_string(*old_seat, "seatNum");
             if (const Value* old_seat = raw.find("oldSeat")) passenger.old_seat_value = optional_number(*old_seat, "seatValue");
-            if (const Value* fixed = raw.find("newSeat")) passenger.fixed_seat = optional_string(*fixed, "seatNum");
+            if (const Value* fixed = raw.find("newSeat")) {
+                passenger.fixed_seat = optional_string(*fixed, "seatNum");
+                passenger.has_new_seat = fixed->is_object() && !fixed->object.empty();
+            }
             if (const Value* rules = raw.find("optionRule"); rules && rules->is_array()) {
                 for (const Value& rule : rules->array) {
                     if (!rule.find("nearToilet")) continue;
@@ -317,6 +321,8 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
         return item ? item->number_or(fallback) : fallback;
     };
     problem.rich_quality_repair_active = setting("business_time_limit_seconds", 5.0)
+        >= setting("three_tier_min_business_time_seconds", 10.0);
+    problem.rich_conflict_diversity_time_active = problem.rich_stage_budgets.business_time_limit
         >= setting("three_tier_min_business_time_seconds", 10.0);
     return problem;
 }
@@ -515,6 +521,29 @@ std::vector<RichGroupRepairMetric> build_rich_repair_queue(
         return key(left) < key(right);
     });
     return queue;
+}
+
+bool rich_conflict_diversity_active(const Problem& problem,
+    const std::vector<RichGroupRepairMetric>& construction_metrics
+) {
+    const int limit = problem.rich.elite_patterns_per_group;
+    const int demand = problem.rich_stage_budgets.seat_demand;
+    if (!problem.rich_conflict_diversity_time_active
+        || problem.seats.size() >= problem.old_seats.size()
+        || demand - static_cast<int>(problem.passengers.size()) < std::max(2, limit - 2)
+        || static_cast<int>(problem.seats.size()) - demand < limit) return false;
+    for (const auto& group : problem.groups) {
+        if (group.passengers.size() < static_cast<size_t>(problem.rich.structured_pattern_min_group_size)) continue;
+        if (!std::all_of(group.passengers.begin(), group.passengers.end(), [&](int p) {
+            const auto& passenger = problem.passengers[p];
+            return passenger.ssr.empty() && !passenger.need_cared && !passenger.has_new_seat
+                && !passenger.need_single_empty && !passenger.need_both_empty;
+        })) continue;
+        const auto metric = std::find_if(construction_metrics.begin(), construction_metrics.end(),
+            [&](const auto& m) { return m.group_id == group.id; });
+        if (metric != construction_metrics.end() && metric->value_mismatch_score < 0.0) return true;
+    }
+    return false;
 }
 
 void write_rich_repair_queue(std::ostream& output,
@@ -1055,6 +1084,18 @@ void RichEliteStore::capture(const AssignmentState& state, const std::string& so
         // no conflicts even when candidate conflict diversity is enabled.
         record(group.id, std::move(pattern), {}, false);
     }
+}
+
+void RichEliteStore::record_candidate(int group_id, RichElitePattern pattern,
+    const AssignmentState& state, bool conflict_diversity_active
+) {
+    std::map<std::string, int> owners;
+    for (int p : state.assignment_order)
+        owners[state.problem.seats[state.passenger_to_seat[p]].id] = state.problem.passengers[p].group_id;
+    for (int p : state.assignment_order)
+        for (int seat : state.assigned_blocked[p])
+            owners[state.problem.seats[seat].id] = state.problem.passengers[p].group_id;
+    record(group_id, std::move(pattern), owners, conflict_diversity_active);
 }
 
 void RichEliteStore::record(int group_id, RichElitePattern pattern,
