@@ -796,12 +796,42 @@ void improve_rich_vnd_m2(
     const int passenger_count = static_cast<int>(assignment.size());
     const int seat_count = static_cast<int>(problem.seats.size());
     const int seat_cap = std::max(1, problem.rich.local_search_candidate_cap);
+    std::set<int> active_caregivers;
+    for (const Group& group : problem.groups) {
+        for (int cared : group.passengers) {
+            const Passenger& cared_item = problem.passengers[cared];
+            const auto rule = problem.ssr_rules.find(cared_item.ssr);
+            if (!cared_item.need_cared &&
+                (rule == problem.ssr_rules.end() || !rule->second.requires_caregiver)) continue;
+            const int cared_seat = assignment[cared];
+            if (cared_seat < 0) continue;
+            const bool cross = rule != problem.ssr_rules.end()
+                && rule->second.caregiver_allow_cross_aisle;
+            const auto& neighbors = cross ? problem.seats[cared_seat].row_neighbors
+                                           : problem.seats[cared_seat].same_block_neighbors;
+            for (int candidate : group.passengers) {
+                const Passenger& item = problem.passengers[candidate];
+                if (candidate != cared && item.ssr.empty() && !item.need_cared
+                    && !item.need_both_empty && !item.need_single_empty
+                    && std::find(neighbors.begin(), neighbors.end(), assignment[candidate])
+                        != neighbors.end()) active_caregivers.insert(candidate);
+            }
+        }
+    }
+    std::vector<int> movable;
+    for (int passenger = 0; passenger < passenger_count; ++passenger) {
+        const Passenger& item = problem.passengers[passenger];
+        if (item.fixed_seat.empty() && item.ssr.empty() && !item.need_cared
+            && !item.need_both_empty && !item.need_single_empty
+            && !active_caregivers.count(passenger)) movable.push_back(passenger);
+    }
     bool improved = true;
     while (improved && std::chrono::steady_clock::now() < deadline) {
         improved = false;
         // Python's first-improvement 1-opt analogue. Candidate seats are
         // ordered by individual score and capped by the frozen config.
-        for (int passenger = 0; passenger < passenger_count && !improved; ++passenger) {
+        for (int passenger : movable) {
+            if (improved) break;
             const int old_seat = assignment[passenger];
             std::vector<int> seats(seat_count);
             std::iota(seats.begin(), seats.end(), 0);
@@ -831,9 +861,11 @@ void improve_rich_vnd_m2(
         }
         if (improved) continue;
 
-        for (int left = 0; left < passenger_count && !improved; ++left) {
-            for (int right = left + 1; right < passenger_count && !improved; ++right) {
-                std::swap(assignment[left], assignment[right]);
+        for (size_t left = 0; left < movable.size() && !improved; ++left) {
+            for (size_t right = left + 1; right < movable.size() && !improved; ++right) {
+                const int left_passenger = movable[left];
+                const int right_passenger = movable[right];
+                std::swap(assignment[left_passenger], assignment[right_passenger]);
                 if (validate_complete_assignment(problem, assignment) == 0) {
                     const double score = evaluate_soft_score(problem, assignment);
                     if (score > current_score + kTolerance) {
@@ -842,18 +874,19 @@ void improve_rich_vnd_m2(
                         improved = true;
                     }
                 }
-                if (!improved) std::swap(assignment[left], assignment[right]);
+                if (!improved) std::swap(assignment[left_passenger], assignment[right_passenger]);
                 if (std::chrono::steady_clock::now() >= deadline) break;
             }
         }
         if (improved) continue;
 
         const int cycle_cap = std::max(1, problem.rich.local_search_cycle_candidate_cap);
-        for (int a = 0; a < passenger_count && !improved; ++a) {
-            for (int b = a + 1; b < passenger_count && !improved; ++b) {
-                for (int c = b + 1; c < passenger_count && !improved; ++c) {
-                    const int sa = assignment[a], sb = assignment[b], sc = assignment[c];
-                    assignment[a] = sb; assignment[b] = sc; assignment[c] = sa;
+        for (size_t a = 0; a < movable.size() && !improved; ++a) {
+            for (size_t b = a + 1; b < movable.size() && !improved; ++b) {
+                for (size_t c = b + 1; c < movable.size() && !improved; ++c) {
+                    const int pa = movable[a], pb = movable[b], pc = movable[c];
+                    const int sa = assignment[pa], sb = assignment[pb], sc = assignment[pc];
+                    assignment[pa] = sb; assignment[pb] = sc; assignment[pc] = sa;
                     if (validate_complete_assignment(problem, assignment) == 0) {
                         const double score = evaluate_soft_score(problem, assignment);
                         if (score > current_score + kTolerance) {
@@ -863,7 +896,7 @@ void improve_rich_vnd_m2(
                         }
                     }
                     if (!improved) {
-                        assignment[a] = sa; assignment[b] = sb; assignment[c] = sc;
+                        assignment[pa] = sa; assignment[pb] = sb; assignment[pc] = sc;
                     }
                     if (std::chrono::steady_clock::now() >= deadline) break;
                     if (c - b >= cycle_cap) break;
@@ -880,7 +913,9 @@ void improve_rich_vnd_m2(
         for (int passenger : problem.groups[group_index].passengers) {
             const Passenger& item = problem.passengers[passenger];
             movable = movable && item.fixed_seat.empty()
-                && !item.need_both_empty && !item.need_single_empty;
+                && item.ssr.empty() && !item.need_cared
+                && !item.need_both_empty && !item.need_single_empty
+                && !active_caregivers.count(passenger);
         }
         if (movable) rebuild_groups.push_back(group_index);
     }
