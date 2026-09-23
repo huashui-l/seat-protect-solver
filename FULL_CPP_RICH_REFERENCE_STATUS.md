@@ -14,6 +14,94 @@ Known boundaries remain visible: wall-clock DFS and LNS set traversal can change
 
 The historical checkpoints below retain their original strict verdicts and earlier pending-work descriptions. This acceptance decision governs the current migration status.
 
+## Recommended short profile: approximately 4.5s search (2026-09-24)
+
+The user requested fuller use of the short budget after the first version averaged
+1.247s. The recommended config is now `configs/config_native_rich_4p5s_search.json`,
+with `--construction-objective rich-fast --time-limit 5`. The accepted 60s profile,
+external original config, results and archived binary remain unchanged.
+
+Only four algorithm settings differ from the first 5s config: scoring reserve
+0.4 -> 0.5s, conflict LNS disabled -> enabled, LNS base budget 0 -> 0.3s,
+restricted MIP base budget 0.4 -> 0.1s. The total nominal stage allocation stays
+4.6s and the existing scheduler scales it to the usable cabin budget (at most
+4.5s). LNS consumes earlier unused budget and retains its existing 200-solve and
+three-stagnation-round limits. Early termination on exhausted neighborhoods is
+allowed; no waiting or repeated identical runs are added to fill time. Protected
+MIP, special pricing and Q1/Q2A remain disabled; on-demand Q0 fallback remains.
+
+Budget diagnosis: enabling LNS with the original restricted reserve (`c78d7cf`,
+`outputs/research/full_cpp_rich_4p5s_lns_v1`) yielded process mean/median/max
+4.051564/4.214525/4.551243s, and 19 improve / 4 tie / 1 regress versus the first
+short profile, mean gain 7.604839. Economy LNS stopped at its deadline in 22 cases;
+restricted MIP reserved 0.353-0.390s but used at most 0.060s. This motivated moving
+0.3s from restricted MIP to LNS. That first diagnostic result and its executed
+config are retained unchanged. Formal24 is reused external benchmark evidence,
+not a pristine holdout; this timing-informed revision is explicitly recorded.
+
+Final frozen config commit `17727e4`, result
+`outputs/research/full_cpp_rich_4p5s_lns_v2/summary.json`: **PASS**.
+24/24 complete/legal/evaluator-consistent, zero unassigned/native/external hard
+violations, zero total-score error, maximum individual error 3.41e-13. All 24
+process invocations are under 5s: mean **4.291865s**, median **4.492802s**, maximum
+**4.549975s**. 22 cases use at least 4s; forward/reverse 50_normal finish at
+1.964/2.120s. All 48 cabins complete Rich construction without invoking Q0.
+These are observed process timings on this machine, not hard real-time guarantees.
+
+Compared with the first short profile `d4b3379`: **20 improve / 4 tie / 0 regress**,
+mean gain **7.969356**. Mean score improves from -607.887210 to -599.917853.
+Compared with preserved C++ 60s `c6a41f3`: 0 improve / 0 tie / 24 regress, mean
+delta **-16.184617**, worst -50.25; mean per-case normalized loss falls from
+4.336013% to **2.871065%**. Normalization is `100*(F_60s-F_short)/max(1,abs(F_60s))`,
+not an optimality gap. Against Python 60s: 7 improve / 0 tie / 17 regress,
+mean delta -2.411921. All paired input and old/new seatmap hashes match. The final
+result is the complete second run; no per-case union or best-of-runs selection.
+CG/LP certificates remain unavailable.
+
+No C++ source or binary changed in this revision. The previously built/tested
+Release /O2 binary SHA-256 remains
+`485f9b959607ff2d55afc61ea436d6abd74f6c77cba1758de234a98bc4fd367b`.
+Relevant schedule/LNS/budget regression: 23 tests and 19,187 subtests passed in
+124.54s. After the final budget transfer, the directed profile test passed again
+with four public fixtures, including legal Q0 fallback and cabin orchestration.
+The prior complete suite (167 tests / 37,241 subtests, 9 skips) remains the
+unchanged binary's full regression evidence; it was not rerun for config-only
+changes. `git diff --check` passed.
+
+Executed config SHA-256:
+`4baacec0b62a2e144edeee7afb22516eac5df2b3af4b6f9d11a53fddef760f51`.
+Its snapshot is retained as `executed_config.json` in the final output directory;
+it differs from the tracked profile only in resolved external seatmap paths.
+The identical executable/DLL are archived in the earlier 5s result's `runtime/`.
+The original external 60s config and archived 60s executable hashes were rechecked.
+
+| Case | Delta vs first short profile | Delta vs CPP 60s | Process wall (s) |
+| --- | ---: | ---: | ---: |
+| forward:100_edge | +5.750000 | -5.600000 | 4.496 |
+| forward:100_normal | +0.300000 | -26.398276 | 4.481 |
+| forward:100_stress | +19.525000 | -9.350000 | 4.497 |
+| forward:150_edge | +0.000000 | -50.250000 | 4.482 |
+| forward:150_normal | +20.650000 | -22.250000 | 4.512 |
+| forward:150_stress | +24.170000 | -38.083333 | 4.507 |
+| forward:50_edge | +0.000000 | -2.533333 | 4.459 |
+| forward:50_normal | +1.000000 | -5.200000 | 1.964 |
+| forward:50_stress | +1.500000 | -8.572838 | 4.472 |
+| forward:full_edge | +6.475952 | -11.675376 | 4.550 |
+| forward:full_normal | +3.760248 | -3.880000 | 4.523 |
+| forward:full_stress | +0.380000 | -25.923465 | 4.514 |
+| reverse:100_edge | +8.289652 | -46.012508 | 4.484 |
+| reverse:100_normal | +36.500000 | -7.470000 | 4.492 |
+| reverse:100_stress | +25.888698 | -29.124535 | 4.504 |
+| reverse:150_edge | +0.150000 | -31.705714 | 4.484 |
+| reverse:150_normal | +3.860000 | -1.875000 | 4.516 |
+| reverse:150_stress | +0.000000 | -27.315000 | 4.485 |
+| reverse:50_edge | +0.000000 | -0.400000 | 4.458 |
+| reverse:50_normal | +0.400000 | -0.200000 | 2.120 |
+| reverse:50_stress | +2.800000 | -1.120000 | 4.462 |
+| reverse:full_edge | +4.975000 | -6.800000 | 4.494 |
+| reverse:full_normal | +20.710000 | -23.050000 | 4.533 |
+| reverse:full_stress | +4.180000 | -3.641429 | 4.515 |
+
 ## Independent 5-second profile (2026-09-24)
 
 The user subsequently requested a 5s C++ heuristic, explicitly accepting score

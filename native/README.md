@@ -120,6 +120,19 @@ unused construction/repair/VND/pattern carry before restricted MIP, which keeps
 so exhausted neighborhoods may still finish early. No artificial wait is added.
 The preserved 60s `group-first` profile and archived results are unchanged.
 
+This is the recommended short profile. Frozen `17727e4` Formal24 passes all
+24 completeness/legality/evaluator checks; process mean/median/max is
+4.292/4.493/4.550s, all below 5s. Against the first short profile: 20 improve,
+4 tie, 0 regress, mean score gain 7.969. Average normalized score loss versus
+C++ 60s is 2.87%. Exact results and the intermediate timing diagnosis are in
+`FULL_CPP_RICH_REFERENCE_STATUS.md`.
+
+```powershell
+./build/native/seat_protect_cpp.exe --input CASE.json `
+  --config configs/config_native_rich_4p5s_search.json --output RESULT.json `
+  --construction-objective rich-fast --time-limit 5 --seed 0
+```
+
 ## Build
 
 Windows x64, PowerShell, Visual Studio C++ tools, and an externally obtained

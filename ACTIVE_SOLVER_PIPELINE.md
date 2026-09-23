@@ -48,7 +48,16 @@ the acceptance decision and retained timing/trajectory boundaries.
 The V1R flow below is the historical preprocessed-input release path and remains
 separate from the raw Rich migration.
 
-## Independent short-budget native path
+## Recommended short-budget native path
+
+Use `configs/config_native_rich_4p5s_search.json` with `rich-fast --time-limit 5`.
+The existing native conflict LNS uses earlier stage carry plus 0.3s base budget;
+restricted MIP retains 0.1s, and scoring/overhead reserve is 0.5s. Final Formal24
+has 24/24 legal/complete/evaluator-consistent cases, median process wall 4.493s,
+maximum 4.550s, and 20 improve / 4 tie / 0 regress versus the initial short profile.
+The unchanged 60s mode remains separate. See the Rich status ledger for evidence.
+
+## Initial short-budget native path
 
 The `rich-fast` entry and `configs/config_native_rich_5s.json` retain the same
 hard constraints, objective and native Rich implementations while changing the
