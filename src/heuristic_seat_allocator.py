@@ -4865,13 +4865,13 @@ def improve_protected_multigroup_pattern_mip(
         import highspy
         import numpy as np
         from . import allocation_evaluator as evaluator_module
-        from . import exact_column_generation as exact
+        from archive.legacy_column_generation import exact_column_generation as exact
     except ImportError:
         try:
             import highspy
             import numpy as np
             import allocation_evaluator as evaluator_module
-            import exact_column_generation as exact
+            from archive.legacy_column_generation import exact_column_generation as exact
         except ImportError:
             diagnostics["enabled"] = False
             diagnostics["reason"] = "highspy_or_numpy_unavailable"
@@ -5775,10 +5775,10 @@ def generate_structured_group_patterns(
         return diagnostics
 
     try:
-        from . import exact_column_generation as exact
+        from archive.legacy_column_generation import exact_column_generation as exact
         from . import allocation_evaluator as evaluator_module
     except ImportError:
-        import exact_column_generation as exact
+        from archive.legacy_column_generation import exact_column_generation as exact
         import allocation_evaluator as evaluator_module
 
     pricing_config = copy.deepcopy(config)
@@ -6465,10 +6465,10 @@ def generate_special_dual_pricing_patterns(
         return diagnostics
     try:
         from . import allocation_evaluator as evaluator_module
-        from . import exact_column_generation as exact
+        from archive.legacy_column_generation import exact_column_generation as exact
     except ImportError:
         import allocation_evaluator as evaluator_module
-        import exact_column_generation as exact
+        from archive.legacy_column_generation import exact_column_generation as exact
 
     special_groups = [
         group for group in groups_data

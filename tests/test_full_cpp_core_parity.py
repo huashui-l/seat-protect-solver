@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from src.allocation_evaluator import SeatTopology
-from src import exact_column_generation as exact
+from archive.legacy_column_generation import exact_column_generation as exact
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
