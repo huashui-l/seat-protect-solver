@@ -37,10 +37,19 @@ External evaluator audits at a 20-second budget passed for
 `forward:50_normal`, `forward:full_edge`, and `reverse:full_edge`: all complete,
 zero hard violations, zero unassigned, and zero score error. These are three
 smoke cases, not the 24-case 60-second parity gate. The current adapter still
-uses the existing RR beam pattern semantics, omits baby-pair objective terms,
-and uses a provisional 0.5-second master cap; exact ACTIVE stage orchestration
+uses the existing RR beam pattern semantics
+and a provisional 0.5-second master cap; exact ACTIVE stage orchestration
 and configuration budgets remain outstanding. Equal-score master results do
 not replace or relabel the incoming incumbent.
+
+The raw adapter now includes baby-pair objective terms and the kernel's same-group
+cancellation, matching Python `_baby_pairs` / `_pattern_from_placements`.
+The public `caregiver_and_ssr` differential exercises 288 pairs with nonzero
+external baby score (-0.6985902255639098); reconstructed master score
+(-8.198590225563912) matches native and external assignment score
+(-8.19859022556391). The native-enabled public suite remains 56 passed,
+10 skipped, and 39 subtests passed. This verifies objective encoding on the
+fixture, not structured generation or full ACTIVE stage equivalence.
 
 ## Correctness
 

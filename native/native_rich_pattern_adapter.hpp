@@ -13,6 +13,8 @@ struct RichPatternResult {
     double score = 0.0;
     int pattern_count = 0;
     int selected_pattern_count = 0;
+    int baby_pair_count = 0;
+    double master_score = 0.0;
 };
 
 RichPatternResult run_rich_pattern_master(

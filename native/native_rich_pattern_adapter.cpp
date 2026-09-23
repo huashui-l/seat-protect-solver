@@ -90,8 +90,27 @@ RichPatternResult run_rich_pattern_master(
     input << std::setprecision(17);
     const int seat_count = static_cast<int>(problem.seats.size());
     const int group_count = static_cast<int>(problem.groups.size());
+    std::vector<native_solver::BabyPair> baby_pairs;
+    if (ssr_types.count("BSCT")) {
+        for (int infant = 0; infant < seat_count; ++infant) {
+            const Seat& source = problem.seats[infant];
+            for (int occupant = 0; occupant < seat_count; ++occupant) {
+                const Seat& target = problem.seats[occupant];
+                if (source.cabin != target.cabin) continue;
+                double factor = 0.0;
+                if (source.row == target.row && source.subrow == target.subrow)
+                    factor = 1.0;
+                else if (std::abs(source.row - target.row) == 1)
+                    factor = problem.baby_front_back_factor;
+                const double cost = -problem.weight_b * factor
+                    / (1.0 + std::abs(source.x - target.x));
+                if (cost != 0.0) baby_pairs.push_back({infant, occupant, cost});
+            }
+        }
+    }
+    result.baby_pair_count = static_cast<int>(baby_pairs.size());
     input << "HEADER_V2 " << seat_count << ' ' << seat_count << ' ' << location_ids.size() << ' '
-          << group_count << " 0 0 " << problem.weight_c << ' '
+          << group_count << ' ' << baby_pairs.size() << " 0 " << problem.weight_c << ' '
           << problem.group_centroid_x_factor << ' ' << problem.group_centroid_y_factor << '\n';
     for (int seat = 0; seat < seat_count; ++seat) {
         const Seat& item = problem.seats[seat];
@@ -101,6 +120,11 @@ RichPatternResult run_rich_pattern_master(
         input << ' ' << item.row_neighbors.size();
         for (int neighbor : item.row_neighbors) input << ' ' << neighbor;
         input << '\n';
+    }
+
+    for (const auto& pair : baby_pairs) {
+        input << "BABY " << pair.infant_seat << ' ' << pair.occupant_seat
+              << ' ' << pair.cost << '\n';
     }
 
     // Keep every seat in the raw adapter so the incumbent can always be
@@ -212,13 +236,22 @@ RichPatternResult run_rich_pattern_master(
         for (const auto& pattern : master.patterns) by_id[pattern.id] = &pattern;
         std::vector<int> candidate = incumbent;
         int selected_count = 0;
+        double master_cost = 0.0;
+        std::set<int> infants, occupied;
         for (uint64_t id : selected) {
             auto found = by_id.find(id);
             if (found == by_id.end()) continue;
             ++selected_count;
+            master_cost += found->second->master_cost;
+            infants.insert(found->second->infant_seats.begin(), found->second->infant_seats.end());
+            occupied.insert(found->second->occupied_seats.begin(), found->second->occupied_seats.end());
             for (const auto& assignment : found->second->assignments)
                 if (assignment.first >= 0 && assignment.first < static_cast<int>(candidate.size()))
                     candidate[assignment.first] = assignment.second;
+        }
+        for (const auto& pair : master.baby_pairs) {
+            if (infants.count(pair.infant_seat) && occupied.count(pair.occupant_seat))
+                master_cost += pair.cost;
         }
         if (selected_count == static_cast<int>(problem.groups.size())
             && validate_complete_assignment(problem, candidate) == 0
@@ -226,6 +259,7 @@ RichPatternResult run_rich_pattern_master(
             result.passenger_to_seat = std::move(candidate);
             result.complete = true;
             result.score = evaluate_soft_score(problem, result.passenger_to_seat);
+            result.master_score = -master_cost;
             result.selected_pattern_count = selected_count;
         }
     }

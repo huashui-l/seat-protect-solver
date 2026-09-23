@@ -44,6 +44,11 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                 self.assertGreater(result["rich_pattern_count"], 0)
                 self.assertGreater(result["rich_selected_pattern_count"], 0)
                 self.assertGreaterEqual(result["rich_pattern_score"], result["rich_vnd_score"] - 1e-8)
+                self.assertAlmostEqual(result["rich_master_score"], result["rich_pattern_score"], places=8)
+                if case_id == "caregiver_and_ssr":
+                    self.assertGreater(result["rich_baby_pair_count"], 0)
+                else:
+                    self.assertEqual(result["rich_baby_pair_count"], 0)
 
     def test_group_first_replay_is_deterministic_and_bounded(self):
         first = self.run_group_first("large_groups_9_10")

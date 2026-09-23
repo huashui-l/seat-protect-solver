@@ -133,6 +133,8 @@ int main(int argc, char** argv) {
             << "\"rich_pattern_count\":" << result.rich_pattern_count << ','
             << "\"rich_selected_pattern_count\":" << result.rich_selected_pattern_count << ','
             << "\"rich_pattern_score\":" << result.rich_pattern_score << ','
+            << "\"rich_baby_pair_count\":" << result.rich_baby_pair_count << ','
+            << "\"rich_master_score\":" << result.rich_master_score << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;
