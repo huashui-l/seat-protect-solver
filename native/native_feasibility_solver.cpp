@@ -192,6 +192,7 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_vnd_one_opt_moves = group_result.rich_vnd_one_opt_moves;
             result.rich_vnd_two_swap_moves = group_result.rich_vnd_two_swap_moves;
             result.rich_vnd_three_cycle_moves = group_result.rich_vnd_three_cycle_moves;
+            result.rich_vnd_group_rebuild_moves = group_result.rich_vnd_group_rebuild_moves;
             result.rich_vnd_score = group_result.rich_vnd_score;
             result.rich_vnd_seconds = group_result.rich_vnd_seconds;
             result.native_hard_violations = validate_complete_assignment(

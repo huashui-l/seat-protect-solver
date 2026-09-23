@@ -89,6 +89,7 @@ struct RichConstructionConfig {
     int local_search_candidate_cap = 32;
     int local_search_cycle_candidate_cap = 12;
     int local_search_related_candidate_cap = 64;
+    int local_search_related_group_cap = 8;
 };
 
 struct Problem {

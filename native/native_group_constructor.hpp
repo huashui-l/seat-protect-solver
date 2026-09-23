@@ -56,6 +56,7 @@ struct GroupConstructionResult {
     int rich_vnd_one_opt_moves = 0;
     int rich_vnd_two_swap_moves = 0;
     int rich_vnd_three_cycle_moves = 0;
+    int rich_vnd_group_rebuild_moves = 0;
     double rich_vnd_score = 0.0;
     double rich_vnd_seconds = 0.0;
 };

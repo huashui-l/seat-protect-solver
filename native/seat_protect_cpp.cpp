@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
             << "\"rich_vnd_one_opt_moves\":" << result.rich_vnd_one_opt_moves << ','
             << "\"rich_vnd_two_swap_moves\":" << result.rich_vnd_two_swap_moves << ','
             << "\"rich_vnd_three_cycle_moves\":" << result.rich_vnd_three_cycle_moves << ','
+            << "\"rich_vnd_group_rebuild_moves\":" << result.rich_vnd_group_rebuild_moves << ','
             << "\"rich_vnd_score\":" << result.rich_vnd_score << ','
             << "\"rich_vnd_seconds\":" << result.rich_vnd_seconds << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
