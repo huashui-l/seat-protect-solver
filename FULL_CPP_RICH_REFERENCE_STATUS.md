@@ -916,6 +916,37 @@ native/state-replay-enabled regression passed 131 tests and 16,151 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for this production structured integration.
 
+### Special dual pricing component
+
+`generate_rich_special_dual_patterns` now implements the frozen special pricing
+function in the existing HiGHS-linked feasibility compilation unit. Core-only
+probes retain their existing link closure. The continuous LP preserves sorted
+group/seat row order, input-group column order, incumbent/elite duplicates,
+elite insertion order, protection resources and affected-group scores. Only group
+and seat row duals feed the existing native pricing DFS. Repair priority, the
+13-group cap, 50 ms per-group deadlines, quick pool size four and the fixed
+`reduced_cost < -1e-7` acceptance threshold match Python. Accepted candidates are
+reported synchronously without changing the assignment.
+
+The full-function differential covers eleven public fixtures and a synthetic
+15-special-group cap case, each with empty elite input, duplicate incumbent elite,
+real structured elites, disabled activation and expired deadline (60 subtests).
+It compares LP status/column count, attempted groups, DFS nodes, accepted candidate
+order/resources, reduced costs and callback scores. The protection-heavy fixture
+uses its legal public reference assignment because construction/repair alone is
+incomplete; special pricing requires a complete context. No-special-group and
+zero-duration early returns are also checked.
+
+Production integration remains pending: frozen Python calls special pricing
+**after protected multi-group MIP**, not directly after structured generation.
+This component does not change the production stage sequence or complete M3.
+Protected/dynamic MIPs, conflict LNS/local branching, Rich restricted MIP and the
+full correctness/quality gate remain open. No Formal24 or profiling run was made.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+Full native/state-replay-enabled regression passed 132 tests and 16,211 subtests
+with 9 skips. `git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

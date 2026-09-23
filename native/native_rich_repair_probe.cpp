@@ -12,6 +12,40 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* mode = replay.find("special_pricing"); mode && mode->bool_or()) {
+            full_cpp::AssignmentState state(problem);
+            for (const auto& entry : replay.at("assignments").array) {
+                const int p = static_cast<int>(entry.array[0].number);
+                state.passenger_to_seat[p] = problem.seat_index.at(entry.array[1].string);
+            }
+            for (const auto& entry : replay.at("blocked").array)
+                for (const auto& seat : entry.array[1].array)
+                    state.assigned_blocked.at(static_cast<int>(entry.array[0].number)).push_back(problem.seat_index.at(seat.string));
+            full_cpp::RichEliteStore elite(1000);
+            for (const auto& entry : replay.at("elite").array) {
+                full_cpp::RichElitePattern pattern;
+                pattern.local_score = entry.at("local_score").number;
+                for (const auto& a : entry.at("assignments").array)
+                    pattern.assignments.emplace_back(static_cast<int>(a.array[0].number), a.array[1].string);
+                for (const auto& a : entry.at("blocked_by_host").array) {
+                    std::vector<std::string> seats;
+                    for (const auto& seat : a.array[1].array) seats.push_back(seat.string);
+                    pattern.blocked_by_host.emplace_back(static_cast<int>(a.array[0].number), seats);
+                }
+                elite.record(static_cast<int>(entry.at("group_id").number), std::move(pattern), {}, false);
+            }
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(replay.at("deadline_seconds").number));
+            std::vector<double> scores;
+            const auto diagnostics = full_cpp::generate_rich_special_dual_patterns(problem, state, elite, deadline,
+                replay.at("enabled").bool_or(), [&](int, const full_cpp::RichExactPattern&, double score) { scores.push_back(score); });
+            std::cout << std::setprecision(17) << "{\"diagnostics\":";
+            full_cpp::write_rich_special_pricing_diagnostics(std::cout, problem, diagnostics);
+            std::cout << ",\"scores\":[";
+            for (size_t i = 0; i < scores.size(); ++i) { if (i) std::cout << ','; std::cout << scores[i]; }
+            std::cout << "]}\n";
+            return 0;
+        }
         if (const auto* mode = replay.find("structured_generation"); mode && mode->bool_or()) {
             std::vector<int> assignment(problem.passengers.size(), -1);
             for (const auto& entry : replay.at("assignments").array)

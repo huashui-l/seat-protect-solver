@@ -7,6 +7,23 @@
 
 namespace full_cpp {
 
+struct RichSpecialPricingDiagnostics {
+    bool enabled = false;
+    std::string lp_status = "disabled";
+    int lp_columns = 0, groups_attempted = 0, negative_patterns = 0;
+    long long dfs_nodes = 0;
+    double seconds = 0.0;
+    std::vector<std::pair<RichExactPattern, double>> accepted_patterns;
+};
+
+RichSpecialPricingDiagnostics generate_rich_special_dual_patterns(
+    const Problem& problem, const AssignmentState& state, const RichEliteStore& elite,
+    std::chrono::steady_clock::time_point deadline, bool enabled,
+    const std::function<void(int, const RichExactPattern&, double)>& recorder);
+
+void write_rich_special_pricing_diagnostics(std::ostream& output,
+    const Problem& problem, const RichSpecialPricingDiagnostics& diagnostics);
+
 enum class ConstructionObjective {
     Feasibility,
     IndividualSoft,

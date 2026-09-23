@@ -15,6 +15,7 @@ from src import allocation_evaluator as evaluator
 from src import exact_column_generation as exact
 from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
+from tests.test_native_rich_elite import python_capture_namespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,6 +73,105 @@ def python_rigid_relaxed(case, config, assignments, value_blocks=False, expired=
 class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_special_dual_pricing_matches_frozen_function(self):
+        prefix = construction_prefix()
+        total_accepted = 0
+        capped = self.synthetic([(100 - i, {"ssr": "TEST"}) for i in range(15)])
+        capped["id"] = "special_group_cap"
+        no_special_seen = False
+        for original in [*self.cases[:11], capped]:
+            config = copy.deepcopy(self.config)
+            config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
+                                       construction_time_budget=60.0, small_group_dfs_time_limit=20.0)
+            # Finish deterministic node budgets before the frozen 50 ms deadline.
+            config.setdefault("column_generation", {})["dfs_node_limit"] = 30
+            config["input_contract"] = {"seatmaps_by_direction": {
+                "public-test": {"old": "old.json", "new": "new.json"}}}
+            constructed = prefix(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                                 original["groupsData"], config["weights"], config)
+            context = constructed["context"]
+            rich.repair_unassigned_by_local_relocation(
+                constructed["groups"], context, constructed["passenger_sorted_seats"], config)
+            scorer = evaluator.IncrementalSoftScorer(original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"],
+                                                    original["groupsData"], config["weights"], config)
+            passengers = [(g["groupId"], p["hostnum"]) for g in original["groupsData"] for p in g["psrs"]]
+            if len(context.assigned_seats) != len(passengers):
+                context = rich.AssignmentContext(constructed["seats"])
+                for group in constructed["groups"]:
+                    for passenger in group.passengers:
+                        self.assertTrue(context.assign_passenger(passenger,
+                            original["referenceAssignments"][group.group_id, passenger.hostnum], group.group_id))
+            self.assertEqual(len(context.assigned_seats), len(passengers))
+            for variant in ("active", "duplicate_elite", "structured_elite", "disabled", "expired"):
+                with self.subTest(case=original["id"], variant=variant):
+                    duration = -1.0 if variant == "expired" else 120.0
+                    elite, native_elite = {}, []
+                    if variant == "duplicate_elite":
+                        for g in original["groupsData"]:
+                            gid = g["groupId"]
+                            assignments = [(p["hostnum"], context.assigned_seats[gid, p["hostnum"]]) for p in g["psrs"]]
+                            blocked = [(p["hostnum"], sorted(context.assigned_blocked.get((gid, p["hostnum"]), ()))) for p in g["psrs"]]
+                            resources = sorted({s for _, s in assignments} | {s for _, seats in blocked for s in seats})
+                            score = scorer.components(context.assigned_seats, {gid})["total_soft_score"]
+                            elite[gid] = {0: dict(local_score=score, seat_resources=resources)}
+                            native_elite.append(dict(group_id=gid, local_score=score, assignments=assignments, blocked_by_host=blocked))
+                    if variant == "structured_elite":
+                        captures = python_capture_namespace(context, constructed["groups"], scorer, 12)
+                        captures["capture_stage_patterns"]("current")
+                        rich.generate_structured_group_patterns(
+                            original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"], original["groupsData"],
+                            context, scorer, config["weights"], config, rich.time.perf_counter() + 120.0,
+                            captures["record_elite_pattern"])
+                        elite = captures["elite_pattern_store"]
+                        for gid, patterns in elite.items():
+                            for pattern in patterns.values():
+                                native_elite.append(dict(group_id=gid, local_score=pattern["local_score"],
+                                    assignments=pattern["assignments"], blocked_by_host=pattern["blocked_by_host"]))
+                    scores = []
+                    def record(gid, placements, score, source, blocked, pinned):
+                        self.assertEqual(source, "special_dual_pricing")
+                        self.assertTrue(pinned)
+                        scores.append(score)
+                    expected = rich.generate_special_dual_pricing_patterns(
+                        original["newSeatmapData"]["seats"], original["oldSeatmapData"]["seats"], original["groupsData"],
+                        context, scorer, config["weights"], config, elite, rich.time.perf_counter() + duration,
+                        record, variant != "disabled")
+                    replay = dict(special_pricing=True, enabled=variant != "disabled", deadline_seconds=duration,
+                                  assignments=[[i, context.assigned_seats[key]] for i, key in enumerate(passengers)],
+                                  blocked=[[i, sorted(context.assigned_blocked.get(key, ()))] for i, key in enumerate(passengers)],
+                                  elite=native_elite)
+                    with tempfile.TemporaryDirectory() as directory:
+                        work = Path(directory)
+                        for name, value in {
+                            "case.json": {"caseId": original["id"], "direction": "public-test", "groups": original["groupsData"]},
+                            "old.json": original["oldSeatmapData"], "new.json": original["newSeatmapData"],
+                            "config.json": config, "replay.json": replay,
+                        }.items():
+                            (work / name).write_text(json.dumps(value), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    actual_d = actual["diagnostics"]
+                    if expected["seconds"] == 0: self.assertEqual(actual_d["seconds"], 0)
+                    expected.pop("seconds")
+                    actual_d.pop("seconds")
+                    expected_patterns = expected.pop("accepted_patterns")
+                    actual_patterns = actual_d.pop("accepted_patterns")
+                    self.assertEqual(actual_d, expected)
+                    no_special_seen |= expected["lp_status"] == "no_special_groups"
+                    if original is capped and variant in ("active", "duplicate_elite", "structured_elite"):
+                        self.assertEqual(actual_d["groups_attempted"], 13)
+                    self.assertEqual(len(actual_patterns), len(expected_patterns))
+                    total_accepted += len(actual_patterns)
+                    for a, b in zip(actual_patterns, expected_patterns):
+                        self.assertAlmostEqual(a.pop("reduced_cost"), b.pop("reduced_cost"), places=8)
+                        self.assertEqual(a, json.loads(json.dumps(b)))
+                    self.assertEqual(len(actual["scores"]), len(scores))
+                    for a, b in zip(actual["scores"], scores): self.assertAlmostEqual(a, b, places=8)
+        self.assertGreater(total_accepted, 0)
+        self.assertTrue(no_special_seen)
 
     def test_complete_structured_generation_matches_frozen_function(self):
         prefix = construction_prefix()
