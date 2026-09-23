@@ -1180,6 +1180,105 @@ RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPr
     return filtered;
 }
 
+size_t RichPricingGeometry::rectangle_index(int row_low, int row_high, int x_low, int x_high) const {
+    return ((static_cast<size_t>(row_low) * row_values.size() + row_high) * x_values.size() + x_low) * x_values.size() + x_high;
+}
+
+RichPricingGeometry build_rich_pricing_geometry(const RichPricingCache& cache) {
+    RichPricingGeometry geometry;
+    for (const auto& entry : cache.row_coordinate) geometry.row_values.push_back(entry.second);
+    for (const auto& entry : cache.x_coordinate) geometry.x_values.push_back(entry.second);
+    for (auto* values : {&geometry.row_values, &geometry.x_values}) {
+        std::sort(values->begin(), values->end());
+        values->erase(std::unique(values->begin(), values->end()), values->end());
+    }
+    const int nr = static_cast<int>(geometry.row_values.size()), nx = static_cast<int>(geometry.x_values.size());
+    geometry.seat_prefix.assign(static_cast<size_t>(nr) * nx, 0);
+    for (int seat : cache.seat_ids) {
+        const int row = static_cast<int>(std::lower_bound(geometry.row_values.begin(), geometry.row_values.end(), cache.row_coordinate.at(seat)) - geometry.row_values.begin());
+        const int x = static_cast<int>(std::lower_bound(geometry.x_values.begin(), geometry.x_values.end(), cache.x_coordinate.at(seat)) - geometry.x_values.begin());
+        geometry.seat_row_index[seat] = row; geometry.seat_x_index[seat] = x;
+        ++geometry.seat_prefix[static_cast<size_t>(row) * nx + x];
+    }
+    for (int row = 1; row < nr; ++row) for (int x = 0; x < nx; ++x)
+        geometry.seat_prefix[static_cast<size_t>(row) * nx + x] += geometry.seat_prefix[static_cast<size_t>(row - 1) * nx + x];
+    for (int row = 0; row < nr; ++row) for (int x = 1; x < nx; ++x)
+        geometry.seat_prefix[static_cast<size_t>(row) * nx + x] += geometry.seat_prefix[static_cast<size_t>(row) * nx + x - 1];
+    return geometry;
+}
+
+RichPricingBounds build_rich_pricing_bounds(const RichPricingCache& cache,
+    const RichPricingGeometry& geometry, const std::vector<int>& order,
+    const std::vector<std::vector<double>>& base_cost, double row_span_cost, double column_span_cost
+) {
+    const size_t nr = geometry.row_values.size(), nx = geometry.x_values.size();
+    if (!nr || !nx) throw std::runtime_error("pricing bounds require a nonempty seat domain");
+    const double infinity = std::numeric_limits<double>::infinity();
+    const size_t count = nr * nr * nx * nx;
+    const auto index = [&](size_t a, size_t b, size_t c, size_t d) { return ((a * nr + b) * nx + c) * nx + d; };
+    const auto capacity = [&](size_t a, size_t b, size_t c, size_t d) {
+        int value = geometry.seat_prefix[b * nx + d];
+        if (a) value -= geometry.seat_prefix[(a - 1) * nx + d];
+        if (c) value -= geometry.seat_prefix[b * nx + c - 1];
+        if (a && c) value += geometry.seat_prefix[(a - 1) * nx + c - 1];
+        return value;
+    };
+    // Same four cumulative minima as NumPy: low axes forward, high axes backward.
+    const auto enclosing_minimum = [&](std::vector<double>& values) {
+        const size_t widths[] = {nr, nr, nx, nx};
+        const size_t strides[] = {nr * nx * nx, nx * nx, nx, 1};
+        for (int axis = 0; axis < 4; ++axis) {
+            const size_t width = widths[axis], stride = strides[axis], block = width * stride;
+            for (size_t base = 0; base < count; base += block) for (size_t offset = 0; offset < stride; ++offset)
+                for (size_t step = 1; step < width; ++step) {
+                    const size_t position = axis % 2 ? width - 1 - step : step;
+                    const size_t current = base + position * stride + offset;
+                    const size_t previous = axis % 2 ? current + stride : current - stride;
+                    values[current] = std::min(values[current], values[previous]);
+                }
+        }
+    };
+    std::vector<double> exact(count, infinity);
+    for (size_t a = 0; a < nr; ++a) for (size_t b = a; b < nr; ++b) {
+        const double row_cost = row_span_cost * (geometry.row_values[b] - geometry.row_values[a]);
+        for (size_t c = 0; c < nx; ++c) for (size_t d = c; d < nx; ++d)
+            if (capacity(a, b, c, d) >= static_cast<int>(cache.all_options.size()))
+                exact[index(a, b, c, d)] = row_cost + column_span_cost * (geometry.x_values[d] - geometry.x_values[c]);
+    }
+    RichPricingBounds bounds;
+    bounds.span = exact; enclosing_minimum(bounds.span);
+    bounds.root_span = *std::min_element(bounds.span.begin(), bounds.span.end());
+    std::vector<std::vector<double>> passenger_cost(cache.all_options.size());
+    for (int p : order) {
+        std::vector<double> grid(nr * nx, infinity);
+        const auto& options = cache.all_options[p];
+        for (size_t i = 0; i < options.size(); ++i) {
+            const size_t cell = static_cast<size_t>(geometry.seat_row_index.at(options[i].seat)) * nx + geometry.seat_x_index.at(options[i].seat);
+            grid[cell] = std::min(grid[cell], base_cost.at(p).at(i));
+        }
+        auto& minimum = passenger_cost[p]; minimum.assign(count, infinity);
+        for (size_t a = 0; a < nr; ++a) for (size_t b = a; b < nr; ++b) {
+            std::vector<double> columns(nx, infinity);
+            for (size_t row = a; row <= b; ++row) for (size_t x = 0; x < nx; ++x)
+                columns[x] = std::min(columns[x], grid[row * nx + x]);
+            for (size_t c = 0; c < nx; ++c) {
+                double running = infinity;
+                for (size_t d = c; d < nx; ++d) {
+                    running = std::min(running, columns[d]); minimum[index(a, b, c, d)] = running;
+                }
+            }
+        }
+    }
+    for (size_t depth = 0; depth <= order.size(); ++depth) {
+        auto combined = exact;
+        // Preserve Python's addition order at every depth (no reverse suffix sums).
+        for (size_t next = depth; next < order.size(); ++next)
+            for (size_t i = 0; i < count; ++i) combined[i] += passenger_cost[order[next]][i];
+        enclosing_minimum(combined); bounds.suffix.push_back(std::move(combined));
+    }
+    return bounds;
+}
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 ) {

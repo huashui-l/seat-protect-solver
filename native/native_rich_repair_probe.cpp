@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <cmath>
 
 int main(int argc, char** argv) {
     if (argc != 4) return 2;
@@ -30,6 +31,37 @@ int main(int argc, char** argv) {
                 }
                 if (!first) std::cout << ',';
                 first = false;
+                if (const auto* mode = request.find("bounds"); mode && mode->bool_or()) {
+                    const auto geometry = full_cpp::build_rich_pricing_geometry(cache);
+                    std::vector<int> order;
+                    for (const auto& entry : request.at("order").array) order.push_back(static_cast<int>(entry.number));
+                    std::vector<std::vector<double>> costs;
+                    for (const auto& passenger : request.at("base_cost").array) {
+                        costs.emplace_back();
+                        for (const auto& entry : passenger.array) costs.back().push_back(entry.number);
+                    }
+                    const auto bounds = full_cpp::build_rich_pricing_bounds(cache, geometry, order, costs,
+                        request.at("row_span_cost").number, request.at("column_span_cost").number);
+                    const auto emit_numbers = [&](const auto& values) {
+                        std::cout << '[';
+                        for (size_t i = 0; i < values.size(); ++i) {
+                            if (i) std::cout << ',';
+                            if (std::isfinite(static_cast<double>(values[i]))) std::cout << values[i];
+                            else std::cout << "null";
+                        }
+                        std::cout << ']';
+                    };
+                    std::cout << "{\"row_values\":"; emit_numbers(geometry.row_values);
+                    std::cout << ",\"x_values\":"; emit_numbers(geometry.x_values);
+                    std::cout << ",\"seat_prefix\":"; emit_numbers(geometry.seat_prefix);
+                    std::cout << ",\"span\":"; emit_numbers(bounds.span);
+                    std::cout << ",\"suffix\":[";
+                    for (size_t d = 0; d < bounds.suffix.size(); ++d) { if (d) std::cout << ','; emit_numbers(bounds.suffix[d]); }
+                    std::cout << "],\"root_span\":";
+                    if (std::isfinite(bounds.root_span)) std::cout << bounds.root_span; else std::cout << "null";
+                    std::cout << '}';
+                    continue;
+                }
                 std::cout << "{\"seat_ids\":"; emit_seats(cache.seat_ids);
                 std::cout << ",\"row_big_m\":" << cache.row_big_m << ",\"x_big_m\":" << cache.x_big_m;
                 const auto emit_coordinates = [&](const char* name, const auto& values) {

@@ -273,6 +273,24 @@ RichPricingCache build_rich_pricing_cache(const Problem& problem, int group_inde
 RichPricingCache filter_rich_pricing_window(const Problem& problem, const RichPricingCache& cache,
     const std::vector<int>& rows);
 
+struct RichPricingGeometry {
+    std::vector<double> row_values, x_values;
+    std::map<int, int> seat_row_index, seat_x_index;
+    std::vector<int> seat_prefix;
+    size_t rectangle_index(int row_low, int row_high, int x_low, int x_high) const;
+};
+
+struct RichPricingBounds {
+    std::vector<double> span;
+    std::vector<std::vector<double>> suffix;
+    double root_span = std::numeric_limits<double>::infinity();
+};
+
+RichPricingGeometry build_rich_pricing_geometry(const RichPricingCache& cache);
+RichPricingBounds build_rich_pricing_bounds(const RichPricingCache& cache,
+    const RichPricingGeometry& geometry, const std::vector<int>& order,
+    const std::vector<std::vector<double>>& base_cost, double row_span_cost, double column_span_cost);
+
 RichStageBudgets calculate_rich_stage_budgets(
     const Problem& problem, const native_json::Value& algorithm
 );

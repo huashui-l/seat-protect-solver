@@ -1,6 +1,7 @@
 import ast
 import copy
 import json
+import math
 import subprocess
 import tempfile
 import types
@@ -69,6 +70,88 @@ def python_rigid_relaxed(case, config, assignments, value_blocks=False, expired=
 class NativeRichStructuredTests(unittest.TestCase):
     setUpClass = classmethod(repair_tests.NativeRichRepairTests.setUpClass.__func__)
     synthetic = repair_tests.NativeRichRepairTests.synthetic
+
+    def test_pricing_rectangle_bounds_match_frozen_dfs(self):
+        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
+        def index(name):
+            return next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)
+                        and isinstance(n.targets[0], ast.Name) and n.targets[0].id == name)
+        workspace_code = compile(ast.Module(body=function.body[index("workspace_started"):index("dynamic_refresh_started")],
+                                           type_ignores=[]), "frozen_dfs_workspace", "exec")
+        bounds_code = compile(ast.Module(body=function.body[index("compactness"):index("baby_relaxation")],
+                                        type_ignores=[]), "frozen_dfs_bounds", "exec")
+        def values(array):
+            return [float(v) if math.isfinite(v) else None for v in array.ravel()]
+        reserved = self.synthetic([(101, {}), (101, {}), (202, {"newSeat": {"seatNum": "1B"}})])
+        reserved["id"] = "bounds_reserved_middle"
+        crowded = self.synthetic([(101, {})] * 7)
+        crowded["id"] = "bounds_insufficient_capacity"
+        crowded["newSeatmapData"]["seats"] = [s for s in crowded["newSeatmapData"]["seats"] if s["row"] == 1]
+        for case in [*self.cases[:11], reserved, crowded]:
+            with self.subTest(case=case["id"]):
+                config = copy.deepcopy(self.config)
+                config["input_contract"] = {"seatmaps_by_direction": {
+                    "public-test": {"old": "old.json", "new": "new.json"}}}
+                new = evaluator.SeatTopology(case["newSeatmapData"]["seats"], config)
+                old = evaluator.SeatTopology(case["oldSeatmapData"]["seats"], config)
+                fixed = exact._preprocess_fixed_seats(case["groupsData"], new, config)
+                requests, expected = [], []
+                for g, group in enumerate(case["groupsData"]):
+                    base_cache = exact._build_group_pricing_cache(group, new, old, config["weights"], config, fixed)
+                    for variant in range(4):
+                        cache = base_cache
+                        window = [max(new.row_seats)]
+                        if variant == 3:
+                            cache = copy.copy(base_cache)
+                            cache.all_options = [[o for o in options if new.seat_map[o.seat_id]["row"] in window]
+                                                 for options in base_cache.all_options]
+                            if any(not options for options in cache.all_options): continue
+                            cache.universe = [o for options in cache.all_options for o in options]
+                            cache.seat_ids = tuple(sorted({o.seat_id for o in cache.universe}))
+                            cache.row_coordinate = {s: base_cache.row_coordinate[s] for s in cache.seat_ids}
+                            cache.x_coordinate = {s: base_cache.x_coordinate[s] for s in cache.seat_ids}
+                            cache.dfs_workspace = None
+                        # Nonzero dual-like offsets exercise negative costs independently of geometric costs.
+                        costs = [[o.individual_cost + ((i % 5) - 2) * 3.125 if variant == 2 else o.individual_cost
+                                  for i, o in enumerate(options)] for options in cache.all_options]
+                        order = list(range(len(group["psrs"])))
+                        if variant == 2: order.reverse()
+                        namespace = dict(exact.__dict__, cache=cache, passengers=group["psrs"], new_topology=new,
+                                         config=config, pricing_cfg={}, weights=config["weights"], phase_one=variant == 1,
+                                         gid=group["groupId"], duals=exact.MasterDuals(), order=order,
+                                         domains=dict(enumerate(cache.all_options)),
+                                         base_cost={o.signature: cost for options, row in zip(cache.all_options, costs)
+                                                    for o, cost in zip(options, row)})
+                        exec(workspace_code, namespace)
+                        exec(bounds_code, namespace)
+                        workspace = namespace["workspace"]
+                        compactness = namespace["compactness"]
+                        requests.append(dict(group_index=g, bounds=True, order=order, base_cost=costs, variant=variant,
+                                             row_span_cost=compactness.row_span, column_span_cost=compactness.column_span))
+                        if variant == 3: requests[-1]["window"] = window
+                        root = namespace["root_rectangle_bound"]
+                        expected.append(dict(row_values=workspace["row_values"], x_values=workspace["x_values"],
+                                             seat_prefix=values(workspace["seat_prefix"]),
+                                             span=values(namespace["rectangle_span_bound"]),
+                                             suffix=[values(a) for a in namespace["suffix_rectangle_bound"]],
+                                             root_span=root if math.isfinite(root) else None))
+                with tempfile.TemporaryDirectory() as directory:
+                    work = Path(directory)
+                    for name, value in {
+                        "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
+                        "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
+                        "replay.json": {"pricing_cache": requests},
+                    }.items():
+                        (work / name).write_text(json.dumps(value), encoding="utf-8")
+                    run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                          str(work / "replay.json")], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                actual = json.loads(run.stdout)
+                self.assertEqual(len(actual), len(expected))
+                for i, (native, python) in enumerate(zip(actual, expected)):
+                    with self.subTest(group=requests[i]["group_index"], variant=requests[i]["variant"]):
+                        self.assertEqual(native, python)
 
     def test_pricing_cache_and_window_geometry_match_python(self):
         tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))

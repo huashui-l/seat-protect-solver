@@ -700,6 +700,30 @@ native/state-replay-enabled regression passed 123 tests and 14,345 subtests, wit
 legality/scoring checks. `git diff --check` passed. No Formal24 or profiling run
 was performed for this cache checkpoint.
 
+The rebuilt DFS geometric workspace and rectangle bounds are now implemented by
+`build_rich_pricing_geometry` and `build_rich_pricing_bounds`. Geometry keeps sorted
+unique coordinate indexes and the same two-dimensional seat prefix sums. Bounds
+retain capacity-feasible rectangle span costs, four directional cumulative minima,
+per-passenger rectangle minima and per-depth coupled bounds. Every depth sums the
+remaining passenger costs in the supplied search order, matching Python's floating
+addition order rather than substituting reverse suffix accumulation. Costs are
+supplied per placement so the same bound builder can consume later dual pricing.
+
+Differential tests execute the actual frozen DFS workspace and bounds AST slices
+and compare every coordinate, prefix cell, span cell and suffix cell exactly.
+Public groups plus reserved-middle and insufficient-capacity fixtures cover
+ordinary/negative placement costs, reversed passenger order, zero span factors and
+filtered last-row windows without coordinate renormalization. This is a search
+prerequisite; seat/resource/SSR masks, symmetry, dominance, caregiver reachability,
+negative-column retention, termination and complete rebuilt orchestration remain
+unimplemented in the pricing DFS. No M3 completion or quality claim follows.
+
+Release /O2 build passed with the two existing conversion warnings. Full
+native/state-replay-enabled regression passed 124 tests and 14,553 subtests, with
+9 skips, including the 12,000-operation state differential and external raw-CLI
+legality/scoring checks. The new bounds test contributed 208 successful subtests.
+`git diff --check` passed. No Formal24 or profiling run was performed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
