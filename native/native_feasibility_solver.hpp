@@ -9,11 +9,6 @@ namespace full_cpp {
 
 struct GroupConstructionResult;
 
-struct RichLnsOption {
-    double score = 0.0;
-    std::set<int> seats;
-    std::vector<int> assignment;
-};
 std::map<int, std::vector<int>> solve_rich_lns_master(const AssignmentState& state,
     const RichLnsWorkspace& workspace, const std::vector<int>& component,
     const std::map<int, std::vector<RichLnsOption>>& options, int root,

@@ -1127,6 +1127,32 @@ LNS tests passed 5 tests and 476 subtests. Full native/state-replay-enabled
 regression passed 146 tests and 18,772 subtests with 9 skips. `git diff --check`
 passed. No Formal24, profiling or 5-second compression run was made.
 
+### LNS geometric candidate generation and traversal contract
+
+Native LNS now enumerates the current placement and each center's nearby seat
+combinations using the frozen row-distance, horizontal-distance and seat-ID
+ordering. Candidate tuples are lexically sorted and deduplicated; ordinary and
+special matching feed the full affected-group score. The bounded heap retains
+strict score-only replacement and descending (score, sequence) output, then calls
+the recorder synchronously for the configured top options. Production LNS search
+and elite-store wiring are still pending.
+
+Traversal boundary: frozen Python iterates a set of seat tuples and its reference
+artifacts do not identify the process hash seed. Native code uses lexical tuple
+traversal of the same set. This is an explicit deterministic tie-order choice,
+not historical assignment parity: options tied at the capacity boundary and
+subsequent search trajectories can differ. The final per-case quality gate is
+still required. Differential separately checks the candidate set, exact option
+and recorder output after normalizing only Python set traversal, and the retained
+score multiset against the unmodified Python function. No frozen production
+Python source or configuration is changed.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+LNS differential passed 7 tests and 892 subtests, including eleven public cases,
+expired deadlines, config floors and all-zero-score cutoff ties. Full regression
+with native/state replay enabled passed 148 tests and 19,188 subtests with 9 skips.
+`git diff --check` passed. No Formal24 or profiling run was made.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

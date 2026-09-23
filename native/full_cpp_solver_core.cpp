@@ -219,6 +219,9 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     }
     if (const Value* algorithm = config.find("algorithm")) {
         if (const Value* item = algorithm->find("multigroup_pattern_group_size_limit")) problem.rich.multigroup_pattern_group_size_limit = std::max(2, static_cast<int>(item->number_or(6)));
+        if (const Value* item = algorithm->find("multigroup_option_limit")) problem.rich.multigroup_option_limit = std::max(10, static_cast<int>(item->number_or(60)));
+        if (const Value* item = algorithm->find("multigroup_neighborhood_extra_seats")) problem.rich.multigroup_neighborhood_extra_seats = std::max(1, static_cast<int>(item->number_or(2)));
+        if (const Value* item = algorithm->find("elite_patterns_from_pricing_per_call")) problem.rich.elite_patterns_from_pricing_per_call = std::max(1, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("enable_protected_multigroup_pattern_mip")) problem.rich.protected_multigroup_enabled = item->bool_or(false);
         if (const Value* item = algorithm->find("protected_multigroup_max_passes")) problem.rich.protected_multigroup_max_passes = std::max(1, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("protected_multigroup_min_pass_gain")) problem.rich.protected_multigroup_min_pass_gain = std::max(0.0, item->number_or(1.0));
@@ -2537,6 +2540,91 @@ RichLnsAssignment RichLnsWorkspace::best_group_assignment(int group_index, const
             for (size_t j : permutation) result.seats.push_back(seats[j]);
         }
     } while (std::next_permutation(permutation.begin(), permutation.end()));
+    return result;
+}
+
+std::vector<std::vector<int>> RichLnsWorkspace::candidate_subsets(int group_index, const std::vector<int>& seat_pool) {
+    const auto& problem = state_.problem;
+    const auto seat_less = [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; };
+    const auto tuple_less = [&](const std::vector<int>& a, const std::vector<int>& b) {
+        return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), seat_less);
+    };
+    // Python iterates a hash set without a frozen hash seed. Use a documented
+    // lexical traversal of the identical set; equal-score cutoff identity can differ.
+    std::set<std::vector<int>, decltype(tuple_less)> subsets(tuple_less);
+    const auto& keys = keys_by_group[group_index];
+    const std::set<int> released(seat_pool.begin(), seat_pool.end());
+    std::vector<int> current;
+    for (int p : keys) current.push_back(state_.passenger_to_seat[p]);
+    if (std::all_of(current.begin(), current.end(), [&](int s) { return released.count(s) != 0; })) {
+        std::sort(current.begin(), current.end(), seat_less); subsets.insert(current);
+    }
+    const size_t neighborhood_size = std::min(seat_pool.size(), keys.size() + problem.rich.multigroup_neighborhood_extra_seats);
+    for (size_t center_index = 0; center_index < seat_pool.size(); ++center_index) {
+        if (center_index % 8 == 0 && std::chrono::steady_clock::now() >= deadline_) { stopped_by_deadline = true; break; }
+        const int center = seat_pool[center_index];
+        const auto& c = problem.seats[center];
+        auto nearest = seat_pool;
+        std::sort(nearest.begin(), nearest.end(), [&](int a, int b) {
+            const auto& x = problem.seats[a]; const auto& y = problem.seats[b];
+            return std::make_tuple(std::abs(x.row - c.row), std::abs(x.x - c.x), x.id)
+                < std::make_tuple(std::abs(y.row - c.row), std::abs(y.x - c.x), y.id);
+        });
+        nearest.resize(neighborhood_size);
+        if (keys.size() > nearest.size()) continue;
+        std::vector<size_t> indexes(keys.size());
+        for (size_t i = 0; i < indexes.size(); ++i) indexes[i] = i;
+        size_t combination_index = 0;
+        while (true) {
+            if (combination_index++ % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) { stopped_by_deadline = true; break; }
+            std::vector<int> seats;
+            for (size_t i : indexes) seats.push_back(nearest[i]);
+            if (std::find(seats.begin(), seats.end(), center) != seats.end()) {
+                std::sort(seats.begin(), seats.end(), seat_less); subsets.insert(std::move(seats));
+            }
+            int i = static_cast<int>(indexes.size()) - 1;
+            while (i >= 0 && indexes[i] == nearest.size() - indexes.size() + i) --i;
+            if (i < 0) break;
+            ++indexes[i];
+            for (size_t j = i + 1; j < indexes.size(); ++j) indexes[j] = indexes[j - 1] + 1;
+        }
+    }
+    return {subsets.begin(), subsets.end()};
+}
+
+std::vector<RichLnsOption> RichLnsWorkspace::group_options(int group_index, const std::vector<int>& seat_pool,
+    const std::function<void(int, const RichLnsOption&)>& recorder
+) {
+    const auto& problem = state_.problem;
+    const std::set<int> released(seat_pool.begin(), seat_pool.end());
+    const auto& keys = keys_by_group[group_index];
+    struct Entry { RichLnsOption option; int sequence; };
+    const auto greater = [](const Entry& a, const Entry& b) {
+        return std::make_pair(a.option.score, a.sequence) > std::make_pair(b.option.score, b.sequence);
+    };
+    std::vector<Entry> heap;
+    int sequence = 0;
+    for (const auto& seats : candidate_subsets(group_index, seat_pool)) {
+        if (std::chrono::steady_clock::now() >= deadline_) break;
+        auto matching = best_group_assignment(group_index, seats, released);
+        if (matching.seats.empty()) continue;
+        auto proposal = state_.passenger_to_seat;
+        for (size_t i = 0; i < keys.size(); ++i) proposal[keys[i]] = matching.seats[i];
+        Entry entry{{evaluate_rich_group_score(problem, proposal, group_index).total(),
+            std::set<int>(seats.begin(), seats.end()), std::move(matching.seats)}, sequence++};
+        if (heap.size() < static_cast<size_t>(problem.rich.multigroup_option_limit)) {
+            heap.push_back(std::move(entry)); std::push_heap(heap.begin(), heap.end(), greater);
+        } else if (entry.option.score > heap.front().option.score) {
+            std::pop_heap(heap.begin(), heap.end(), greater); heap.back() = std::move(entry);
+            std::push_heap(heap.begin(), heap.end(), greater);
+        }
+    }
+    options_generated += static_cast<int>(heap.size());
+    std::sort(heap.begin(), heap.end(), greater);
+    std::vector<RichLnsOption> result;
+    for (auto& entry : heap) result.push_back(std::move(entry.option));
+    if (recorder) for (size_t i = 0; i < std::min(result.size(), static_cast<size_t>(problem.rich.elite_patterns_from_pricing_per_call)); ++i)
+        recorder(group_index, result[i]);
     return result;
 }
 

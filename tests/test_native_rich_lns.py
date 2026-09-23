@@ -78,7 +78,7 @@ class NativeRichLnsTests(unittest.TestCase):
         self.assertEqual(actual[4], {"0": ["1D", "1A"], "1": ["1B", "1E"]})
         self.assertEqual(actual[5], {})
 
-    def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None):
+    def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None, options_mode=False):
         config = copy.deepcopy(self.config)
         config["algorithm"].update(algorithm or {})
         config["input_contract"] = {"seatmaps_by_direction": {
@@ -118,6 +118,22 @@ class NativeRichLnsTests(unittest.TestCase):
                 individual_cache={}, baby_cache={}, compact_cache={}, w_c=config["weights"].get("w_c", -2.0),
                 bsct_items=[(key[0], seat) for key, seat in context.assigned_seats.items() if objects[key].ssr == "BSCT"])
             exec(compile(ast.Module(body=function.body[start:stop] + definitions, type_ignores=[]), "frozen_lns_matching", "exec"), namespace)
+            option_function = copy.deepcopy(next(n for n in function.body if isinstance(n, ast.FunctionDef) and n.name == "group_options"))
+            exec(compile(ast.Module(body=[option_function], type_ignores=[]), "frozen_lns_options", "exec"), namespace)
+            original_options = namespace["group_options"]
+            # Normalize only the otherwise process-hash-dependent traversal.
+            loop = next(n for n in option_function.body if isinstance(n, ast.For) and isinstance(n.iter, ast.Name) and n.iter.id == "candidate_subsets")
+            loop.iter = ast.Call(func=ast.Name(id="sorted", ctx=ast.Load()), args=[loop.iter], keywords=[])
+            index = option_function.body.index(loop)
+            option_function.body[index:index] = ast.parse("observed_subsets.append(sorted(candidate_subsets))").body
+            ast.fix_missing_locations(option_function)
+            exec(compile(ast.Module(body=[option_function], type_ignores=[]), "ordered_lns_options", "exec"), namespace)
+            recorded, observed_subsets = [], []
+            namespace.update(algorithm=config["algorithm"], option_limit=max(10, int(config["algorithm"].get("multigroup_option_limit", 60))),
+                incremental_scorer=evaluator.IncrementalSoftScorer(seats_data, case["oldSeatmapData"]["seats"], case["groupsData"], config["weights"], config),
+                elite_pattern_recorder=lambda gid, assignment, score, source: recorded.append((gid, assignment, score, source)),
+                observed_subsets=observed_subsets)
+            namespace["diagnostics"]["options_generated"] = 0
             expected_keys = [[keys.index(key) for key in namespace["keys_by_group"].get(g.group_id, ())] for g in groups]
             if calls is None:
                 rng = random.Random(20260923)
@@ -131,7 +147,10 @@ class NativeRichLnsTests(unittest.TestCase):
                         released = list(context.occupied) if variant % 3 else seats
                         calls.append(dict(group_index=g, seats=seats, released=released,
                             scores=[[p, seat] for p in group_keys for seat in seats]))
+                        if options_mode:
+                            calls[-1]["option_pool"] = seat_ids if variant % 2 else list(context.occupied)
             expected = []
+            generated = 0
             for call in calls:
                 for p, _ in call.get("moves", []): context.remove_assignment(*keys[p])
                 for p, seat in call.get("moves", []):
@@ -141,6 +160,19 @@ class NativeRichLnsTests(unittest.TestCase):
                 expected.append(dict(score=score if math.isfinite(score) else None, assignment=list(assignment),
                     compact=namespace["compact_score"](tuple(call["seats"])), stopped=namespace["diagnostics"]["stopped_by_deadline"],
                     scores=[namespace["passenger_score"](keys[p], seat) for p, seat in call["scores"]]))
+                if "option_pool" in call:
+                    original = original_options(gid, tuple(call["option_pool"]))
+                    recorded.clear()
+                    options = namespace["group_options"](gid, tuple(call["option_pool"]))
+                    # Unmodified Python must retain the same top score multiset,
+                    # even when identities at an equal-score cutoff differ.
+                    self.assertEqual(len(options), len(original))
+                    for a, b in zip(options, original): self.assertAlmostEqual(a[0], b[0], places=8)
+                    generated += len(options)
+                    expected[-1].update(options=options, subsets=observed_subsets[-1], options_generated=generated,
+                        recorded=[(score, frozenset(seat for _, seat in assignment), tuple(seat for _, seat in assignment))
+                                  for _, assignment, score, source in recorded])
+                    self.assertTrue(all(source == "lns_generated" and group == gid for group, _, _, source in recorded))
             eligible = namespace["eligible_groups"]
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
@@ -166,7 +198,38 @@ class NativeRichLnsTests(unittest.TestCase):
                 self.assertAlmostEqual(a["compact"], b["compact"], places=8)
                 self.assertEqual(len(a["scores"]), len(b["scores"]))
                 for x, y in zip(a["scores"], b["scores"]): self.assertAlmostEqual(x, y, places=8)
+                if "options" in b:
+                    self.assertEqual(a["subsets"], [list(seats) for seats in b["subsets"]])
+                    self.assertEqual(a["options_generated"], b["options_generated"])
+                    for field in ("options", "recorded"):
+                        self.assertEqual(len(a[field]), len(b[field]))
+                        for x, y in zip(a[field], b[field]):
+                            self.assertAlmostEqual(x[0], y[0], places=8)
+                            self.assertEqual(set(x[1]), set(y[1]))
+                            self.assertEqual(x[2], list(y[2]))
         return actual
+
+    def test_lns_options_geometry_scoring_and_elite_recording(self):
+        generated = 0
+        for case in self.cases[:11]:
+            result = self.replay_matching(case, options_mode=True, algorithm={"multigroup_option_limit": 10})
+            generated += sum(len(call["options"]) for call in result["calls"])
+        self.assertGreater(generated, 100)
+        self.replay_matching(self.cases[7], options_mode=True, expired=True)
+
+    def test_lns_options_config_floors_and_tied_cutoff(self):
+        case = self.synthetic([(20, {}), (20, {}), (10, {}), (10, {})])
+        saved = self.config
+        self.config = copy.deepcopy(saved)
+        self.config["weights"] = {key: 0.0 for key in saved["weights"]}
+        try:
+            result = self.replay_matching(case, initial=[[0, "1A"], [1, "1B"], [2, "1D"], [3, "1E"]],
+                options_mode=True, algorithm={"multigroup_option_limit": 0, "multigroup_neighborhood_extra_seats": 0,
+                                              "elite_patterns_from_pricing_per_call": 0})
+            self.assertTrue(any(len(call["options"]) == 10 for call in result["calls"]))
+            self.assertTrue(all(len(call["recorded"]) == 1 for call in result["calls"]))
+        finally:
+            self.config = saved
 
     def test_lns_matching_and_scoring_match_frozen_functions(self):
         for case in self.cases[:11]:

@@ -94,7 +94,35 @@ int main(int argc, char** argv) {
                         const auto& item = call.at("scores").array[i];
                         std::cout << workspace.passenger_score(static_cast<int>(item.array[0].number), problem.seat_index.at(item.array[1].string));
                     }
-                    std::cout << "]}";
+                    std::cout << ']';
+                    if (const auto* pool = call.find("option_pool")) {
+                        std::vector<int> seat_pool;
+                        for (const auto& seat : pool->array) seat_pool.push_back(problem.seat_index.at(seat.string));
+                        const auto subsets = workspace.candidate_subsets(g, seat_pool);
+                        std::vector<full_cpp::RichLnsOption> recorded;
+                        const auto options = workspace.group_options(g, seat_pool, [&](int, const full_cpp::RichLnsOption& option) { recorded.push_back(option); });
+                        const auto write_seats = [&](const auto& items) {
+                            std::cout << '['; bool first_seat = true;
+                            for (int s : items) { if (!first_seat) std::cout << ','; first_seat = false; std::cout << '"' << problem.seats[s].id << '"'; }
+                            std::cout << ']';
+                        };
+                        std::cout << ",\"subsets\":[";
+                        for (size_t i = 0; i < subsets.size(); ++i) { if (i) std::cout << ','; write_seats(subsets[i]); }
+                        std::cout << ']';
+                        const auto write_options = [&](const auto& values) {
+                            std::cout << '[';
+                            for (size_t i = 0; i < values.size(); ++i) {
+                                if (i) std::cout << ',';
+                                std::cout << '[' << values[i].score << ','; write_seats(values[i].seats);
+                                std::cout << ','; write_seats(values[i].assignment); std::cout << ']';
+                            }
+                            std::cout << ']';
+                        };
+                        std::cout << ",\"options\":"; write_options(options);
+                        std::cout << ",\"recorded\":"; write_options(recorded);
+                        std::cout << ",\"options_generated\":" << workspace.options_generated;
+                    }
+                    std::cout << '}';
                 }
                 std::cout << "]}\n";
                 return 0;

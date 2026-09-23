@@ -80,6 +80,8 @@ struct RichConstructionConfig {
     int protected_multigroup_max_passes = 3;
     double protected_multigroup_min_pass_gain = 1.0;
     int multigroup_pattern_group_size_limit = 6;
+    int multigroup_option_limit = 60, multigroup_neighborhood_extra_seats = 2;
+    int elite_patterns_from_pricing_per_call = 3;
     bool protected_dynamic_relocation_enabled = true;
     double protected_dynamic_relocation_seconds = 0.08;
     int protected_dynamic_relocation_columns = 6;
@@ -488,6 +490,12 @@ struct RichLnsAssignment {
     std::vector<int> seats;
 };
 
+struct RichLnsOption {
+    double score = 0.0;
+    std::set<int> seats;
+    std::vector<int> assignment;
+};
+
 class RichLnsWorkspace {
 public:
     RichLnsWorkspace(const AssignmentState& state, std::chrono::steady_clock::time_point deadline);
@@ -496,9 +504,13 @@ public:
     RichLnsAssignment best_matching(const std::vector<int>& passengers, const std::vector<int>& seats);
     RichLnsAssignment best_group_assignment(int group_index, const std::vector<int>& seats,
                                             const std::set<int>& released_seats);
+    std::vector<std::vector<int>> candidate_subsets(int group_index, const std::vector<int>& seat_pool);
+    std::vector<RichLnsOption> group_options(int group_index, const std::vector<int>& seat_pool,
+        const std::function<void(int, const RichLnsOption&)>& recorder);
     std::vector<std::vector<int>> keys_by_group;
     std::set<int> eligible_groups;
     bool stopped_by_deadline = false;
+    int options_generated = 0;
 private:
     const AssignmentState& state_;
     std::chrono::steady_clock::time_point deadline_;
