@@ -33,6 +33,15 @@ For `group-soft`, `q0_solver_status` reports the underlying MIP status while
 the final `status` is `HeuristicComplete`; the heuristic result does not claim
 global optimality for the complete group-aware objective.
 
+The experimental `group-first` mode additionally builds an independent Q2A
+candidate from fixed passengers and their required protected-seat resources.
+It places whole groups in deterministic constrained-first order with the same
+bounded DFS/Beam searches, and on a later placement failure makes one bounded
+attempt to rebuild the immediately preceding group before retrying. The Q0
+and Q1 assignments remain intact incumbents: Q2A is selected only when it is
+complete, passes the native hard validator, and has a strictly better full
+native score than Q1. Otherwise the Q1 result is returned unchanged.
+
 The RR and restricted-master pipeline consists of:
 
 - `native_master_types.hpp`
@@ -77,7 +86,7 @@ python native/run_native_formal24.py `
   --executable build\native\seat_protect_cpp.exe `
   --output outputs\native-rich-q0 `
   --time-limit 60 --seed 0 `
-  --construction-objective group-soft
+  --construction-objective group-first
 ```
 
 The output contains the full 24-case external legality/score audit, paired

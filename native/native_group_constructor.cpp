@@ -180,6 +180,12 @@ bool better_assignment(
     if (score > best_score + kTolerance) return true;
     if (std::abs(score - best_score) > kTolerance) return false;
     for (int passenger = 0; passenger < static_cast<int>(candidate.size()); ++passenger) {
+        if (candidate[passenger] < 0 || best[passenger] < 0) {
+            if (candidate[passenger] != best[passenger]) {
+                return candidate[passenger] > best[passenger];
+            }
+            continue;
+        }
         const std::string& left = problem.seats[candidate[passenger]].id;
         const std::string& right = problem.seats[best[passenger]].id;
         if (left != right) return left < right;
@@ -189,19 +195,80 @@ bool better_assignment(
 
 struct SearchResult {
     std::vector<int> assignment;
+    AssignmentSnapshot snapshot;
     double score = -std::numeric_limits<double>::infinity();
     long long nodes = 0;
 };
 
-void consider_complete(
-    const Problem& problem, const AssignmentState& state, SearchResult& result
+bool group_caregivers_satisfied(
+    const Problem& problem, const Group& group, const AssignmentState& state
 ) {
-    if (validate_complete_assignment(problem, state.passenger_to_seat) != 0) return;
-    const double score = evaluate_soft_score(problem, state.passenger_to_seat);
+    for (int passenger : group.passengers) {
+        const Passenger& cared = problem.passengers[passenger];
+        const auto rule_item = problem.ssr_rules.find(cared.ssr);
+        const bool requires = cared.need_cared
+            || (rule_item != problem.ssr_rules.end()
+                && rule_item->second.requires_caregiver);
+        if (!requires) continue;
+        const int seat = state.passenger_to_seat[passenger];
+        if (seat < 0) return false;
+        const bool allow_cross = cared.need_cared && cared.ssr.empty()
+            ? false
+            : rule_item != problem.ssr_rules.end()
+                && rule_item->second.caregiver_allow_cross_aisle;
+        const auto& neighbors = allow_cross
+            ? problem.seats[seat].row_neighbors
+            : problem.seats[seat].same_block_neighbors;
+        bool found = false;
+        for (int other : group.passengers) {
+            if (other == passenger) continue;
+            const Passenger& adult = problem.passengers[other];
+            if (!adult.ssr.empty() || adult.need_cared
+                || adult.need_both_empty || adult.need_single_empty) continue;
+            found = found || std::find(
+                neighbors.begin(), neighbors.end(), state.passenger_to_seat[other]
+            ) != neighbors.end();
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+
+bool same_group_assignment(
+    const Group& group, const std::vector<int>& left, const std::vector<int>& right
+) {
+    if (right.empty()) return false;
+    for (int passenger : group.passengers) {
+        if (left[passenger] != right[passenger]) return false;
+    }
+    return true;
+}
+
+void consider_candidate(
+    const Problem& problem, const AssignmentState& state, SearchResult& result,
+    const Group* partial_group = nullptr,
+    const std::vector<int>* forbidden = nullptr
+) {
+    double score = 0.0;
+    if (partial_group) {
+        for (int passenger : partial_group->passengers) {
+            if (state.passenger_to_seat[passenger] < 0) return;
+        }
+        if (!group_caregivers_satisfied(problem, *partial_group, state)) return;
+        if (forbidden && same_group_assignment(
+                *partial_group, state.passenger_to_seat, *forbidden)) return;
+        score = group_placement_score(
+            problem, *partial_group, state.passenger_to_seat
+        );
+    } else {
+        if (validate_complete_assignment(problem, state.passenger_to_seat) != 0) return;
+        score = evaluate_soft_score(problem, state.passenger_to_seat);
+    }
     if (result.assignment.empty()
         || better_assignment(problem, score, state.passenger_to_seat,
                              result.score, result.assignment)) {
         result.assignment = state.passenger_to_seat;
+        result.snapshot = state.save();
         result.score = score;
     }
 }
@@ -210,7 +277,9 @@ SearchResult search_dfs(
     const Problem& problem, const std::vector<int>& incumbent,
     AssignmentState state,
     const std::vector<int>& order,
-    std::chrono::steady_clock::time_point deadline
+    std::chrono::steady_clock::time_point deadline,
+    const Group* partial_group = nullptr,
+    const std::vector<int>* forbidden = nullptr
 ) {
     SearchResult result;
     auto visit = [&](auto&& self, int depth) -> void {
@@ -218,7 +287,9 @@ SearchResult search_dfs(
             || std::chrono::steady_clock::now() >= deadline) return;
         ++result.nodes;
         if (depth == static_cast<int>(order.size())) {
-            consider_complete(problem, state, result);
+            consider_candidate(
+                problem, state, result, partial_group, forbidden
+            );
             return;
         }
         const int passenger = order[depth];
@@ -246,7 +317,9 @@ SearchResult search_beam(
     const Problem& problem, const std::vector<int>& incumbent,
     const Group& group, AssignmentState state,
     const std::vector<int>& order,
-    std::chrono::steady_clock::time_point deadline
+    std::chrono::steady_clock::time_point deadline,
+    const Group* partial_group = nullptr,
+    const std::vector<int>* forbidden = nullptr
 ) {
     const int size = static_cast<int>(order.size());
     const int width = size <= 2 ? 24 : size <= 5 ? 40 : 96;
@@ -309,9 +382,119 @@ SearchResult search_beam(
     }
     for (const BeamState& candidate : beam) {
         state.restore(candidate.snapshot);
-        consider_complete(problem, state, result);
+        consider_candidate(
+            problem, state, result, partial_group, forbidden
+        );
     }
     return result;
+}
+
+AssignmentState fixed_initial_state(const Problem& problem) {
+    const FixedSeatContext fixed = preprocess_fixed_seats(problem);
+    AssignmentState state(problem, &fixed);
+    std::vector<int> singles;
+    for (int passenger = 0;
+         passenger < static_cast<int>(problem.passengers.size()); ++passenger) {
+        if (state.passenger_to_seat[passenger] >= 0
+            && problem.passengers[passenger].need_single_empty) {
+            singles.push_back(passenger);
+        }
+    }
+    std::vector<int> owner(problem.seats.size(), -1);
+    auto augment = [&](auto&& self, int passenger, std::vector<bool>& seen) -> bool {
+        const int seat = state.passenger_to_seat[passenger];
+        for (int empty : problem.seats[seat].same_block_neighbors) {
+            if (state.seat_to_passenger[empty] >= 0 || state.blocked_count[empty] > 0
+                || seen[empty]) continue;
+            seen[empty] = true;
+            if (owner[empty] < 0 || self(self, owner[empty], seen)) {
+                owner[empty] = passenger;
+                return true;
+            }
+        }
+        return false;
+    };
+    for (int passenger : singles) {
+        std::vector<bool> seen(problem.seats.size(), false);
+        if (!augment(augment, passenger, seen)) {
+            throw std::runtime_error(
+                "cannot reserve empty neighbor for fixed protected passenger"
+            );
+        }
+    }
+    for (int empty = 0; empty < static_cast<int>(owner.size()); ++empty) {
+        if (owner[empty] < 0) continue;
+        ++state.blocked_count[empty];
+        state.assigned_blocked[owner[empty]].push_back(empty);
+    }
+    return state;
+}
+
+std::vector<int> group_first_order(
+    const Problem& problem, const AssignmentState& initial
+) {
+    std::vector<int> order(problem.groups.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::vector<int> minimum_domains(problem.groups.size(), 0);
+    for (int group_index : order) {
+        int minimum = static_cast<int>(problem.seats.size()) + 1;
+        bool has_unassigned = false;
+        for (int passenger : problem.groups[group_index].passengers) {
+            if (initial.passenger_to_seat[passenger] >= 0) continue;
+            has_unassigned = true;
+            int domain = 0;
+            for (int seat = 0; seat < static_cast<int>(problem.seats.size()); ++seat) {
+                domain += initial.can_assign(passenger, seat);
+            }
+            minimum = std::min(minimum, domain);
+        }
+        minimum_domains[group_index] = has_unassigned ? minimum : 0;
+    }
+    std::stable_sort(order.begin(), order.end(), [&](int left, int right) {
+        auto priority = [&](int group_index) {
+            const Group& group = problem.groups[group_index];
+            int fixed_count = 0, protected_demand = 0, caregiver_demand = 0;
+            for (int passenger : group.passengers) {
+                const Passenger& item = problem.passengers[passenger];
+                fixed_count += !item.fixed_seat.empty();
+                protected_demand += item.need_both_empty ? 2 : item.need_single_empty ? 1 : 0;
+                const auto rule = problem.ssr_rules.find(item.ssr);
+                caregiver_demand += item.need_cared
+                    || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
+            }
+            return std::tuple(
+                -fixed_count, minimum_domains[group_index], -protected_demand,
+                -caregiver_demand, -static_cast<int>(group.passengers.size()), group.id
+            );
+        };
+        return priority(left) < priority(right);
+    });
+    return order;
+}
+
+SearchResult search_partial_group(
+    const Problem& problem, const std::vector<int>& incumbent,
+    const Group& group, AssignmentState state,
+    std::chrono::steady_clock::time_point deadline,
+    const std::vector<int>* forbidden = nullptr
+) {
+    std::vector<int> order = passenger_order(problem, group, state);
+    order.erase(std::remove_if(order.begin(), order.end(), [&](int passenger) {
+        return state.passenger_to_seat[passenger] >= 0;
+    }), order.end());
+    if (order.empty()) {
+        SearchResult result;
+        consider_candidate(problem, state, result, &group, forbidden);
+        return result;
+    }
+    if (static_cast<int>(order.size()) <= kDfsMaxGroupSize) {
+        return search_dfs(
+            problem, incumbent, state, order, deadline, &group, forbidden
+        );
+    }
+    return search_beam(
+        problem, incumbent, group, state, order, deadline, &group, forbidden
+    );
 }
 
 }  // namespace
@@ -402,6 +585,133 @@ GroupConstructionResult construct_group_aware(
         result.score_delta = result.selected_components.total() - result.q0_score;
     } else if (result.fallback_reason.empty()) {
         result.fallback_reason = "not_strictly_better";
+    }
+    return result;
+}
+
+GroupConstructionResult construct_group_first(
+    const Problem& problem, const std::vector<int>& q0_assignment,
+    const GroupConstructionResult& q1_result,
+    std::chrono::steady_clock::time_point deadline
+) {
+    GroupConstructionResult result = q1_result;
+    result.fallback_reason.clear();
+    result.q1_selected_incumbent = q1_result.selected_incumbent;
+    result.q1_score = evaluate_soft_score(problem, q1_result.passenger_to_seat);
+    result.from_scratch_score = 0.0;
+    result.from_scratch_complete = false;
+    if (validate_complete_assignment(problem, q1_result.passenger_to_seat) != 0) {
+        result.fallback_reason = "q1_invalid";
+        return result;
+    }
+
+    AssignmentState state = fixed_initial_state(problem);
+    const std::vector<int> group_order = group_first_order(problem, state);
+    struct CommittedGroup {
+        int group_index = -1;
+        AssignmentSnapshot before;
+        std::vector<int> placement;
+    };
+    std::vector<CommittedGroup> committed;
+
+    auto record_search = [&](const Group& group, const SearchResult& search) {
+        int remaining = 0;
+        for (int passenger : group.passengers) {
+            remaining += state.passenger_to_seat[passenger] < 0;
+        }
+        if (remaining <= kDfsMaxGroupSize) {
+            ++result.from_scratch_dfs_groups;
+            result.from_scratch_dfs_nodes += search.nodes;
+        } else {
+            ++result.from_scratch_beam_groups;
+            result.from_scratch_beam_nodes += search.nodes;
+        }
+    };
+
+    bool complete = true;
+    for (int group_index : group_order) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            complete = false;
+            result.fallback_reason = "q2a_deadline";
+            break;
+        }
+        const Group& group = problem.groups[group_index];
+        const AssignmentSnapshot before = state.save();
+        SearchResult search = search_partial_group(
+            problem, q0_assignment, group, state, deadline
+        );
+        record_search(group, search);
+        if (!search.assignment.empty()) {
+            state.restore(search.snapshot);
+            committed.push_back({group_index, before, search.assignment});
+            continue;
+        }
+
+        ++result.recovery_attempts;
+        bool recovered = false;
+        if (!committed.empty() && std::chrono::steady_clock::now() < deadline) {
+            CommittedGroup previous = committed.back();
+            const Group& previous_group = problem.groups[previous.group_index];
+            bool has_movable = false;
+            for (int passenger : previous_group.passengers) {
+                has_movable = has_movable
+                    || problem.passengers[passenger].fixed_seat.empty();
+            }
+            if (has_movable) {
+                state.restore(previous.before);
+                SearchResult alternate = search_partial_group(
+                    problem, q0_assignment, previous_group, state, deadline,
+                    &previous.placement
+                );
+                record_search(previous_group, alternate);
+                if (!alternate.assignment.empty()) {
+                    state.restore(alternate.snapshot);
+                    SearchResult retry = search_partial_group(
+                        problem, q0_assignment, group, state, deadline
+                    );
+                    record_search(group, retry);
+                    if (!retry.assignment.empty()) {
+                        committed.back() = {
+                            previous.group_index, previous.before,
+                            alternate.assignment
+                        };
+                        const AssignmentSnapshot retry_before = alternate.snapshot;
+                        state.restore(retry.snapshot);
+                        committed.push_back({group_index, retry_before, retry.assignment});
+                        ++result.recovery_succeeded;
+                        recovered = true;
+                    }
+                }
+            }
+        }
+        if (!recovered) {
+            complete = false;
+            if (result.fallback_reason.empty()) {
+                result.fallback_reason = "q2a_incomplete";
+            }
+            break;
+        }
+    }
+
+    if (complete && validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
+        result.from_scratch_complete = true;
+        result.from_scratch_score = evaluate_soft_score(
+            problem, state.passenger_to_seat
+        );
+        if (result.from_scratch_score > result.q1_score + kTolerance) {
+            result.passenger_to_seat = state.passenger_to_seat;
+            result.selected_incumbent = "q2a-group-first";
+            result.selected_components = evaluate_score_components(
+                problem, result.passenger_to_seat
+            );
+            result.group_construction_score = result.from_scratch_score;
+            result.score_delta = result.from_scratch_score - result.q0_score;
+            result.fallback_reason.clear();
+        } else if (result.fallback_reason.empty()) {
+            result.fallback_reason = "q2a_not_strictly_better";
+        }
+    } else if (complete && result.fallback_reason.empty()) {
+        result.fallback_reason = "q2a_invalid";
     }
     return result;
 }

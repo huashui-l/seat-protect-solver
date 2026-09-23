@@ -99,12 +99,14 @@ ConstructionObjective parse_construction_objective(const std::string& value) {
     if (value == "feasibility") return ConstructionObjective::Feasibility;
     if (value == "individual-soft") return ConstructionObjective::IndividualSoft;
     if (value == "group-soft") return ConstructionObjective::GroupSoft;
+    if (value == "group-first") return ConstructionObjective::GroupFirst;
     throw std::runtime_error("unknown construction objective: " + value);
 }
 
 const char* construction_objective_name(ConstructionObjective objective) {
     if (objective == ConstructionObjective::IndividualSoft) return "individual-soft";
     if (objective == ConstructionObjective::GroupSoft) return "group-soft";
+    if (objective == ConstructionObjective::GroupFirst) return "group-first";
     return "feasibility";
 }
 
@@ -113,18 +115,27 @@ FeasibilityResult solve_feasibility_mip(
     ConstructionObjective objective
 ) {
     const auto started = std::chrono::steady_clock::now();
-    if (objective == ConstructionObjective::GroupSoft) {
+    if (objective == ConstructionObjective::GroupSoft
+        || objective == ConstructionObjective::GroupFirst) {
         FeasibilityResult result = solve_feasibility_mip(
             problem, time_limit_seconds, seed, ConstructionObjective::IndividualSoft
         );
         result.q0_solver_status = result.status;
         if (result.native_hard_violations == 0) {
-            const GroupConstructionResult group_result = construct_group_aware(
+            GroupConstructionResult group_result = construct_group_aware(
                 problem, result.passenger_to_seat,
                 started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(time_limit_seconds)
                 )
             );
+            if (objective == ConstructionObjective::GroupFirst) {
+                group_result = construct_group_first(
+                    problem, result.passenger_to_seat, group_result,
+                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>(time_limit_seconds)
+                    )
+                );
+            }
             result.passenger_to_seat = group_result.passenger_to_seat;
             result.selected_incumbent = group_result.selected_incumbent;
             result.fallback_reason = group_result.fallback_reason;
@@ -138,6 +149,16 @@ FeasibilityResult solve_feasibility_mip(
             result.dfs_groups = group_result.dfs_groups;
             result.beam_groups = group_result.beam_groups;
             result.groups_improved = group_result.groups_improved;
+            result.q1_selected_incumbent = group_result.q1_selected_incumbent;
+            result.q1_score = group_result.q1_score;
+            result.from_scratch_score = group_result.from_scratch_score;
+            result.from_scratch_complete = group_result.from_scratch_complete;
+            result.from_scratch_dfs_nodes = group_result.from_scratch_dfs_nodes;
+            result.from_scratch_beam_nodes = group_result.from_scratch_beam_nodes;
+            result.from_scratch_dfs_groups = group_result.from_scratch_dfs_groups;
+            result.from_scratch_beam_groups = group_result.from_scratch_beam_groups;
+            result.recovery_attempts = group_result.recovery_attempts;
+            result.recovery_succeeded = group_result.recovery_succeeded;
             result.native_hard_violations = validate_complete_assignment(
                 problem, result.passenger_to_seat
             );

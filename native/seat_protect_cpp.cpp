@@ -96,6 +96,12 @@ int main(int argc, char** argv) {
             << "\"selected_incumbent\":\"" << result.selected_incumbent << "\","
             << "\"q0_score\":" << result.q0_score << ','
             << "\"group_construction_score\":" << result.group_construction_score << ','
+            << "\"q1_selected_incumbent\":\""
+            << escape_json(result.q1_selected_incumbent) << "\","
+            << "\"q1_score\":" << result.q1_score << ','
+            << "\"from_scratch_score\":" << result.from_scratch_score << ','
+            << "\"from_scratch_complete\":"
+            << (result.from_scratch_complete ? "true" : "false") << ','
             << "\"score_delta\":" << result.score_delta << ','
             << "\"component_deltas\":{"
             << "\"score_s\":" << result.selected_components.score_s - result.q0_components.score_s << ','
@@ -108,6 +114,12 @@ int main(int argc, char** argv) {
             << "\"dfs_groups\":" << result.dfs_groups << ','
             << "\"beam_groups\":" << result.beam_groups << ','
             << "\"groups_improved\":" << result.groups_improved << ','
+            << "\"from_scratch_dfs_nodes\":" << result.from_scratch_dfs_nodes << ','
+            << "\"from_scratch_beam_nodes\":" << result.from_scratch_beam_nodes << ','
+            << "\"from_scratch_dfs_groups\":" << result.from_scratch_dfs_groups << ','
+            << "\"from_scratch_beam_groups\":" << result.from_scratch_beam_groups << ','
+            << "\"recovery_attempts\":" << result.recovery_attempts << ','
+            << "\"recovery_succeeded\":" << result.recovery_succeeded << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;

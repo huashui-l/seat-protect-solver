@@ -11,6 +11,7 @@ enum class ConstructionObjective {
     Feasibility,
     IndividualSoft,
     GroupSoft,
+    GroupFirst,
 };
 
 ConstructionObjective parse_construction_objective(const std::string& value);
@@ -34,6 +35,16 @@ struct FeasibilityResult {
     int dfs_groups = 0;
     int beam_groups = 0;
     int groups_improved = 0;
+    std::string q1_selected_incumbent;
+    double q1_score = 0.0;
+    double from_scratch_score = 0.0;
+    bool from_scratch_complete = false;
+    long long from_scratch_dfs_nodes = 0;
+    long long from_scratch_beam_nodes = 0;
+    int from_scratch_dfs_groups = 0;
+    int from_scratch_beam_groups = 0;
+    int recovery_attempts = 0;
+    int recovery_succeeded = 0;
 };
 
 FeasibilityResult solve_feasibility_mip(
