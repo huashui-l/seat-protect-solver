@@ -37,6 +37,7 @@ $FullCore = Join-Path $PSScriptRoot "full_cpp_solver_core.cpp"
 $FullCoreProbe = Join-Path $PSScriptRoot "native_full_core_probe.cpp"
 $FeasibilitySolver = Join-Path $PSScriptRoot "native_feasibility_solver.cpp"
 $GroupConstructor = Join-Path $PSScriptRoot "native_group_constructor.cpp"
+$RichPatternAdapter = Join-Path $PSScriptRoot "native_rich_pattern_adapter.cpp"
 $SeatProtectCli = Join-Path $PSScriptRoot "seat_protect_cpp.cpp"
 $StateReplay = Join-Path $PSScriptRoot "native_state_replay.cpp"
 $KernelObject = Join-Path $OutputDir "native_pattern_kernel_library.obj"
@@ -56,6 +57,7 @@ $FullCoreProbeObject = Join-Path $OutputDir "native_full_core_probe.obj"
 $FullCoreProbeOutput = Join-Path $OutputDir "native_full_core_probe.exe"
 $FeasibilitySolverObject = Join-Path $OutputDir "native_feasibility_solver.obj"
 $GroupConstructorObject = Join-Path $OutputDir "native_group_constructor.obj"
+$RichPatternAdapterObject = Join-Path $OutputDir "native_rich_pattern_adapter.obj"
 $SeatProtectCliObject = Join-Path $OutputDir "seat_protect_cpp.obj"
 $SeatProtectCliOutput = Join-Path $OutputDir "seat_protect_cpp.exe"
 $StateReplayObject = Join-Path $OutputDir "native_state_replay.obj"
@@ -124,11 +126,12 @@ $SeatProtectCliCompile = (
     'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{1}" "{2}" /I"{3}" /I"{4}" && ' +
     'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{5}" "{6}" && ' +
     'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{7}" "{8}" && ' +
-    'link /nologo "{9}" "{1}" "{5}" "{7}" /LIBPATH:"{10}" highs.lib /OUT:"{11}"'
+    'cl /nologo /O2 /EHsc /W4 /std:c++17 /c /Fo"{9}" "{10}" && ' +
+    'link /nologo "{11}" "{1}" "{5}" "{7}" "{9}" "{12}" "{13}" /LIBPATH:"{14}" highs.lib /OUT:"{15}"'
 ) -f $DevCmd, $FeasibilitySolverObject, $FeasibilitySolver, $Include, `
     $HighsInclude, $SeatProtectCliObject, $SeatProtectCli, `
-    $GroupConstructorObject, $GroupConstructor, $FullCoreObject, `
-    $Library, $SeatProtectCliOutput
+    $GroupConstructorObject, $GroupConstructor, $RichPatternAdapterObject, $RichPatternAdapter, `
+    $FullCoreObject, $KernelObject, $MasterObject, $Library, $SeatProtectCliOutput
 & cmd.exe /d /c $SeatProtectCliCompile
 if ($LASTEXITCODE -ne 0) {
     throw "raw-native seat-protection CLI compilation failed"

@@ -55,6 +55,9 @@ struct FeasibilityResult {
     int rich_repair_repaired = 0;
     int rich_repair_unresolved = 0;
     long long rich_repair_nodes = 0;
+    int rich_pattern_count = 0;
+    int rich_selected_pattern_count = 0;
+    double rich_pattern_score = 0.0;
 };
 
 FeasibilityResult solve_feasibility_mip(

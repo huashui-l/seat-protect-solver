@@ -130,6 +130,9 @@ int main(int argc, char** argv) {
             << "\"rich_repair_repaired\":" << result.rich_repair_repaired << ','
             << "\"rich_repair_unresolved\":" << result.rich_repair_unresolved << ','
             << "\"rich_repair_nodes\":" << result.rich_repair_nodes << ','
+            << "\"rich_pattern_count\":" << result.rich_pattern_count << ','
+            << "\"rich_selected_pattern_count\":" << result.rich_selected_pattern_count << ','
+            << "\"rich_pattern_score\":" << result.rich_pattern_score << ','
             << "\"fallback_reason\":\"" << escape_json(result.fallback_reason) << "\","
             << "\"assignments\":[";
         bool first = true;

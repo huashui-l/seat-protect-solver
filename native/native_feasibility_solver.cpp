@@ -1,4 +1,6 @@
 #include "native_feasibility_solver.hpp"
+
+#include "native_rich_pattern_adapter.hpp"
 #include "native_group_constructor.hpp"
 
 #include "interfaces/highs_c_api.h"
@@ -164,6 +166,24 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.selected_incumbent = "rich-m2-vnd";
                     group_result.score_delta = group_result.group_construction_score
                         - group_result.q0_score;
+                }
+                const RichPatternResult pattern_result = run_rich_pattern_master(
+                    problem, group_result.passenger_to_seat,
+                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>(time_limit_seconds)
+                    )
+                );
+                result.rich_pattern_count = pattern_result.pattern_count;
+                result.rich_selected_pattern_count = pattern_result.selected_pattern_count;
+                result.rich_pattern_score = pattern_result.score;
+                if (pattern_result.complete
+                    && pattern_result.score >= group_result.group_construction_score - 1e-9) {
+                    group_result.passenger_to_seat = pattern_result.passenger_to_seat;
+                    group_result.group_construction_score = pattern_result.score;
+                    group_result.selected_components = evaluate_score_components(
+                        problem, pattern_result.passenger_to_seat
+                    );
+                    group_result.selected_incumbent = "rich-m3-pattern-master";
                 }
             }
             result.passenger_to_seat = group_result.passenger_to_seat;

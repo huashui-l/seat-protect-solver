@@ -27,8 +27,8 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | caregiver rebuild | VND joint rebuild | native caregiver-pair rescue exists in repair; full VND caregiver joint rebuild remains Python-only | PARTIAL_CPP | no | ACTIVE |
 | RR/search generation | separate orchestration | native task/Beam/commit/deadline | FULL_CPP | yes | Rich INACTIVE |
 | simulated annealing | none active | none | DEAD/UNUSED | no | Rich INACTIVE |
-| structured pattern handling | elite store, structured/special pricing | RR stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |
-| restricted/protected master | Python HiGHS stages | native RR restricted master | PARTIAL_CPP | yes | ACTIVE, semantics differ |
+| structured pattern handling | elite store, structured/special pricing | raw native Problem adapter, seat/protection resources, SSR location encoding, stable ID/dedup/materialization | PARTIAL_CPP | different path | ACTIVE |
+| restricted/protected master | Python HiGHS stages | native RR restricted master; raw M3 adapter invokes it with native patterns | PARTIAL_CPP | yes | ACTIVE, semantics differ |
 | final validation | independent evaluator | native feasibility validator plus external Python audit | PARTIAL_CPP | external | ACTIVE |
 | serialization | Python benchmark output | raw-native assignment JSON and legacy solver-ready JSON | FULL_CPP | yes | ACTIVE |
 

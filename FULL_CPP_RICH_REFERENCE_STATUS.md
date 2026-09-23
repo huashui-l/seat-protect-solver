@@ -23,6 +23,14 @@ restricted/protected master semantics remain outstanding. Native repair now
 uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
 caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
 
+The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
+protocol, materializes native patterns, and runs the restricted master. The
+adapter encodes seat/protection resources, SSR row/subrow locations, caregiver
+flags, incumbent choices, and a shared deadline. The exercised smoke cases
+produced complete evaluator-valid assignments; this remains a stage checkpoint,
+not Formal24 quality parity. Structured/special pattern semantics and the
+protected multi-group/LNS stages are still pending.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
