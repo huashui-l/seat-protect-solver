@@ -85,6 +85,10 @@ struct RichConstructionConfig {
     long long paired_joint_rebuild_node_limit = 50000;
     int final_repair_node_limit = 20000;
     double final_repair_time_limit = 2.0;
+    double vnd_time_budget = 6.351063829787234;
+    int local_search_candidate_cap = 32;
+    int local_search_cycle_candidate_cap = 12;
+    int local_search_related_candidate_cap = 64;
 };
 
 struct Problem {

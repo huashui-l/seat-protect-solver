@@ -785,4 +785,96 @@ GroupConstructionResult construct_rich_m1(
     return result;
 }
 
+void improve_rich_vnd_m2(
+    const Problem& problem, std::vector<int>& assignment,
+    std::chrono::steady_clock::time_point deadline,
+    GroupConstructionResult& diagnostics
+) {
+    const auto started = std::chrono::steady_clock::now();
+    if (validate_complete_assignment(problem, assignment) != 0) return;
+    double current_score = evaluate_soft_score(problem, assignment);
+    const int passenger_count = static_cast<int>(assignment.size());
+    const int seat_count = static_cast<int>(problem.seats.size());
+    const int seat_cap = std::max(1, problem.rich.local_search_candidate_cap);
+    bool improved = true;
+    while (improved && std::chrono::steady_clock::now() < deadline) {
+        improved = false;
+        // Python's first-improvement 1-opt analogue. Candidate seats are
+        // ordered by individual score and capped by the frozen config.
+        for (int passenger = 0; passenger < passenger_count && !improved; ++passenger) {
+            const int old_seat = assignment[passenger];
+            std::vector<int> seats(seat_count);
+            std::iota(seats.begin(), seats.end(), 0);
+            std::stable_sort(seats.begin(), seats.end(), [&](int left, int right) {
+                const double ls = evaluate_individual_score(problem, passenger, left).total();
+                const double rs = evaluate_individual_score(problem, passenger, right).total();
+                if (std::abs(ls - rs) > kTolerance) return ls > rs;
+                return problem.seats[left].id < problem.seats[right].id;
+            });
+            if (seats.size() > static_cast<size_t>(seat_cap)) seats.resize(seat_cap);
+            for (int seat : seats) {
+                if (seat == old_seat) continue;
+                assignment[passenger] = seat;
+                if (validate_complete_assignment(problem, assignment) == 0) {
+                    const double score = evaluate_soft_score(problem, assignment);
+                    if (score > current_score + kTolerance) {
+                        current_score = score;
+                        ++diagnostics.rich_vnd_one_opt_moves;
+                        improved = true;
+                        break;
+                    }
+                }
+                assignment[passenger] = old_seat;
+                if (std::chrono::steady_clock::now() >= deadline) break;
+            }
+            if (!improved) assignment[passenger] = old_seat;
+        }
+        if (improved) continue;
+
+        for (int left = 0; left < passenger_count && !improved; ++left) {
+            for (int right = left + 1; right < passenger_count && !improved; ++right) {
+                std::swap(assignment[left], assignment[right]);
+                if (validate_complete_assignment(problem, assignment) == 0) {
+                    const double score = evaluate_soft_score(problem, assignment);
+                    if (score > current_score + kTolerance) {
+                        current_score = score;
+                        ++diagnostics.rich_vnd_two_swap_moves;
+                        improved = true;
+                    }
+                }
+                if (!improved) std::swap(assignment[left], assignment[right]);
+                if (std::chrono::steady_clock::now() >= deadline) break;
+            }
+        }
+        if (improved) continue;
+
+        const int cycle_cap = std::max(1, problem.rich.local_search_cycle_candidate_cap);
+        for (int a = 0; a < passenger_count && !improved; ++a) {
+            for (int b = a + 1; b < passenger_count && !improved; ++b) {
+                for (int c = b + 1; c < passenger_count && !improved; ++c) {
+                    const int sa = assignment[a], sb = assignment[b], sc = assignment[c];
+                    assignment[a] = sb; assignment[b] = sc; assignment[c] = sa;
+                    if (validate_complete_assignment(problem, assignment) == 0) {
+                        const double score = evaluate_soft_score(problem, assignment);
+                        if (score > current_score + kTolerance) {
+                            current_score = score;
+                            ++diagnostics.rich_vnd_three_cycle_moves;
+                            improved = true;
+                        }
+                    }
+                    if (!improved) {
+                        assignment[a] = sa; assignment[b] = sb; assignment[c] = sc;
+                    }
+                    if (std::chrono::steady_clock::now() >= deadline) break;
+                    if (c - b >= cycle_cap) break;
+                }
+                if (b - a >= cycle_cap) break;
+            }
+        }
+    }
+    diagnostics.rich_vnd_score = current_score;
+    diagnostics.rich_vnd_seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - started).count();
+}
+
 }  // namespace full_cpp

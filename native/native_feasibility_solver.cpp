@@ -142,6 +142,30 @@ FeasibilityResult solve_feasibility_mip(
                     std::chrono::duration<double>(time_limit_seconds)
                 )
             );
+            if (group_result.rich_candidate_complete) {
+                const auto vnd_deadline = std::min(
+                    started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>(time_limit_seconds)
+                    ),
+                    std::chrono::steady_clock::now()
+                        + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                            std::chrono::duration<double>(problem.rich.vnd_time_budget)
+                        )
+                );
+                improve_rich_vnd_m2(
+                    problem, group_result.passenger_to_seat, vnd_deadline, group_result
+                );
+                group_result.group_construction_score =
+                    evaluate_soft_score(problem, group_result.passenger_to_seat);
+                group_result.selected_components = evaluate_score_components(
+                    problem, group_result.passenger_to_seat
+                );
+                if (group_result.group_construction_score > group_result.q0_score + 1e-9) {
+                    group_result.selected_incumbent = "rich-m2-vnd";
+                    group_result.score_delta = group_result.group_construction_score
+                        - group_result.q0_score;
+                }
+            }
             result.passenger_to_seat = group_result.passenger_to_seat;
             result.selected_incumbent = group_result.selected_incumbent;
             result.fallback_reason = group_result.fallback_reason;
@@ -165,6 +189,11 @@ FeasibilityResult solve_feasibility_mip(
             result.from_scratch_beam_groups = group_result.from_scratch_beam_groups;
             result.recovery_attempts = group_result.recovery_attempts;
             result.recovery_succeeded = group_result.recovery_succeeded;
+            result.rich_vnd_one_opt_moves = group_result.rich_vnd_one_opt_moves;
+            result.rich_vnd_two_swap_moves = group_result.rich_vnd_two_swap_moves;
+            result.rich_vnd_three_cycle_moves = group_result.rich_vnd_three_cycle_moves;
+            result.rich_vnd_score = group_result.rich_vnd_score;
+            result.rich_vnd_seconds = group_result.rich_vnd_seconds;
             result.native_hard_violations = validate_complete_assignment(
                 problem, result.passenger_to_seat
             );
