@@ -70,8 +70,8 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                         self.assertGreaterEqual(cabin["rich_multigroup_lns"]["score_improvement"], -1e-8)
                         self.assertGreaterEqual(cabin["native_score"], cabin["rich_vnd_score"] - 1e-8)
                         lns = cabin["rich_stage_timing"]["lns"]
-                        self.assertEqual(0, lns["base_budget"])
-                        self.assertGreater(lns["effective_budget"], 0)
+                        self.assertGreater(lns["base_budget"], 0)
+                        self.assertGreater(lns["effective_budget"], lns["base_budget"])
                     for timing in cabin["rich_stage_timing"].values():
                         self.assertLessEqual(timing["deadline"], cabin["rich_search_deadline"])
 

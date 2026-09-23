@@ -114,9 +114,9 @@ ledger for per-case results, provenance and retained acceptance boundaries.
 
 `configs/config_native_rich_4p5s_search.json` uses the same `rich-fast --time-limit 5`
 entry. Relative to the first 5s profile it enables native conflict-component LNS
-and reserves 0.5s for scoring/overhead. LNS has zero base budget but receives
-unused construction/repair/VND/pattern carry before restricted MIP; zero base
-budget does not disable it. Existing solve-count and stagnation limits remain,
+and reserves 0.5s for scoring/overhead. LNS receives a 0.3s base budget plus
+unused construction/repair/VND/pattern carry before restricted MIP, which keeps
+0.1s instead of the earlier 0.4s base budget. Existing solve-count and stagnation limits remain,
 so exhausted neighborhoods may still finish early. No artificial wait is added.
 The preserved 60s `group-first` profile and archived results are unchanged.
 
