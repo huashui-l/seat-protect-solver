@@ -177,6 +177,24 @@ FeasibilityResult solve_feasibility_mip(
                         budgets.stages.at("pattern_generation"), pattern_window.effective_budget,
                         pattern_started, pattern_finished, pattern_window.deadline,
                         schedule.carry(), schedule.pricing_reserve()};
+                    const double protected_started = elapsed();
+                    const auto protected_window = schedule.begin("protected_multigroup_mip", protected_started);
+                    result.rich_protected = improve_rich_protected_stage(problem, at(protected_window.deadline), group_result);
+                    const double protected_finished = elapsed();
+                    schedule.finish("protected_multigroup_mip", protected_window, protected_finished);
+                    group_result.rich_stage_timing["protected_multigroup_mip"] = {
+                        budgets.stages.at("protected_multigroup_mip"), protected_window.effective_budget,
+                        protected_started, protected_finished, protected_window.deadline,
+                        schedule.carry(), schedule.pricing_reserve()};
+                    const double pricing_started = elapsed();
+                    const auto pricing_window = schedule.begin("special_pricing", pricing_started);
+                    result.rich_special_pricing = generate_rich_special_pricing_stage(problem, at(pricing_window.deadline),
+                        budgets.post_protected_special_pricing_active, group_result);
+                    const double pricing_finished = elapsed();
+                    schedule.finish("special_pricing", pricing_window, pricing_finished);
+                    group_result.rich_stage_timing["special_pricing"] = {
+                        0.0, pricing_window.effective_budget, pricing_started, pricing_finished, pricing_window.deadline,
+                        schedule.carry(), schedule.pricing_reserve()};
                 }
                 const RichPatternResult pattern_result = run_rich_pattern_master(
                     problem, group_result.passenger_to_seat,
@@ -580,6 +598,65 @@ int validate_complete_assignment(
 }
 
 
+RichProtectedMipDiagnostics improve_rich_protected_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result
+) {
+    RichProtectedMipDiagnostics combined;
+    if (!result.rich_candidate_complete) return combined;
+    AssignmentState state(problem); state.restore(result.rich_state);
+    for (int i = 0; i < problem.rich.protected_multigroup_max_passes; ++i) {
+        const auto pass = improve_rich_protected_mip(problem, state, result.rich_elite_store, deadline);
+        result.rich_elite_store.capture(state, "protected_multigroup_mip");
+        if (i == 0) combined = pass;
+        else {
+            combined.roots_considered += pass.roots_considered;
+            combined.components_tested += pass.components_tested;
+            combined.mip_columns += pass.mip_columns;
+            combined.dynamic_relocation_calls += pass.dynamic_relocation_calls;
+            combined.dynamic_relocation_patterns += pass.dynamic_relocation_patterns;
+            combined.accepted += pass.accepted;
+            combined.score_improvement += pass.score_improvement;
+            combined.seconds += pass.seconds;
+            combined.tested_components.insert(combined.tested_components.end(), pass.tested_components.begin(), pass.tested_components.end());
+            combined.accepted_components.insert(combined.accepted_components.end(), pass.accepted_components.begin(), pass.accepted_components.end());
+            combined.stopped_by_deadline |= pass.stopped_by_deadline;
+            // Frozen Python retains first-pass root metadata and conditional row count.
+        }
+        combined.passes = i + 1;
+        if (!pass.enabled || !pass.accepted || pass.score_improvement < problem.rich.protected_multigroup_min_pass_gain
+            || std::chrono::steady_clock::now() >= deadline) break;
+    }
+    result.rich_state = state.save();
+    const double score = evaluate_soft_score(problem, state.passenger_to_seat);
+    if (validate_complete_assignment(problem, state.passenger_to_seat) == 0 && score > result.group_construction_score + 1e-9) {
+        result.passenger_to_seat = state.passenger_to_seat;
+        result.group_construction_score = score;
+        result.selected_components = evaluate_score_components(problem, state.passenger_to_seat);
+        result.selected_incumbent = "rich-m4-protected-mip";
+        result.score_delta = score - result.q0_score;
+    }
+    return combined;
+}
+
+RichSpecialPricingDiagnostics generate_rich_special_pricing_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, bool enabled, GroupConstructionResult& result
+) {
+    if (!result.rich_candidate_complete) return {};
+    AssignmentState state(problem); state.restore(result.rich_state);
+    return generate_rich_special_dual_patterns(problem, state, result.rich_elite_store, deadline, enabled,
+        [&](int group, const RichExactPattern& candidate, double score) {
+            RichElitePattern pattern;
+            pattern.local_score = score; pattern.source = "special_dual_pricing"; pattern.pinned = true;
+            for (const auto& entry : candidate.assignments)
+                pattern.assignments.emplace_back(problem.passengers[entry.first].hostnum, problem.seats[entry.second].id);
+            std::map<int, std::vector<std::string>> blocked;
+            for (const auto& entry : candidate.blocked_by)
+                blocked[problem.passengers[entry.second].hostnum].push_back(problem.seats[entry.first].id);
+            pattern.blocked_by_host.assign(blocked.begin(), blocked.end());
+            result.rich_elite_store.record_candidate(problem.groups[group].id, std::move(pattern), state, result.rich_conflict_diversity_active);
+        });
+}
+
 RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
     AssignmentState& state, RichEliteStore& elite, std::chrono::steady_clock::time_point deadline
 ) {
@@ -748,6 +825,7 @@ void write_rich_protected_mip_diagnostics(std::ostream& output, const RichProtec
         << ",\"dynamic_relocation_patterns\":" << d.dynamic_relocation_patterns << ",\"conditional_ssr_rows\":" << d.conditional_ssr_rows
         << ",\"accepted\":" << d.accepted << ",\"score_improvement\":" << d.score_improvement << ",\"seconds\":" << d.seconds
         << ",\"stopped_by_deadline\":" << (d.stopped_by_deadline ? "true" : "false");
+    if (d.passes) output << ",\"passes\":" << d.passes;
     if (d.roots_initialized) output << ",\"protected_root_count\":" << d.protected_root_count << ",\"priority_root_count\":" << d.priority_root_count;
     if (!d.reason.empty()) output << ",\"reason\":\"" << d.reason << '"';
     const auto groups = [&](const std::vector<int>& values) {

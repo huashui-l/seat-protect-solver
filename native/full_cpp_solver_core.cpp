@@ -219,6 +219,8 @@ Problem load_problem(const std::string& case_path_raw, const std::string& config
     }
     if (const Value* algorithm = config.find("algorithm")) {
         if (const Value* item = algorithm->find("enable_protected_multigroup_pattern_mip")) problem.rich.protected_multigroup_enabled = item->bool_or(false);
+        if (const Value* item = algorithm->find("protected_multigroup_max_passes")) problem.rich.protected_multigroup_max_passes = std::max(1, static_cast<int>(item->number_or(3)));
+        if (const Value* item = algorithm->find("protected_multigroup_min_pass_gain")) problem.rich.protected_multigroup_min_pass_gain = std::max(0.0, item->number_or(1.0));
         if (const Value* item = algorithm->find("protected_multigroup_root_limit")) problem.rich.protected_multigroup_root_limit = std::max(1, static_cast<int>(item->number_or(8)));
         if (const Value* item = algorithm->find("protected_multigroup_max_groups")) problem.rich.protected_multigroup_max_groups = std::max(2, static_cast<int>(item->number_or(4)));
         if (const Value* item = algorithm->find("protected_multigroup_component_limit")) problem.rich.protected_multigroup_component_limit = std::max(1, static_cast<int>(item->number_or(30)));

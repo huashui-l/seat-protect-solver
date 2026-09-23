@@ -7,6 +7,8 @@
 
 namespace full_cpp {
 
+struct GroupConstructionResult;
+
 struct RichProtectedAcceptedComponent {
     std::vector<int> groups;
     double delta = 0.0, elapsed_seconds = 0.0;
@@ -17,6 +19,7 @@ struct RichProtectedMipDiagnostics {
     bool stopped_by_deadline = false, roots_initialized = false;
     int protected_root_count = 0, priority_root_count = 0;
     int roots_considered = 0, components_tested = 0, mip_columns = 0;
+    int passes = 0;
     int dynamic_relocation_calls = 0, dynamic_relocation_patterns = 0, conditional_ssr_rows = 0, accepted = 0;
     double score_improvement = 0.0, seconds = 0.0;
     std::string reason;
@@ -44,6 +47,11 @@ RichSpecialPricingDiagnostics generate_rich_special_dual_patterns(
 void write_rich_special_pricing_diagnostics(std::ostream& output,
     const Problem& problem, const RichSpecialPricingDiagnostics& diagnostics);
 
+RichProtectedMipDiagnostics improve_rich_protected_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result);
+RichSpecialPricingDiagnostics generate_rich_special_pricing_stage(const Problem& problem,
+    std::chrono::steady_clock::time_point deadline, bool enabled, GroupConstructionResult& result);
+
 enum class ConstructionObjective {
     Feasibility,
     IndividualSoft,
@@ -58,6 +66,8 @@ struct FeasibilityResult {
     RichEliteStore rich_m1_elite_store;
     RichEliteStore rich_elite_store;
     RichStructuredDiagnostics rich_structured;
+    RichProtectedMipDiagnostics rich_protected;
+    RichSpecialPricingDiagnostics rich_special_pricing;
     bool rich_conflict_diversity_active = false;
     RichStageBudgets rich_stage_budgets;
     std::map<std::string, RichStageTiming> rich_stage_timing;

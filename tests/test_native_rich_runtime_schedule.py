@@ -10,6 +10,37 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
 
+    def test_raw_cli_protected_and_special_stages_honor_activation_and_carry(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                result = self.run_case("dense_full_resource_special_chain", "group-first", algorithm={
+                    "business_time_limit_seconds": 60.0, "adaptive_stage_budgets": False,
+                    "construction_time_budget": 0.4, "repair_time_budget": 0.2, "vnd_time_budget": 2.2,
+                    "structured_pattern_time_budget": 0.2, "structured_pattern_min_group_size": 1,
+                    "structured_pattern_dfs_per_group": 0.01, "protected_multigroup_mip_time_budget": 0.3,
+                    "enable_protected_multigroup_pattern_mip": enabled, "enable_priority_multigroup_pattern_mip": enabled,
+                    "enable_post_protected_special_pricing": enabled,
+                })
+                self.assertTrue(result["rich_candidate_complete"])
+                protected = result["rich_protected_multigroup_mip"]
+                special = result["rich_special_dual_pricing"]
+                self.assertEqual(protected["enabled"], enabled)
+                self.assertGreaterEqual(protected["passes"], 1)
+                self.assertEqual(special["enabled"], enabled)
+                if enabled:
+                    self.assertGreater(protected["roots_considered"], 0)
+                    self.assertEqual(special["lp_status"], "Optimal")
+                    self.assertGreater(special["lp_columns"], 0)
+                    self.assertGreater(special["groups_attempted"], 0)
+                else:
+                    self.assertEqual(special["lp_status"], "disabled")
+                    self.assertEqual(special["groups_attempted"], 0)
+                timings = result["rich_stage_timing"]
+                self.assertGreaterEqual(timings["protected_multigroup_mip"]["started"], timings["pattern_generation"]["finished"])
+                self.assertGreaterEqual(timings["special_pricing"]["started"], timings["protected_multigroup_mip"]["finished"])
+                self.assertGreater(timings["special_pricing"]["effective_budget"], 0)
+                self.assertEqual(timings["special_pricing"]["carry"], timings["protected_multigroup_mip"]["carry"])
+
     def test_raw_cli_records_structured_patterns_and_honors_disable(self):
         for enabled in (True, False):
             with self.subTest(enabled=enabled):
@@ -90,7 +121,8 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 self.assertAlmostEqual(result["rich_search_deadline"], search_limit)
                 timings = result["rich_stage_timing"]
                 stages = ["construction", "repair", "vnd"]
-                if result["rich_candidate_complete"]: stages.append("pattern_generation")
+                if result["rich_candidate_complete"]:
+                    stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing"))
                 self.assertEqual(set(timings), set(stages))
                 replay = dict(allocation_start=0.0, search_deadline_limit=search_limit,
                               construction_unassigned=result["rich_construction_unassigned"],
@@ -105,7 +137,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                     self.assertGreaterEqual(timing["finished"], timing["started"])
                     self.assertLessEqual(timing["deadline"], search_limit)
                     previous_finished = timing["finished"]
-                    self.assertAlmostEqual(timing["base_budget"], budgets["stages"][stage], places=10)
+                    self.assertAlmostEqual(timing["base_budget"], budgets["stages"].get(stage, 0.0), places=10)
                     for key, value in window.items():
                         self.assertAlmostEqual(timing[key], value, places=10, msg=stage + ":" + key)
                 if variant.get("construction_time_budget") == -1.0:

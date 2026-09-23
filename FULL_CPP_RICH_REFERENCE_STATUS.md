@@ -1049,6 +1049,45 @@ with 9 skips. Coverage assertions require actual tested components, dynamic
 pricing calls and newly inserted patterns in the public replay. `git diff --check`
 passed.
 
+### Production protected stage and post-protected special pricing
+
+The raw native Rich trajectory now runs structured generation, the protected MIP
+multi-pass loop, then special dual pricing before the still-independent legacy RR
+adapter/master. Both new wrappers restore preserved `rich_state`; they never use
+the separately selected fallback as their starting context. Protected passes
+capture current patterns after every call, including disabled/expired calls, and
+stop on disabled execution, zero acceptance, gain below the configured floor,
+pass limit or deadline. Aggregation matches frozen Python, including retaining
+first-pass root metadata and conditional-row count. A legal strict improvement can
+replace the selected fallback independently of continuing the Rich trajectory.
+
+Special pricing records accepted candidates synchronously with protection resources,
+`special_dual_pricing` source, pinning and construction-frozen conflict diversity.
+The production scheduler uses protected base budget plus carry, then the reserved
+special-pricing deadline, preserving protected carry across special pricing.
+Diagnostics are exposed as `rich_protected_multigroup_mip`,
+`rich_special_dual_pricing` and their `rich_stage_timing` windows.
+
+Wrapper replay executes the frozen Python multi-pass AST and special-pricing
+function on eleven public fixtures plus five controlled pass-limit/gain/disabled/
+expired cases. It compares aggregate diagnostics, current state, selected-score
+behavior and the final elite store; the native probe deliberately starts with an
+empty selected assignment. Tests require two-pass continuation and actual negative
+special-pricing candidates. Runtime schedule replay now includes both stages at
+actual native times. A dense full-resource raw CLI case verifies activation,
+nonempty optimal special LP/pricing, stage order and unchanged carry, with external
+legality/scoring audit for enabled and disabled runs.
+
+Protected and special rows are `FULL_CPP` at component scope. The full Rich gate
+remains open: conflict-component LNS, Rich restricted MIP, final diagnostic audit
+and Formal24 quality parity are still required. The legacy RR master still does
+not consume the complete Rich elite store. No Formal24 or profiling run was made.
+
+Validation: Release /O2 build passed with the two existing conversion warnings.
+The protected/special wrapper differential passed 16 subtests; runtime schedule
+and raw CLI activation checks passed. Full native/state-replay-enabled regression
+passed 141 tests and 18,296 subtests with 9 skips. `git diff --check` passed.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
