@@ -129,6 +129,8 @@ int write_result(std::ostream* output, const full_cpp::Problem& problem,
             << "\"rich_scoring_reserve\":" << result.rich_stage_budgets.scoring_reserve << ','
             << "\"rich_search_deadline\":" << result.rich_search_deadline << ','
             << "\"rich_allocation_start\":" << result.rich_allocation_start << ','
+            << "\"fallback_improvement_started\":" << result.fallback_improvement_started << ','
+            << "\"fallback_improvement_finished\":" << result.fallback_improvement_finished << ','
             << "\"rich_stage_budgets\":{";
         bool first_budget = true;
         for (const auto& entry : result.rich_stage_budgets.stages) {

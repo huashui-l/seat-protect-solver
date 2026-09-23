@@ -107,7 +107,8 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
                     self.assertTrue(result["rich_candidate_complete"])
 
     def test_vnd_continues_rich_state_when_repair_loses_to_fallback(self):
-        result = self.run_case("shrink_small_blockers", "group-first", algorithm={
+        # group-soft prepares Q1 before Rich; group-first defers Q1/Q2A.
+        result = self.run_case("shrink_small_blockers", "group-soft", algorithm={
             "enable_restricted_pattern_mip": False,
             "enable_conflict_component_lns": False,
         })

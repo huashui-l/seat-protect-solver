@@ -17,6 +17,21 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     setUpClass = classmethod(group_tests.NativeGroupSoftTests.setUpClass.__func__)
     run_case = group_tests.NativeGroupSoftTests.run_case
 
+    def test_group_first_defers_fallback_search_until_after_rich(self):
+        result = self.run_case("shrink_small_blockers", "group-first", algorithm={
+            "enable_conflict_component_lns": False,
+        })
+        timings = result["rich_stage_timing"]
+        self.assertGreaterEqual(result["fallback_improvement_started"], timings["restricted_mip"]["finished"])
+        self.assertGreaterEqual(result["fallback_improvement_finished"], result["fallback_improvement_started"])
+        self.assertGreater(result["dfs_nodes"] + result["beam_nodes"], 0)
+        self.assertGreater(result["from_scratch_dfs_nodes"] + result["from_scratch_beam_nodes"], 0)
+        self.assertGreaterEqual(result["native_score"], result["q0_score"] - 1e-8)
+        self.assertGreaterEqual(result["native_score"], result["q1_score"] - 1e-8)
+        self.assertGreaterEqual(result["native_score"], result["rich_master_score"] - 1e-8)
+        for timing in timings.values():
+            self.assertLessEqual(timing["deadline"], result["rich_search_deadline"])
+
     def test_cabin_wrapper_matches_frozen_order_filtering_and_budget(self):
         case = self.cases["two_cabin_valid_groups"]
         for minimum in (.1, 4.0):

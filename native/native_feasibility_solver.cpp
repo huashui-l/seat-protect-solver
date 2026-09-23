@@ -135,15 +135,17 @@ FeasibilityResult solve_feasibility_mip(
         result.rich_search_deadline = search_seconds;
         result.q0_solver_status = result.status;
         if (result.native_hard_violations == 0) {
-            GroupConstructionResult group_result = construct_group_aware(
-                problem, result.passenger_to_seat,
-                search_deadline
-            );
+            GroupConstructionResult group_result;
             if (objective == ConstructionObjective::GroupFirst) {
-                group_result = construct_group_first(
-                    problem, result.passenger_to_seat, group_result,
-                    search_deadline
-                );
+                group_result.passenger_to_seat = result.passenger_to_seat;
+                group_result.q0_components = evaluate_score_components(problem, result.passenger_to_seat);
+                group_result.selected_components = group_result.q0_components;
+                group_result.q0_score = group_result.q0_components.total();
+                group_result.group_construction_score = group_result.q0_score;
+                group_result.q1_score = group_result.q0_score;
+                group_result.q1_selected_incumbent = "q0";
+            } else {
+                group_result = construct_group_aware(problem, result.passenger_to_seat, search_deadline);
             }
             // Fallback preparation is charged to the global deadline, but is
             // not Python Rich construction. Start its stage clock here so a
@@ -224,6 +226,29 @@ FeasibilityResult solve_feasibility_mip(
                     result.rich_master_last_radius = result.rich_restricted.radius_history.empty() ? -1 : result.rich_restricted.radius_history.back();
                 }
             }
+            // Q1/Q2A are independent fallback improvements, not frozen Rich
+            // stages. Run them only after Rich, using the same remaining global
+            // deadline. Q0 is already legal and remains available throughout.
+            GroupConstructionResult fallback_result;
+            result.fallback_improvement_started = elapsed();
+            if (objective == ConstructionObjective::GroupFirst && Clock::now() < search_deadline) {
+                fallback_result = construct_group_aware(problem, result.passenger_to_seat, search_deadline);
+                fallback_result = construct_group_first(problem, result.passenger_to_seat, fallback_result, search_deadline);
+                if (validate_complete_assignment(problem, fallback_result.passenger_to_seat) == 0
+                    && fallback_result.group_construction_score > group_result.group_construction_score + 1e-9) {
+                    group_result.passenger_to_seat = fallback_result.passenger_to_seat;
+                    group_result.group_construction_score = fallback_result.group_construction_score;
+                    group_result.selected_components = fallback_result.selected_components;
+                    group_result.score_delta = fallback_result.score_delta;
+                    group_result.selected_incumbent = fallback_result.selected_incumbent;
+                    group_result.fallback_reason = fallback_result.fallback_reason;
+                }
+            } else {
+                fallback_result.q1_score = group_result.q1_score;
+                fallback_result.q1_selected_incumbent = group_result.q1_selected_incumbent;
+            }
+            result.fallback_improvement_finished = elapsed();
+            const auto& fallback_diagnostics = objective == ConstructionObjective::GroupFirst ? fallback_result : group_result;
             result.rich_elite_store = group_result.rich_elite_store;
             result.rich_structured = group_result.rich_structured;
             result.rich_conflict_diversity_active = group_result.rich_conflict_diversity_active;
@@ -237,21 +262,21 @@ FeasibilityResult solve_feasibility_mip(
             result.score_delta = group_result.score_delta;
             result.q0_components = group_result.q0_components;
             result.selected_components = group_result.selected_components;
-            result.dfs_nodes = group_result.dfs_nodes;
-            result.beam_nodes = group_result.beam_nodes;
-            result.dfs_groups = group_result.dfs_groups;
-            result.beam_groups = group_result.beam_groups;
-            result.groups_improved = group_result.groups_improved;
-            result.q1_selected_incumbent = group_result.q1_selected_incumbent;
-            result.q1_score = group_result.q1_score;
-            result.from_scratch_score = group_result.from_scratch_score;
-            result.from_scratch_complete = group_result.from_scratch_complete;
-            result.from_scratch_dfs_nodes = group_result.from_scratch_dfs_nodes;
-            result.from_scratch_beam_nodes = group_result.from_scratch_beam_nodes;
-            result.from_scratch_dfs_groups = group_result.from_scratch_dfs_groups;
-            result.from_scratch_beam_groups = group_result.from_scratch_beam_groups;
-            result.recovery_attempts = group_result.recovery_attempts;
-            result.recovery_succeeded = group_result.recovery_succeeded;
+            result.dfs_nodes = fallback_diagnostics.dfs_nodes;
+            result.beam_nodes = fallback_diagnostics.beam_nodes;
+            result.dfs_groups = fallback_diagnostics.dfs_groups;
+            result.beam_groups = fallback_diagnostics.beam_groups;
+            result.groups_improved = fallback_diagnostics.groups_improved;
+            result.q1_selected_incumbent = fallback_diagnostics.q1_selected_incumbent;
+            result.q1_score = fallback_diagnostics.q1_score;
+            result.from_scratch_score = fallback_diagnostics.from_scratch_score;
+            result.from_scratch_complete = fallback_diagnostics.from_scratch_complete;
+            result.from_scratch_dfs_nodes = fallback_diagnostics.from_scratch_dfs_nodes;
+            result.from_scratch_beam_nodes = fallback_diagnostics.from_scratch_beam_nodes;
+            result.from_scratch_dfs_groups = fallback_diagnostics.from_scratch_dfs_groups;
+            result.from_scratch_beam_groups = fallback_diagnostics.from_scratch_beam_groups;
+            result.recovery_attempts = fallback_diagnostics.recovery_attempts;
+            result.recovery_succeeded = fallback_diagnostics.recovery_succeeded;
             result.rich_vnd_one_opt_moves = group_result.rich_vnd_one_opt_moves;
             result.rich_vnd_two_swap_moves = group_result.rich_vnd_two_swap_moves;
             result.rich_vnd_three_cycle_moves = group_result.rich_vnd_three_cycle_moves;

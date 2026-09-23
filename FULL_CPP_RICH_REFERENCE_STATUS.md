@@ -1385,6 +1385,24 @@ Latest complete regression after the clock and aggregation corrections passed
 build passed with the two pre-existing C4244 conversion warnings.
 `git diff --check` passed.
 
+### Deferred independent fallback improvements
+
+In `group-first`, Q0 remains the initial legal fallback. Rich construction,
+repair and all quality stages now run before Q1/Q2A; independent Q1/Q2A search
+uses only remaining global time and replaces the selected solution only on a
+complete/legal strict improvement. It does not alter the saved Rich state or
+elite store. The `group-soft` entry retains the earlier Q1-first behavior.
+`fallback_improvement_started/finished` expose the ordering in each cabin.
+No stage parameters or algorithm limits were changed. Q0 work still consumes
+the global budget; this is not a claim of zero orchestration overhead.
+
+Release /O2 passed with the two existing conversion warnings. Targeted tests
+passed 26 tests / 28 subtests, covering actual Q1/Q2A search after restricted
+MIP, strict fallback selection, shared deadlines and preserved Rich state.
+Complete native/state-replay regression passed 166 tests / 37,230 subtests,
+with 9 skips, in 375.86 seconds. `git diff --check` passed.
+The quality gate must be rerun on this frozen implementation.
+
 ## Correctness
 
 ### Follow-up regression isolation on the frozen 54f827c artifacts
