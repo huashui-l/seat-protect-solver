@@ -13,8 +13,8 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | hard legality | evaluator and allocator checks | native feasibility model and final validator cover cabin/fixed/SSR/caregiver/protection/resource isolation | FULL_CPP | indirect | ACTIVE |
 | fixed seats | precheck and assignment | native fixed/reserved preprocessor applied to independent Rich construction; full snapshot parity remains under audit | PARTIAL_CPP | indirect | ACTIVE |
 | candidate ordering/domain | native Python domain and ranking | native static domains, cached owner regret/cost ranking and remaining-group/passenger ordering with Python stage differentials | PARTIAL_CPP | indirect | ACTIVE |
-| SSR/caregiver | construction, rescue, rebuild | checks supplied flags/resources | PARTIAL_CPP | indirect | ACTIVE |
-| initial construction | anchored, SSR-first, DFS/Beam | independent fixed-state anchored/remaining construction with DFS/Beam; paired SSR construction/rescue still pending; Q0/Q1/Q2A remain fallbacks | PARTIAL_CPP | supplied artifact | ACTIVE |
+| SSR/caregiver | construction, rescue, rebuild | native paired construction and relocation repair; dedicated failed-pair joint rescue and VND caregiver rebuild still pending | PARTIAL_CPP | indirect | ACTIVE |
+| initial construction | anchored, SSR-first, DFS/Beam | independent fixed-state anchored/paired/remaining construction with DFS/Beam; failed-pair joint rescue still pending; Q0/Q1/Q2A remain fallbacks | PARTIAL_CPP | supplied artifact | ACTIVE |
 | small DFS | construction DFS | native remaining-stage DFS with retry caps, node/time bounds and fixed-care validation; fixture differential passed | PARTIAL_CPP | no | ACTIVE |
 | beam search | construction Beam | native remaining-stage Beam with skips, compactness ranking, dominance and transactional commit; separate RR pattern Beam remains | PARTIAL_CPP | yes | ACTIVE |
 | unassigned repair | relocation-chain repair | native bounded relocation DFS with rollback, node/time limits, protection resources, and caregiver-pair rescue | PARTIAL_CPP | no | ACTIVE |

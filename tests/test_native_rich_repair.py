@@ -23,11 +23,14 @@ class NativeRichRepairTests(unittest.TestCase):
         cls.config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
         cls.cases = materialize_cases()
 
-    def replay(self, case, initial, rankings, node_limit=20000, expected_orphan_count=0, construct_algorithm=None):
+    def replay(self, case, initial, rankings, node_limit=20000, expected_orphan_count=0, construct_algorithm=None,
+               paired_algorithm=None):
         config = copy.deepcopy(self.config)
         config["algorithm"].update(final_repair_node_limit=node_limit, final_repair_time_limit=10.0)
         if construct_algorithm is not None:
             config["algorithm"].update(construct_algorithm)
+        if paired_algorithm is not None:
+            config["algorithm"].update(paired_algorithm)
         config["input_contract"] = {"seatmaps_by_direction": {
             "public-test": {"old": "old.json", "new": "new.json"}}}
         seats_data = case["newSeatmapData"]["seats"]
@@ -49,12 +52,16 @@ class NativeRichRepairTests(unittest.TestCase):
                                                          chosen_block=block[0] if block else None))
             ordered = {(group, p.hostnum): [seats[s] for s in row]
                        for (group, p), row in zip(passengers, rankings)}
-            if construct_algorithm is not None:
+            if construct_algorithm is not None or paired_algorithm is not None:
                 values = {sid: rich.calc_seat_value(seat, config) for sid, seat in seats.items()}
                 owners = {p.old_seat_num: (g, p.hostnum) for g, p in passengers if p.old_seat_num in rich._OLD_SEATS}
                 rich._OLD_SEAT_OWNER_REGRET = rich.compute_old_seat_owner_regret(
                     groups, seats, values, config["weights"], config, context)
-                expected = rich.assign_remaining_passengers(groups, context, ordered, config["weights"], config, values, owners)
+                if paired_algorithm is not None:
+                    expected = {"paired_added": rich.assign_paired_ssrs(
+                        groups, context, ordered, values, config["weights"], config, owners)}
+                else:
+                    expected = rich.assign_remaining_passengers(groups, context, ordered, config["weights"], config, values, owners)
             else:
                 expected = rich.repair_unassigned_by_local_relocation(groups, context, ordered, config)
             expected_assignments = [context.assigned_seats.get((g, p.hostnum)) for g, p in passengers]
@@ -67,7 +74,8 @@ class NativeRichRepairTests(unittest.TestCase):
                 "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
                 "config.json": config, "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
                 "replay.json": {"assignments": initial, "rankings": rankings,
-                                "construct_remaining": construct_algorithm is not None},
+                                "construct_remaining": construct_algorithm is not None,
+                                "paired_ssrs": paired_algorithm is not None},
             }.items():
                 (work / name).write_text(json.dumps(data), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
@@ -82,6 +90,8 @@ class NativeRichRepairTests(unittest.TestCase):
             self.assertEqual([sorted(row) for row in actual["blocked"]], expected_blocked)
             fields = (("groups_considered", "dfs_attempted", "dfs_succeeded", "dfs_nodes", "beam_groups", "transaction_failures")
                       if construct_algorithm is not None else ("attempted", "repaired", "unresolved", "search_nodes"))
+            if paired_algorithm is not None:
+                fields = ("paired_added",)
             for name in fields:
                 self.assertEqual(actual[name], expected[name], name)
         return actual

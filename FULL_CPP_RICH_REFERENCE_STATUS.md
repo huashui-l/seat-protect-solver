@@ -102,7 +102,7 @@ ranking cache to repair. Q0/Q1/Q2A are selection fallbacks rather than construct
 input. Construction timing/counts are captured before repair, and raw CLI output
 includes Rich DFS/Beam counters. A production regression forces Q2A and Rich DFS
 failure but observes successful independent Rich Beam completion without repair.
-Paired SSR construction/rescue (between anchored and remaining passes), complete
+Failed-pair joint rescue (between paired and remaining passes), complete
 adaptive/carry runtime scheduling, and full-pipeline quality parity are still pending;
 repair is not claimed as an equivalent substitute for those missing stages.
 
@@ -117,6 +117,32 @@ tests, 12,361 subtests and 9 skips, with native and state replay both enabled.
 This includes all 12,000 state operations and 26 construction replay subtests.
 The two pre-existing conversion warnings remain. No Formal24 run or quality-parity
 claim is attached to this remaining-construction checkpoint.
+
+`assign_rich_paired_ssrs` now runs between anchored and remaining construction.
+It matches Python group priority (cared BSCT first, care demand, group ID),
+fills a caregiver next to an assigned cared passenger, retains unsatisfied fixed
+cared seats, removes/repositions unfixed cared passengers when necessary, prefers
+assigned caregivers, then searches joint pairs with a 500-feasible-seat cutoff.
+Costs use current context and frozen owner regrets, with group compactness where
+Python applies it. Stable candidate ordering and caregiver-first transactional
+submission are preserved. The production loop runs at most four passes and stops
+on no newly assigned passengers; its pass count is exposed by the raw CLI.
+
+Native assignment state now accepts the explicit partner-seat exclusion needed
+by these paired submissions. Feasibility excludes that partner from occupied/SSR
+checks where Python does; protection blocks do not consume the partner's seat.
+Single-empty placement rejects an unavailable actual block before mutating state.
+The replay probe calls the same production pair function and compares actual
+Python assignments, blocked resources and newly assigned count. Tests cover
+11 public fixtures, assigned/unassigned care combinations, fixed unsatisfied
+passengers, single/both-empty partner exclusions and the 500-feasible-seat cutoff.
+The production caregiver/SSR fixture completes construction without relocation
+repair. Dedicated `rescue_failed_paired_ssrs` (fixed-neighbor displacement,
+bounded multi-task plans and complete care-group joint rebuild) is still pending;
+paired construction alone is not claimed to replace it.
+Release build passed, followed by the full native/state-replay-enabled public
+suite: 87 tests, 12,379 subtests, 9 skips. The existing two conversion warnings
+remain. No Formal24 or default-budget quality-parity claim is made at this stage.
 
 The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
 protocol, materializes native patterns, and runs the restricted master. The

@@ -787,7 +787,7 @@ AssignmentState::AssignmentState(const Problem& source, const FixedSeatContext* 
     }
 }
 
-bool AssignmentState::can_assign(int passenger_index, int seat_index, int chosen_block) const {
+bool AssignmentState::can_assign(int passenger_index, int seat_index, int chosen_block, int excluded_seat) const {
     if (passenger_index < 0 || passenger_index >= static_cast<int>(problem.passengers.size())
         || seat_index < 0 || seat_index >= static_cast<int>(problem.seats.size())) return false;
     if (passenger_to_seat[passenger_index] >= 0) return false;
@@ -796,13 +796,13 @@ bool AssignmentState::can_assign(int passenger_index, int seat_index, int chosen
     if (!passenger.fixed_seat.empty() && passenger.fixed_seat != seat.id) return false;
     if (passenger.need_both_empty && (problem.both_side_empty_allow_cross_aisle
         ? seat.row_neighbors : seat.same_block_neighbors).empty()) return false;
-    return rich_seat_feasible(passenger_index, seat_index, chosen_block);
+    return rich_seat_feasible(passenger_index, seat_index, chosen_block, excluded_seat);
 }
 
-bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, int chosen_block) const {
+bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, int chosen_block, int excluded_seat) const {
     if (passenger_index < 0 || passenger_index >= static_cast<int>(problem.passengers.size())
         || seat_index < 0 || seat_index >= static_cast<int>(problem.seats.size())) return false;
-    if (seat_to_passenger[seat_index] >= 0 || blocked_count[seat_index] > 0) return false;
+    if ((seat_to_passenger[seat_index] >= 0 && seat_index != excluded_seat) || blocked_count[seat_index] > 0) return false;
     const Passenger& passenger = problem.passengers[passenger_index];
     const Seat& seat = problem.seats[seat_index];
     if (!passenger.cabin.empty() && passenger.cabin != seat.cabin) return false;
@@ -816,13 +816,13 @@ bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, in
             ? seat.row_neighbors : seat.same_block_neighbors;
         if (problem.require_two_real_neighbors && neighbors.size() != 2) return false;
         for (int neighbor : neighbors) {
-            if (seat_to_passenger[neighbor] >= 0 || blocked_count[neighbor] > 0) return false;
+            if ((seat_to_passenger[neighbor] >= 0 && neighbor != excluded_seat) || blocked_count[neighbor] > 0) return false;
         }
     }
     if (passenger.need_single_empty) {
         bool available = false;
         for (int neighbor : seat.same_block_neighbors) {
-            if (seat_to_passenger[neighbor] < 0 && blocked_count[neighbor] == 0
+            if ((seat_to_passenger[neighbor] < 0 || neighbor == excluded_seat) && blocked_count[neighbor] == 0
                 && (chosen_block < 0 || chosen_block == neighbor)) available = true;
         }
         if (!available) return false;
@@ -836,7 +836,7 @@ bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, in
             for (int other_seat = 0;
                  other_seat < static_cast<int>(seat_ssr_passenger.size()); ++other_seat) {
                 const int other_index = seat_ssr_passenger[other_seat];
-                if (other_index < 0) continue;
+                if (other_index < 0 || other_seat == excluded_seat) continue;
                 const Seat& other = problem.seats[other_seat];
                 if (other.row != seat.row || (!by_row && other.subrow != seat.subrow)) continue;
                 const Passenger& other_passenger = problem.passengers[other_index];
@@ -850,10 +850,22 @@ bool AssignmentState::rich_seat_feasible(int passenger_index, int seat_index, in
     return true;
 }
 
-bool AssignmentState::assign(int passenger_index, int seat_index, int chosen_block) {
-    if (!can_assign(passenger_index, seat_index, chosen_block)) return false;
+bool AssignmentState::assign(int passenger_index, int seat_index, int chosen_block, int excluded_seat) {
+    if (!can_assign(passenger_index, seat_index, chosen_block, excluded_seat)) return false;
     const Passenger& passenger = problem.passengers[passenger_index];
     const Seat& seat = problem.seats[seat_index];
+    int single_block = chosen_block;
+    if (passenger.need_single_empty && !passenger.need_both_empty) {
+        single_block = -1;
+        for (int neighbor : seat.same_block_neighbors) {
+            if (seat_to_passenger[neighbor] < 0 && blocked_count[neighbor] == 0 && neighbor != excluded_seat
+                && (chosen_block < 0 || chosen_block == neighbor)) {
+                single_block = neighbor;
+                break;
+            }
+        }
+        if (single_block < 0) return false;
+    }
     seat_to_passenger[seat_index] = passenger_index;
     passenger_to_seat[passenger_index] = seat_index;
     owner_group_by_seat[seat_index] = passenger.group;
@@ -862,21 +874,13 @@ bool AssignmentState::assign(int passenger_index, int seat_index, int chosen_blo
         const auto& neighbors = problem.both_side_empty_allow_cross_aisle
             ? seat.row_neighbors : seat.same_block_neighbors;
         for (int neighbor : neighbors) {
+            if (neighbor == excluded_seat || seat_to_passenger[neighbor] >= 0) continue;
             ++blocked_count[neighbor];
             assigned_blocked[passenger_index].push_back(neighbor);
         }
     } else if (passenger.need_single_empty) {
-        int block = chosen_block;
-        if (block < 0) {
-            for (int neighbor : seat.same_block_neighbors) {
-                if (seat_to_passenger[neighbor] < 0 && blocked_count[neighbor] == 0) {
-                    block = neighbor;
-                    break;
-                }
-            }
-        }
-        ++blocked_count[block];
-        assigned_blocked[passenger_index].push_back(block);
+        ++blocked_count[single_block];
+        assigned_blocked[passenger_index].push_back(single_block);
     }
     return true;
 }

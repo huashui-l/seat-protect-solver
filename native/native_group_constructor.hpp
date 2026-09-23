@@ -100,6 +100,11 @@ RichRemainingDiagnostics assign_rich_remaining(
     std::chrono::steady_clock::time_point global_deadline
 );
 
+int assign_rich_paired_ssrs(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    std::chrono::steady_clock::time_point deadline
+);
+
 void improve_rich_vnd_m2(
     const Problem& problem,
     std::vector<int>& assignment,

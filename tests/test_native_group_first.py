@@ -124,6 +124,14 @@ class NativeGroupFirstTests(test_native_group_soft.NativeGroupSoftTests):
         self.assertEqual(result["rich_repair_attempted"], 0)
         self.assertTrue(result["rich_candidate_complete"])
 
+    def test_paired_ssr_stage_completes_care_groups_before_repair(self):
+        result = self.run_case("caregiver_and_ssr", "group-first")
+        self.assertGreater(result["rich_paired_ssr_passes"], 0)
+        self.assertLessEqual(result["rich_paired_ssr_passes"], 4)
+        self.assertEqual(result["rich_construction_unassigned"], 0)
+        self.assertEqual(result["rich_repair_attempted"], 0)
+        self.assertTrue(result["rich_candidate_complete"])
+
     def test_worse_complete_repair_does_not_replace_incumbent(self):
         result = self.run_case("shrink_small_blockers", "group-first", algorithm={
             "small_group_dfs_node_limit": 1,

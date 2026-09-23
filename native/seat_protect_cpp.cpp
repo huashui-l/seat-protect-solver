@@ -134,6 +134,7 @@ int main(int argc, char** argv) {
             << "\"rich_dfs_succeeded\":" << result.rich_dfs_succeeded << ','
             << "\"rich_dfs_nodes\":" << result.rich_dfs_nodes << ','
             << "\"rich_beam_groups\":" << result.rich_beam_groups << ','
+            << "\"rich_paired_ssr_passes\":" << result.rich_paired_ssr_passes << ','
             << "\"rich_repair_score\":" << result.rich_repair_score << ','
             << "\"rich_repair_repaired\":" << result.rich_repair_repaired << ','
             << "\"rich_repair_unresolved\":" << result.rich_repair_unresolved << ','

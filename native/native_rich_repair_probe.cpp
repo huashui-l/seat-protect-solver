@@ -45,7 +45,13 @@ int main(int argc, char** argv) {
         if (rankings.size() != problem.passengers.size()) throw std::runtime_error("ranking count mismatch");
         full_cpp::GroupConstructionResult diagnostics;
         full_cpp::RichRemainingDiagnostics construction;
-        if (const auto* mode = replay.find("construct_remaining"); mode && mode->bool_or()) {
+        int paired_added = 0;
+        if (const auto* paired = replay.find("paired_ssrs"); paired && paired->bool_or()) {
+            auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            cache.rankings = rankings;
+            paired_added = full_cpp::assign_rich_paired_ssrs(problem, state, cache,
+                std::chrono::steady_clock::now() + std::chrono::seconds(60));
+        } else if (const auto* mode = replay.find("construct_remaining"); mode && mode->bool_or()) {
             auto cache = full_cpp::build_rich_candidate_cache(problem, state);
             cache.rankings = rankings;
             std::vector<int> groups;
@@ -61,7 +67,8 @@ int main(int argc, char** argv) {
             if (owner >= 0 && state.passenger_to_seat[owner] != static_cast<int>(seat))
                 throw std::runtime_error("orphan occupied seat after repair");
         }
-        std::cout << std::setprecision(17) << "{\"groups_considered\":" << construction.groups_considered
+        std::cout << std::setprecision(17) << "{\"paired_added\":" << paired_added
+                  << ",\"groups_considered\":" << construction.groups_considered
                   << ",\"dfs_attempted\":" << construction.dfs_attempted
                   << ",\"dfs_succeeded\":" << construction.dfs_succeeded
                   << ",\"dfs_nodes\":" << construction.dfs_nodes

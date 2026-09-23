@@ -945,8 +945,12 @@ GroupConstructionResult construct_rich_m1(
         result.rich_beam_groups += diagnostics.beam_groups;
     };
     if (!anchored.empty()) capture(assign_rich_remaining(problem, state, cache, anchored, construction_deadline));
-    // Paired SSR construction/rescue remains a separate pending migration.
-    // This pass fills non-cared passengers; repair handles missing cared passengers.
+    while (result.rich_paired_ssr_passes < 4 && std::chrono::steady_clock::now() < construction_deadline) {
+        const int added = assign_rich_paired_ssrs(problem, state, cache, construction_deadline);
+        ++result.rich_paired_ssr_passes;
+        if (added <= 0) break;
+    }
+    // Failed paired-SSR joint rescue remains a separate pending migration.
     capture(assign_rich_remaining(problem, state, cache, groups, construction_deadline));
     const auto construction_finished = std::chrono::steady_clock::now();
     result.rich_construction_seconds = std::chrono::duration<double>(construction_finished - started).count();

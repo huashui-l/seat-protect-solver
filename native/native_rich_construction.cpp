@@ -263,4 +263,139 @@ RichRemainingDiagnostics assign_rich_remaining(
     return diagnostics;
 }
 
+int assign_rich_paired_ssrs(
+    const Problem& problem, AssignmentState& state, const RichCandidateCache& cache,
+    std::chrono::steady_clock::time_point deadline
+) {
+    const int before = static_cast<int>(std::count_if(state.passenger_to_seat.begin(), state.passenger_to_seat.end(),
+        [](int seat) { return seat >= 0; }));
+    const auto needs_care = [&](int p) {
+        const auto& passenger = problem.passengers[p];
+        const auto rule = problem.ssr_rules.find(passenger.ssr);
+        return passenger.need_cared || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
+    };
+    const auto adult = [&](int p) {
+        const auto& passenger = problem.passengers[p];
+        return passenger.ssr.empty() && !passenger.need_cared && !passenger.need_both_empty && !passenger.need_single_empty;
+    };
+    const auto neighbors = [&](int p, int seat) -> const std::vector<int>& {
+        const auto rule = problem.ssr_rules.find(problem.passengers[p].ssr);
+        const bool cross = rule != problem.ssr_rules.end() && rule->second.caregiver_allow_cross_aisle;
+        return cross ? problem.seats[seat].row_neighbors : problem.seats[seat].same_block_neighbors;
+    };
+    const auto compactness = [&](const std::vector<int>& seats) {
+        if (seats.size() <= 1) return 0.0;
+        double x = 0.0, y = 0.0;
+        for (int seat : seats) { x += problem.seats[seat].x; y += problem.seats[seat].y; }
+        x /= seats.size(); y /= seats.size();
+        double dx = 0.0, dy = 0.0;
+        for (int seat : seats) {
+            dx = std::max(dx, std::abs(problem.seats[seat].x - x));
+            dy = std::max(dy, std::abs(problem.seats[seat].y - y));
+        }
+        return problem.group_centroid_x_factor * dx + problem.group_centroid_y_factor * dy;
+    };
+    std::vector<int> groups(problem.groups.size());
+    std::iota(groups.begin(), groups.end(), 0);
+    const auto priority = [&](int g) {
+        bool baby = false;
+        int care = 0;
+        for (int p : problem.groups[g].passengers) {
+            care += needs_care(p);
+            baby = baby || (needs_care(p) && problem.passengers[p].ssr == "BSCT");
+        }
+        return std::make_tuple(baby ? 0 : 1, -care, problem.groups[g].id);
+    };
+    std::stable_sort(groups.begin(), groups.end(), [&](int a, int b) { return priority(a) < priority(b); });
+    for (int g : groups) {
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        std::vector<int> caregivers;
+        for (int p : problem.groups[g].passengers) if (adult(p)) caregivers.push_back(p);
+        for (int p : problem.groups[g].passengers) {
+            if (!needs_care(p)) continue;
+            if (std::chrono::steady_clock::now() >= deadline) break;
+            auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+            if (state.passenger_to_seat[p] >= 0) {
+                const int seat = state.passenger_to_seat[p];
+                const auto& adjacent = neighbors(p, seat);
+                bool satisfied = false;
+                for (int cg : caregivers) {
+                    if (std::find(adjacent.begin(), adjacent.end(), state.passenger_to_seat[cg]) != adjacent.end()) satisfied = true;
+                }
+                if (satisfied) continue;
+                int best_caregiver = -1, best_seat = -1;
+                double best_cost = std::numeric_limits<double>::infinity();
+                for (int cg : caregivers) {
+                    if (state.passenger_to_seat[cg] >= 0) continue;
+                    for (int neighbor : adjacent) {
+                        if (state.rich_seat_feasible(cg, neighbor, -1, seat) && costs.costs[cg][neighbor] < best_cost) {
+                            best_cost = costs.costs[cg][neighbor]; best_caregiver = cg; best_seat = neighbor;
+                        }
+                    }
+                }
+                if (best_caregiver >= 0) {
+                    state.assign(best_caregiver, best_seat, -1, seat);
+                    continue;
+                }
+                if (!problem.passengers[p].fixed_seat.empty()) continue;
+                state.remove(p);
+                costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+            }
+            std::vector<int> assigned;
+            for (int other : problem.groups[g].passengers)
+                if (state.passenger_to_seat[other] >= 0) assigned.push_back(state.passenger_to_seat[other]);
+            const double old_compactness = compactness(assigned);
+            int best_seat = -1, best_caregiver_seat = -1;
+            double best_cost = std::numeric_limits<double>::infinity();
+            for (int cg : caregivers) {
+                const int caregiver_seat = state.passenger_to_seat[cg];
+                if (caregiver_seat < 0) continue;
+                for (int neighbor : neighbors(p, caregiver_seat)) {
+                    if (!state.rich_seat_feasible(p, neighbor, -1, caregiver_seat)) continue;
+                    auto expanded = assigned;
+                    expanded.push_back(neighbor);
+                    const double cost = costs.costs[p][neighbor] - problem.weight_c * (compactness(expanded) - old_compactness);
+                    if (cost < best_cost) { best_cost = cost; best_seat = neighbor; best_caregiver_seat = caregiver_seat; }
+                }
+            }
+            if (best_seat >= 0 && state.assign(p, best_seat, -1, best_caregiver_seat)) continue;
+            std::vector<int> unassigned;
+            for (int cg : caregivers) if (state.passenger_to_seat[cg] < 0) unassigned.push_back(cg);
+            if (unassigned.empty()) continue;
+            struct Pair { double cost; int seat, caregiver_seat, caregiver; };
+            std::vector<Pair> pairs;
+            int feasible_count = 0;
+            for (int seat : cache.rankings[p]) {
+                if (std::chrono::steady_clock::now() >= deadline) break;
+                if (!state.rich_seat_feasible(p, seat)) continue;
+                ++feasible_count;
+                for (int neighbor : neighbors(p, seat)) {
+                    for (int cg : unassigned) {
+                        if (!state.rich_seat_feasible(cg, neighbor, -1, seat)) continue;
+                        double penalty = 0.0;
+                        if (!assigned.empty()) {
+                            auto expanded = assigned;
+                            expanded.push_back(seat); expanded.push_back(neighbor);
+                            penalty = -problem.weight_c * (compactness(expanded) - old_compactness);
+                        }
+                        pairs.push_back({costs.costs[p][seat] + costs.costs[cg][neighbor] + penalty, seat, neighbor, cg});
+                    }
+                }
+                if (feasible_count >= 500) break;
+            }
+            std::stable_sort(pairs.begin(), pairs.end(), [](const Pair& a, const Pair& b) { return a.cost < b.cost; });
+            for (const auto& pair : pairs) {
+                if (state.passenger_to_seat[pair.caregiver] >= 0) continue;
+                if (state.assign(pair.caregiver, pair.caregiver_seat, -1, pair.seat)) {
+                    if (state.assign(p, pair.seat, -1, pair.caregiver_seat)) break;
+                    state.remove(pair.caregiver);
+                }
+            }
+        }
+    }
+    const int after = static_cast<int>(std::count_if(state.passenger_to_seat.begin(), state.passenger_to_seat.end(),
+        [](int seat) { return seat >= 0; }));
+    return std::max(0, after - before);
+}
+
 }  // namespace full_cpp

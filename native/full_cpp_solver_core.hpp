@@ -191,11 +191,11 @@ public:
         const FixedSeatContext* fixed = nullptr
     );
 
-    bool can_assign(int passenger, int seat, int chosen_block = -1) const;
+    bool can_assign(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1) const;
     // Python is_seat_feasible: does not enforce fixed-seat identity or require
     // the passenger to be unassigned; used for construction owner regret.
-    bool rich_seat_feasible(int passenger, int seat, int chosen_block = -1) const;
-    bool assign(int passenger, int seat, int chosen_block = -1);
+    bool rich_seat_feasible(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1) const;
+    bool assign(int passenger, int seat, int chosen_block = -1, int excluded_seat = -1);
     void remove(int passenger);
     AssignmentSnapshot save() const;
     void restore(AssignmentSnapshot snapshot);

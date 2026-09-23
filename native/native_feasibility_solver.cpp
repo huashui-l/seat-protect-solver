@@ -231,6 +231,7 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_dfs_succeeded = group_result.rich_dfs_succeeded;
             result.rich_dfs_nodes = group_result.rich_dfs_nodes;
             result.rich_beam_groups = group_result.rich_beam_groups;
+            result.rich_paired_ssr_passes = group_result.rich_paired_ssr_passes;
             result.rich_repair_score = group_result.rich_repair_score;
             result.rich_repair_repaired = group_result.rich_repair_repaired;
             result.rich_repair_unresolved = group_result.rich_repair_unresolved;
