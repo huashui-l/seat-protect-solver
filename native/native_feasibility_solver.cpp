@@ -144,7 +144,9 @@ FeasibilityResult solve_feasibility_mip(
                     std::chrono::duration<double>(time_limit_seconds)
                 )
             );
-            if (group_result.rich_candidate_complete) {
+            // A failed construction/repair candidate leaves the legal fallback
+            // selected. Never confuse candidate completeness with that incumbent.
+            if (validate_complete_assignment(problem, group_result.passenger_to_seat) == 0) {
                 const auto vnd_deadline = std::min(
                     started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                         std::chrono::duration<double>(time_limit_seconds)
@@ -222,6 +224,10 @@ FeasibilityResult solve_feasibility_mip(
             result.rich_vnd_score = group_result.rich_vnd_score;
             result.rich_vnd_seconds = group_result.rich_vnd_seconds;
             result.rich_repair_attempted = group_result.rich_repair_attempted;
+            result.rich_construction_assigned = group_result.rich_construction_assigned;
+            result.rich_construction_unassigned = group_result.rich_construction_unassigned;
+            result.rich_candidate_complete = group_result.rich_candidate_complete;
+            result.rich_repair_score = group_result.rich_repair_score;
             result.rich_repair_repaired = group_result.rich_repair_repaired;
             result.rich_repair_unresolved = group_result.rich_repair_unresolved;
             result.rich_repair_nodes = group_result.rich_repair_nodes;

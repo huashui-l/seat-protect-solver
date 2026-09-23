@@ -689,6 +689,7 @@ GroupConstructionResult construct_group_first(
             }
         }
         if (!recovered) {
+            state.restore(before);
             complete = false;
             if (result.fallback_reason.empty()) {
                 result.fallback_reason = "q2a_incomplete";
@@ -697,6 +698,7 @@ GroupConstructionResult construct_group_first(
         }
     }
 
+    result.from_scratch_state = state.save();
     if (complete && validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
         result.from_scratch_complete = true;
         result.from_scratch_score = evaluate_soft_score(
@@ -728,20 +730,28 @@ GroupConstructionResult construct_rich_m1(
     (void)q0_assignment;
     const auto started = std::chrono::steady_clock::now();
     GroupConstructionResult result = q2a_result;
-    result.rich_construction_score = evaluate_soft_score(problem, q2a_result.passenger_to_seat);
+    const bool has_construction_state = !q2a_result.from_scratch_state.passenger_to_seat.empty();
+    const auto& construction_assignment = has_construction_state
+        ? q2a_result.from_scratch_state.passenger_to_seat : q2a_result.passenger_to_seat;
+    result.rich_construction_score = evaluate_soft_score(problem, construction_assignment);
+    result.rich_repair_score = result.rich_construction_score;
     result.rich_construction_assigned = 0;
-    for (int seat : q2a_result.passenger_to_seat) result.rich_construction_assigned += seat >= 0;
+    for (int seat : construction_assignment) result.rich_construction_assigned += seat >= 0;
     result.rich_construction_unassigned = static_cast<int>(problem.passengers.size())
         - result.rich_construction_assigned;
     result.rich_candidate_complete = result.rich_construction_unassigned == 0
-        && validate_complete_assignment(problem, q2a_result.passenger_to_seat) == 0;
+        && validate_complete_assignment(problem, construction_assignment) == 0;
 
     // M1 keeps Q0/Q1/Q2A as the audited fallback, then performs the native
     // construction/repair pass against the same shared deadline.
-    if (!result.rich_candidate_complete && std::chrono::steady_clock::now() < global_deadline) {
+    if (!result.rich_candidate_complete && problem.rich.final_repair_node_limit > 0
+        && problem.rich.final_repair_time_limit > 0.0
+        && std::chrono::steady_clock::now() < global_deadline) {
         AssignmentState state = fixed_initial_state(problem);
         bool rebuilt = true;
-        for (int passenger = 0; passenger < static_cast<int>(q2a_result.passenger_to_seat.size()); ++passenger) {
+        if (has_construction_state) {
+            state.restore(q2a_result.from_scratch_state);
+        } else for (int passenger = 0; passenger < static_cast<int>(q2a_result.passenger_to_seat.size()); ++passenger) {
             const int seat = q2a_result.passenger_to_seat[passenger];
             if (seat < 0 || state.passenger_to_seat[passenger] >= 0) continue;
             if (!state.assign(passenger, seat)) { rebuilt = false; break; }
@@ -793,7 +803,7 @@ GroupConstructionResult construct_rich_m1(
                 if (needs_caregiver) {
                     const Group* group = nullptr;
                     for (const Group& candidate : problem.groups)
-                        if (candidate.id == missing_item.group) { group = &candidate; break; }
+                        if (candidate.id == missing_item.group_id) { group = &candidate; break; }
                     if (group) {
                         for (int caregiver : group->passengers) {
                             const Passenger& caregiver_item = problem.passengers[caregiver];
@@ -899,14 +909,15 @@ GroupConstructionResult construct_rich_m1(
                 if (!repaired) ++result.rich_repair_unresolved;
             }
             if (validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
-                result.passenger_to_seat = state.passenger_to_seat;
                 result.rich_candidate_complete = true;
-                result.rich_construction_assigned = static_cast<int>(problem.passengers.size());
-                result.rich_construction_unassigned = 0;
-                result.rich_repair_score = evaluate_soft_score(problem, result.passenger_to_seat);
-                result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
-                result.group_construction_score = result.rich_repair_score;
-                result.selected_incumbent = "rich-m1";
+                result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);
+                if (result.rich_repair_score > result.group_construction_score + kTolerance) {
+                    result.passenger_to_seat = state.passenger_to_seat;
+                    result.selected_components = evaluate_score_components(problem, result.passenger_to_seat);
+                    result.group_construction_score = result.rich_repair_score;
+                    result.score_delta = result.rich_repair_score - result.q0_score;
+                    result.selected_incumbent = "rich-m1";
+                }
             }
         }
     }

@@ -23,6 +23,28 @@ restricted/protected master semantics remain outstanding. Native repair now
 uses rollback snapshots, bounded relocation DFS, protected-seat resources, and
 caregiver-pair rescue; its diagnostics are emitted by the raw CLI.
 
+The production Q2A-to-repair boundary now preserves the actual construction
+snapshot separately from the selected legal fallback. Previously Q2A discarded
+an incomplete candidate, so the repair entry inspected the complete fallback
+and effectively skipped its production repair path. Failed Q2A recovery now
+restores the last committed snapshot, including protection resources; repair
+receives that state. Only a complete, legal, strictly better repaired candidate
+replaces the fallback. Construction assigned/unassigned counts remain the
+pre-repair checkpoint, and candidate completeness is reported separately from
+the complete selected incumbent. A legal fallback remains eligible for VND.
+Zero repair time/node limits disable the stage, matching Python. Caregiver
+lookup uses external group ID rather than comparing it with an internal index.
+Regression fixtures cover a ten-passenger repair, disabled repair with fixed
+assignments retained, equal-score fallback retention, and a worse complete
+repair (-79.970 versus incumbent -71.995) rejected by final selection; the test
+harness independently audits final legality and score. This is the existing
+Q2A candidate feeding partial Rich repair, not exact Python Rich construction.
+Exact construction, repair semantics, and production stage scheduling remain
+outstanding.
+Release build and the native/state-replay-enabled public suite passed after
+this boundary fix: 71 tests, 12,276 subtests, 9 skips (including all 12,000
+state-operation differentials). The two existing conversion warnings remain.
+
 The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
 protocol, materializes native patterns, and runs the restricted master. The
 adapter encodes seat/protection resources, SSR row/subrow locations, caregiver

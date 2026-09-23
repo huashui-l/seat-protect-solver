@@ -52,6 +52,10 @@ struct FeasibilityResult {
     double rich_vnd_score = 0.0;
     double rich_vnd_seconds = 0.0;
     int rich_repair_attempted = 0;
+    int rich_construction_assigned = 0;
+    int rich_construction_unassigned = 0;
+    bool rich_candidate_complete = false;
+    double rich_repair_score = 0.0;
     int rich_repair_repaired = 0;
     int rich_repair_unresolved = 0;
     long long rich_repair_nodes = 0;

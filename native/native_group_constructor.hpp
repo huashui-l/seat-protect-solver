@@ -26,6 +26,7 @@ struct GroupConstructionResult {
     double q1_score = 0.0;
     double from_scratch_score = 0.0;
     bool from_scratch_complete = false;
+    AssignmentSnapshot from_scratch_state;
     long long from_scratch_dfs_nodes = 0;
     long long from_scratch_beam_nodes = 0;
     int from_scratch_dfs_groups = 0;
