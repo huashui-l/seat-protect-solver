@@ -18,6 +18,26 @@ int main(int argc, char** argv) {
             if (!state.assign(passenger, seat, block)) throw std::runtime_error("invalid replay assignment");
         }
         std::vector<std::vector<int>> rankings;
+        if (const auto* mode = replay.find("rank_only"); mode && mode->bool_or()) {
+            const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            std::cout << std::setprecision(17) << "{\"passengers\":[";
+            for (size_t p = 0; p < cache.rankings.size(); ++p) {
+                if (p) std::cout << ',';
+                std::cout << "{\"regret\":" << cache.owner_regrets[p] << ",\"costs\":[";
+                for (size_t s = 0; s < cache.costs[p].size(); ++s) {
+                    if (s) std::cout << ',';
+                    std::cout << cache.costs[p][s];
+                }
+                std::cout << "],\"order\":[";
+                for (size_t s = 0; s < cache.rankings[p].size(); ++s) {
+                    if (s) std::cout << ',';
+                    std::cout << cache.rankings[p][s];
+                }
+                std::cout << "]}";
+            }
+            std::cout << "]}\n";
+            return 0;
+        }
         for (const auto& row : replay.at("rankings").array) {
             rankings.emplace_back();
             for (const auto& seat : row.array) rankings.back().push_back(problem.seat_index.at(seat.string));

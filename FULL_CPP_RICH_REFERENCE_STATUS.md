@@ -52,8 +52,8 @@ set, dynamic minimum-feasible-domain mover selection, external-key ordering,
 care-group member release/permutation, group-local caregiver validation, rollback,
 node accounting, and unresolved-count rules. Cared passengers no longer fall
 through to ordinary single-seat repair, and caregiver repair need not wait for
-unrelated groups to be complete. Production passes its current full individual-score
-ranking; migration of Python construction's exact cached ranking remains pending.
+unrelated groups to be complete. Production now passes the native construction
+candidate cache described below rather than individual-score-only rankings.
 The probe calls the same function with identical state/rankings as actual Python
 `repair_unassigned_by_local_relocation`. Tests compare exact assignments,
 protection resources and all four non-timing repair counters, including a two-node
@@ -76,6 +76,27 @@ passed 76 tests and 12,300 subtests, with 9 skips. After adding the probe's orph
 occupancy assertion, the final rebuild and all 5 repair tests / 24 subtests also
 passed. The known-reference-defect test is explicitly separate from exact-state
 parity comparisons. No Formal24 checkpoint was run for this change.
+
+The native core now implements Python `compute_old_seat_owner_regret`,
+`calc_seat_sort_key`, and `build_passenger_sorted_seats` as a construction
+candidate cache. It includes old/new seat values and geometry, attribute and
+multiple toilet preferences, old-seat reservation pressure, contextual baby
+interference, and stable input-seat ordering for equal costs. Regret feasibility
+is distinct from assignment admission: Python's feasibility predicate does not
+require the passenger to be unassigned or enforce fixed-seat identity. The
+native assignment admission checks remain in place. Production repair builds
+this cache from the fixed initial state before restoring the partial candidate.
+This replaces its individual-score-only and seat-ID-tie ranking, but does not
+yet wire a complete independent Rich construction stage.
+The existing stage probe's `rank_only` replay compares native cache costs,
+regrets and rankings against all three actual Python functions. All 35 scenarios
+matched costs/regrets to 10 decimal places and exact candidate order, including
+11 public fixtures, empty/fixed/mixed states, reservation pressure 0/1/2.5,
+missing old seat with explicit old value, multiple preferences and stable ties.
+Release MSVC build and the native/state-replay-enabled public suite passed:
+77 tests, 12,335 subtests, 9 skips; the two existing conversion warnings remain.
+This validates the cache in the exercised states and its repair integration,
+not full construction ordering, runtime schedule or Formal24 quality parity.
 
 The M3 checkpoint now also builds a raw `Problem` into the native pattern-kernel
 protocol, materializes native patterns, and runs the restricted master. The

@@ -946,6 +946,7 @@ GroupConstructionResult construct_rich_m1(
         && problem.rich.final_repair_time_limit > 0.0
         && std::chrono::steady_clock::now() < global_deadline) {
         AssignmentState state = fixed_initial_state(problem);
+        const auto cache = build_rich_candidate_cache(problem, state);
         bool rebuilt = true;
         if (has_construction_state) {
             state.restore(q2a_result.from_scratch_state);
@@ -955,19 +956,7 @@ GroupConstructionResult construct_rich_m1(
             if (!state.assign(passenger, seat)) { rebuilt = false; break; }
         }
         if (rebuilt) {
-            std::vector<std::vector<int>> rankings(problem.passengers.size());
-            for (int passenger = 0; passenger < static_cast<int>(rankings.size()); ++passenger) {
-                auto& seats = rankings[passenger];
-                seats.resize(problem.seats.size());
-                std::iota(seats.begin(), seats.end(), 0);
-                std::stable_sort(seats.begin(), seats.end(), [&](int left, int right) {
-                    const double ls = evaluate_individual_score(problem, passenger, left).total();
-                    const double rs = evaluate_individual_score(problem, passenger, right).total();
-                    if (std::abs(ls - rs) > kTolerance) return ls > rs;
-                    return problem.seats[left].id < problem.seats[right].id;
-                });
-            }
-            repair_rich_assignment(problem, state, rankings, global_deadline, result);
+            repair_rich_assignment(problem, state, cache.rankings, global_deadline, result);
             if (validate_complete_assignment(problem, state.passenger_to_seat) == 0) {
                 result.rich_candidate_complete = true;
                 result.rich_repair_score = evaluate_soft_score(problem, state.passenger_to_seat);

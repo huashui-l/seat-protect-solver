@@ -42,6 +42,7 @@ struct Passenger {
     bool has_near_toilet_preference = false;
     bool prefer_near_toilet = true;
     double near_toilet_preference_weight = 1.0;
+    std::vector<std::pair<bool, double>> rich_toilet_preferences;
     bool need_cared = false;
     bool need_both_empty = false;
     bool need_single_empty = false;
@@ -191,6 +192,9 @@ public:
     );
 
     bool can_assign(int passenger, int seat, int chosen_block = -1) const;
+    // Python is_seat_feasible: does not enforce fixed-seat identity or require
+    // the passenger to be unassigned; used for construction owner regret.
+    bool rich_seat_feasible(int passenger, int seat, int chosen_block = -1) const;
     bool assign(int passenger, int seat, int chosen_block = -1);
     void remove(int passenger);
     AssignmentSnapshot save() const;
@@ -204,6 +208,14 @@ public:
     std::vector<int> owner_group_by_seat;
     std::vector<int> seat_ssr_passenger;
 };
+
+struct RichCandidateCache {
+    std::vector<double> owner_regrets;
+    std::vector<std::vector<double>> costs;
+    std::vector<std::vector<int>> rankings;
+};
+
+RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state);
 
 Problem load_problem(
     const std::string& case_path,
