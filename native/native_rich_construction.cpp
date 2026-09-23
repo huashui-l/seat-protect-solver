@@ -668,4 +668,140 @@ RichConstructionDiagnostics construct_rich_assignment(
     return diagnostics;
 }
 
+RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
+    AssignmentState& state, const std::vector<std::vector<int>>& rankings,
+    std::chrono::steady_clock::time_point deadline
+) {
+    RichOrdinaryVndDiagnostics diagnostics;
+    const auto expired = [&]() { return std::chrono::steady_clock::now() >= deadline; };
+    if (expired()) { diagnostics.stopped_by_deadline = true; return diagnostics; }
+    const auto& problem = state.problem;
+    const int n = static_cast<int>(problem.passengers.size());
+    std::vector<bool> active(n, false), movable_set(n, false);
+    for (const auto& group : problem.groups) for (int p : group.passengers) {
+        const auto& passenger = problem.passengers[p];
+        const auto rule = problem.ssr_rules.find(passenger.ssr);
+        const int seat = state.passenger_to_seat[p];
+        if (seat < 0 || (!passenger.need_cared &&
+            (rule == problem.ssr_rules.end() || !rule->second.requires_caregiver))) continue;
+        const bool cross = rule != problem.ssr_rules.end() && rule->second.caregiver_allow_cross_aisle;
+        const auto& neighbors = cross ? problem.seats[seat].row_neighbors : problem.seats[seat].same_block_neighbors;
+        for (int cg : group.passengers) {
+            const auto& item = problem.passengers[cg];
+            if (item.ssr.empty() && !item.need_both_empty && !item.need_single_empty
+                && std::find(neighbors.begin(), neighbors.end(), state.passenger_to_seat[cg]) != neighbors.end()) active[cg] = true;
+        }
+    }
+    std::vector<int> movable;
+    for (int p = 0; p < n; ++p) {
+        const auto& item = problem.passengers[p];
+        if (state.passenger_to_seat[p] >= 0 && item.fixed_seat.empty() && item.ssr.empty()
+            && !item.need_cared && !item.need_both_empty && !item.need_single_empty && !active[p]) {
+            movable.push_back(p); movable_set[p] = true;
+        }
+    }
+    if (movable.empty()) return diagnostics;
+    // Infant positions are frozen in this ordinary-only prefix, as in Python.
+    const auto initial = state.passenger_to_seat;
+    std::map<std::pair<int, int>, double> passenger_cache;
+    const auto passenger_score = [&](int p, int s) {
+        const auto key = std::make_pair(p, s);
+        const auto found = passenger_cache.find(key);
+        if (found != passenger_cache.end()) return found->second;
+        std::vector<int> isolated(n, -1);
+        isolated[p] = s;
+        for (int infant = 0; infant < n; ++infant)
+            if (problem.passengers[infant].ssr == "BSCT"
+                && problem.passengers[infant].group != problem.passengers[p].group) isolated[infant] = initial[infant];
+        const double value = evaluate_rich_group_score(problem, isolated, problem.passengers[p].group).total();
+        passenger_cache[key] = value;
+        return value;
+    };
+    std::vector<std::vector<int>> group_seats(problem.groups.size());
+    for (int p = 0; p < n; ++p) if (state.passenger_to_seat[p] >= 0)
+        group_seats[problem.passengers[p].group].push_back(state.passenger_to_seat[p]);
+    const auto compact = [&](const std::vector<int>& seats) {
+        if (seats.size() <= 1) return 0.0;
+        double x = 0.0, y = 0.0, dx = 0.0, dy = 0.0;
+        for (int s : seats) { x += problem.seats[s].x; y += problem.seats[s].y; }
+        x /= seats.size(); y /= seats.size();
+        for (int s : seats) { dx = std::max(dx, std::abs(problem.seats[s].x - x)); dy = std::max(dy, std::abs(problem.seats[s].y - y)); }
+        return problem.weight_c * (problem.group_centroid_x_factor * dx + problem.group_centroid_y_factor * dy);
+    };
+    const auto attempt = [&](const std::vector<int>& passengers, const std::vector<int>& targets) {
+        ++diagnostics.evaluated_moves;
+        double delta = 0.0;
+        std::map<int, std::map<int, int>> replacements;
+        for (size_t i = 0; i < passengers.size(); ++i) {
+            const int p = passengers[i], old = state.passenger_to_seat[p];
+            delta += passenger_score(p, targets[i]) - passenger_score(p, old);
+            replacements[problem.passengers[p].group][old] = targets[i];
+        }
+        std::map<int, std::vector<int>> updated;
+        for (const auto& group : replacements) {
+            auto seats = group_seats[group.first];
+            for (int& seat : seats) {
+                const auto replacement = group.second.find(seat);
+                if (replacement != group.second.end()) seat = replacement->second;
+            }
+            delta += compact(seats) - compact(group_seats[group.first]);
+            updated[group.first] = std::move(seats);
+        }
+        if (delta <= problem.rich.local_search_epsilon) return false;
+        const auto snapshot = state.save();
+        for (int p : passengers) state.remove(p);
+        for (size_t i = 0; i < passengers.size(); ++i) if (!state.assign(passengers[i], targets[i])) {
+            state.restore(snapshot); return false;
+        }
+        for (auto& group : updated) group_seats[group.first] = std::move(group.second);
+        ++diagnostics.accepted_moves;
+        diagnostics.score_improvement += delta;
+        return true;
+    };
+    const int cap = std::max(4, problem.rich.local_search_candidate_cap);
+    while (!expired()) {
+        ++diagnostics.passes;
+        bool accepted = false;
+        std::stable_sort(movable.begin(), movable.end(), [&](int left, int right) {
+            return passenger_score(left, state.passenger_to_seat[left]) < passenger_score(right, state.passenger_to_seat[right]);
+        });
+        for (int p : movable) {
+            if (expired()) break;
+            const int old = state.passenger_to_seat[p];
+            for (int i = 0; i < std::min(cap, static_cast<int>(rankings[p].size())); ++i) {
+                if (expired()) break;
+                const int seat = rankings[p][i], other = state.seat_to_passenger[seat];
+                if (seat == old || state.blocked_count[seat] > 0 || (other >= 0 && !movable_set[other])) continue;
+                accepted = other < 0 ? attempt({p}, {seat}) : attempt({p, other}, {seat, old});
+                if (accepted) { if (other < 0) ++diagnostics.one_opt; else ++diagnostics.swaps; break; }
+            }
+            if (accepted) break;
+        }
+        if (!accepted) break;
+    }
+    const int cycle_cap = std::max(4, problem.rich.local_search_cycle_candidate_cap);
+    while (!expired()) {
+        bool accepted = false;
+        for (int first : movable) {
+            if (expired()) break;
+            for (int i = 0; i < std::min(cycle_cap, static_cast<int>(rankings[first].size())); ++i) {
+                const int second = state.seat_to_passenger[rankings[first][i]];
+                if (second < 0 || second == first || !movable_set[second]) continue;
+                for (int j = 0; j < std::min(cycle_cap, static_cast<int>(rankings[second].size())); ++j) {
+                    if (expired()) break;
+                    const int third = state.seat_to_passenger[rankings[second][j]];
+                    if (third < 0 || third == first || third == second || !movable_set[third]) continue;
+                    accepted = attempt({first, second, third}, {state.passenger_to_seat[second],
+                        state.passenger_to_seat[third], state.passenger_to_seat[first]});
+                    if (accepted) { ++diagnostics.cycles; break; }
+                }
+                if (accepted) break;
+            }
+            if (accepted) break;
+        }
+        if (!accepted) break;
+    }
+    return diagnostics;
+}
+
 }  // namespace full_cpp

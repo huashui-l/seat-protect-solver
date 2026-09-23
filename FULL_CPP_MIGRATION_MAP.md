@@ -23,8 +23,8 @@ Status meanings are literal: `FULL_CPP` means native semantics exist; `PARTIAL_C
 | scoring | complete independent/incremental score | native full-assignment score with Formal24 parity | FULL_CPP | indirect | ACTIVE |
 | group matching | exact bitmask matching | bounded two-group bitmask matching over the current occupied seat union | PARTIAL_CPP | no | ACTIVE |
 | multi-group rebuild/LNS | conflict LNS and pattern MIPs | restricted RR master only | PARTIAL_CPP | master only | ACTIVE |
-| 1-opt / 2-swap | VND | native strict-improvement moves with shared deadline and full validator | PARTIAL_CPP | no | ACTIVE |
-| 3-cycle | VND explicit cycle | native strict-improvement cycles with shared deadline and full validator | PARTIAL_CPP | no | ACTIVE |
+| 1-opt / 2-swap | VND | stateful Python-ordered move/swap prefix differential passed; production still uses earlier approximate VND | PARTIAL_CPP | no | ACTIVE |
+| 3-cycle | VND explicit cycle | stateful Python-ordered cycle prefix differential passed; production integration pending | PARTIAL_CPP | no | ACTIVE |
 | caregiver rebuild | VND joint rebuild | native caregiver-pair rescue exists in repair; full VND caregiver joint rebuild remains Python-only | PARTIAL_CPP | no | ACTIVE |
 | RR/search generation | separate orchestration | native task/Beam/commit/deadline | FULL_CPP | yes | Rich INACTIVE |
 | simulated annealing | none active | none | DEAD/UNUSED | no | Rich INACTIVE |

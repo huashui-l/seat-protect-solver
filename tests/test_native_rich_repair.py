@@ -24,7 +24,7 @@ class NativeRichRepairTests(unittest.TestCase):
         cls.cases = materialize_cases()
 
     def replay(self, case, initial, rankings, node_limit=20000, expected_orphan_count=0, construct_algorithm=None,
-               paired_algorithm=None, rescue_algorithm=None):
+               paired_algorithm=None, rescue_algorithm=None, vnd_algorithm=None):
         config = copy.deepcopy(self.config)
         config["algorithm"].update(final_repair_node_limit=node_limit, final_repair_time_limit=10.0)
         if construct_algorithm is not None:
@@ -33,6 +33,8 @@ class NativeRichRepairTests(unittest.TestCase):
             config["algorithm"].update(paired_algorithm)
         if rescue_algorithm is not None:
             config["algorithm"].update(rescue_algorithm)
+        if vnd_algorithm is not None:
+            config["algorithm"].update(vnd_algorithm)
         config["input_contract"] = {"seatmaps_by_direction": {
             "public-test": {"old": "old.json", "new": "new.json"}}}
         seats_data = case["newSeatmapData"]["seats"]
@@ -54,7 +56,12 @@ class NativeRichRepairTests(unittest.TestCase):
                                                          chosen_block=block[0] if block else None))
             ordered = {(group, p.hostnum): [seats[s] for s in row]
                        for (group, p), row in zip(passengers, rankings)}
-            if construct_algorithm is not None or paired_algorithm is not None or rescue_algorithm is not None:
+            if vnd_algorithm is not None:
+                from tests.test_native_rich_vnd import python_vnd_prefix
+                expected = python_vnd_prefix()(seats_data, case["oldSeatmapData"]["seats"],
+                    case["groupsData"], groups, context, ordered, config["weights"], config,
+                    rich.time.perf_counter() + 60.0)
+            elif construct_algorithm is not None or paired_algorithm is not None or rescue_algorithm is not None:
                 values = {sid: rich.calc_seat_value(seat, config) for sid, seat in seats.items()}
                 owners = {p.old_seat_num: (g, p.hostnum) for g, p in passengers if p.old_seat_num in rich._OLD_SEATS}
                 rich._OLD_SEAT_OWNER_REGRET = rich.compute_old_seat_owner_regret(
@@ -81,7 +88,7 @@ class NativeRichRepairTests(unittest.TestCase):
                 "replay.json": {"assignments": initial, "rankings": rankings,
                                 "construct_remaining": construct_algorithm is not None,
                                 "paired_ssrs": paired_algorithm is not None,
-                                "paired_rescue": rescue_algorithm is not None},
+                                "paired_rescue": rescue_algorithm is not None, "vnd_prefix": vnd_algorithm is not None},
             }.items():
                 (work / name).write_text(json.dumps(data), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
@@ -104,6 +111,11 @@ class NativeRichRepairTests(unittest.TestCase):
                     self.assertEqual(actual["rescue"][name], [list(key) for key in expected[name]], name)
                     self.assertEqual(len(actual["rescue"][name]), expected[name + "_count"])
                 self.assertEqual(actual["rescue"]["joint_rebuilds"], expected.get("joint_rebuilds", 0))
+            if vnd_algorithm is not None:
+                fields = ()
+                for name in ("passes", "evaluated_moves", "accepted_moves", "stopped_by_deadline"):
+                    self.assertEqual(actual["vnd"][name], expected[name], name)
+                self.assertAlmostEqual(actual["vnd"]["score_improvement"], expected["score_improvement"], places=8)
             for name in fields:
                 self.assertEqual(actual[name], expected[name], name)
         return actual

@@ -95,6 +95,7 @@ struct RichConstructionConfig {
     int final_repair_node_limit = 20000;
     double final_repair_time_limit = 2.0;
     int local_search_candidate_cap = 32;
+    double local_search_epsilon = 1e-9;
     int local_search_cycle_candidate_cap = 12;
     int local_search_related_candidate_cap = 64;
     int local_search_related_group_cap = 8;

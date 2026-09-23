@@ -384,6 +384,35 @@ Release build and the full native/state-replay-enabled suite passed: 96 tests,
 13,166 subtests, 9 skips. The two existing conversion warnings remain. No Formal24
 checkpoint or performance experiment was run.
 
+The native `improve_rich_ordinary_vnd` now implements the ordinary-move prefix
+of frozen `improve_assignment_with_safe_neighborhoods`: frozen active-caregiver
+exclusion, stable ascending current passenger-score ordering, interleaved move/
+swap attempts over the supplied frozen candidate lists, first-improvement restarts,
+and then the separate three-cycle phase. Candidate caps have Python's minimum
+of four; configured epsilon, evaluated/accepted counters and accumulated delta
+are retained. Transactions use real AssignmentState occupancy/protection/SSR
+state and snapshot rollback. The ordinary prefix does not move protected/cared/
+SSR/fixed/active-caregiver passengers. Infant positions stay frozen for its scores.
+
+The differential oracle compiles the actual Python VND function prefix through
+three-cycles, stopping before `keys_by_group` and later rebuilds. Public test entry
+states come from actual frozen construction, including its protection choices,
+rather than missing referenceAssignments fields. Twenty-two fixture/order runs
+plus two cap/epsilon/multiple-preference scenarios match assignments, protection
+resources, passes, evaluated/accepted moves and score improvement. Coverage asserts
+actual accepted move, swap and cycle paths (observed 3 moves in the synthetic
+scenario, 18 swaps and 1 cycle across public scenarios).
+
+This new stateful prefix is exposed through the existing probe but does not yet
+replace the production approximate VND. Exact small-group matching, related-group
+rebuild, caregiver rebuild and the remaining Python phase order must be integrated
+before declaring complete VND parity. The production path still uses its earlier
+approximate moves/rebuild and does not capture VND protection state into elites.
+No full-VND or Formal24 quality claim follows from prefix parity.
+Final Release rebuild passed; the native/state-replay-enabled full suite passed
+98 tests, 13,190 subtests and 9 skips. Only the two existing conversion warnings
+remain. No Formal24 checkpoint or profiling was run.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`
