@@ -236,6 +236,20 @@ int main(int argc, char** argv) {
                 std::cout << ",\"assignment_order\":"; ints(snapshot.assignment_order);
                 std::cout << '}';
             };
+            if (const auto* mode = input->find("restricted_mip"); mode && mode->bool_or()) {
+                full_cpp::RichEliteStore elite;
+                for (const auto& entry : patterns)
+                    elite.insert_relocation(entry.first, entry.second, [&]() { return entry.second.local_score; });
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(input->at("deadline_seconds").number));
+                const auto stats = full_cpp::improve_rich_restricted_mip(problem, state, elite, deadline);
+                std::cout << std::setprecision(17) << "],\"diagnostics\":";
+                full_cpp::write_rich_restricted_diagnostics(std::cout, stats);
+                std::cout << ",\"elite\":"; full_cpp::write_rich_elite_store(std::cout, elite);
+                std::cout << ",\"state\":"; write_snapshot(state.save());
+                std::cout << "}\n";
+                return 0;
+            }
             if (const auto* mode = input->find("protected_mip"); mode && mode->bool_or()) {
                 full_cpp::RichEliteStore elite;
                 for (const auto& entry : patterns)

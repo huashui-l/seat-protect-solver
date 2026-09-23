@@ -9,6 +9,27 @@ namespace full_cpp {
 
 struct GroupConstructionResult;
 
+struct RichRestrictedAccepted {
+    int attempt = 0, radius = -1;
+    double score_improvement = 0.0;
+    std::map<int, RichElitePattern> selected_patterns;
+};
+struct RichRestrictedDiagnostics {
+    bool enabled = false, stopped_by_deadline = false, mip_start_supplied = false;
+    bool branching_initialized = false, branching_enabled = false;
+    int patterns = 0, resource_complete_patterns = 0, protected_resource_patterns = 0;
+    int usable_columns = 0, attempts = 0, invalid_candidates = 0, rebuild_failures = 0;
+    int hard_invalid_candidates = 0, nonimproving_candidates = 0, conditional_ssr_rows = 0, accepted = 0;
+    int initial_radius = 0, radius_growth = 0, maximum_radius = 0;
+    double score_improvement = 0.0, seconds = 0.0;
+    std::string solver_status, reason;
+    std::vector<int> radius_history;
+    std::vector<RichRestrictedAccepted> accepted_attempts;
+};
+RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, AssignmentState& state,
+    const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline);
+void write_rich_restricted_diagnostics(std::ostream& output, const RichRestrictedDiagnostics& diagnostics);
+
 struct RichLnsAcceptedComponent {
     std::vector<int> groups;
     double delta = 0.0, best_score = 0.0;

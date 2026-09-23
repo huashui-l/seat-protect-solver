@@ -1193,6 +1193,38 @@ no remaining observed failure is unresolved. `git diff --check` passed.
 No Formal24, profiling or 5-second compression run was made. Rich restricted
 MIP/local branching, final audit and the full quality gate remain outstanding.
 
+### Rich restricted MIP and local branching component
+
+Native restricted MIP now consumes the complete Rich elite store. Group and seat
+rows use sorted IDs, columns preserve elite insertion order, occupied and blocked
+resources share capacity rows, and current group signatures identify the sparse
+MIP start. Local branching retains its frozen incumbent column set, grows its
+radius across attempts, and is disabled by any structured global value-block
+source. Each selected combination receives a no-good row; conditional SSR pair
+rows are added only after failed reconstruction. Changed groups alone are rebuilt
+and accepted using lexicographic legality/completeness/soft-score quality.
+
+Differential runs the actual frozen Python function on eleven public fixtures
+and controlled cases for branching floors/disable, disabled and expired entry,
+empty elite store, global value-block source, conditional SSR cuts and fixed-seat
+rejection. It compares all non-time diagnostics, accepted pattern provenance,
+final assignment, protected resources, insertion order and unchanged elite store.
+Entry contexts in these tests are complete and legal, matching production's
+existing entry gate. The native validator folds missing passengers into its
+violation count, so arbitrary incomplete-entry quality ordering has not been
+claimed equivalent. That distinction does not change complete legal entry's
+acceptance of only complete legal improvements.
+
+The function is not yet connected to the production restricted stage; the legacy
+RR master remains the production consumer. Stage deadline/carry integration,
+final diagnostics audit and Formal24 parity remain outstanding.
+
+Validation: Release /O2 build passed with two existing conversion warnings.
+Restricted differential passed 3 tests and 18 subtests, with nonzero acceptance,
+conditional cuts, rebuild failures and hard-invalid rejections asserted. Full
+native/state-replay-enabled regression passed 156 tests and 37,217 subtests with
+9 skips. `git diff --check` passed. No Formal24 or profiling run was made.
+
 ## Correctness
 
 - Rich Python Formal24 complete: `24/24`

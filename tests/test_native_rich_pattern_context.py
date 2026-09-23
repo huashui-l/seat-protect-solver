@@ -91,7 +91,7 @@ class NativeRichPatternContextTests(unittest.TestCase):
             with self.subTest(case=case["id"], component=component): self.assertEqual(native, python)
         return actual
 
-    def protected_replay(self, case, algorithm, variant="active", initial_override=None, extra_patterns=(), stage=False, special=False):
+    def protected_replay(self, case, algorithm, variant="active", initial_override=None, extra_patterns=(), stage=False, special=False, restricted=False, empty_elite=False, global_source=False):
         config = copy.deepcopy(self.config)
         config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
             construction_time_budget=60.0, small_group_dfs_time_limit=20.0,
@@ -137,10 +137,17 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 captured["record_elite_pattern"](gid, tuple(((gid, host), seat) for host, seat in assignments),
                     scorer.components(proposal, {gid})["total_soft_score"], "fixture", dict(blocked), False)
             elite = captured["elite_pattern_store"]
+            if empty_elite: elite.clear()
+            if global_source:
+                for entries in elite.values():
+                    for pattern in entries.values(): pattern["source"] = "structured_global_value_block"
             patterns = [dict(group_id=gid, **pattern) for gid, entries in elite.items() for pattern in entries.values()]
             duration = -1.0 if variant == "expired" else 120.0
             initial_score = scorer.components(context.assigned_seats)["total_soft_score"]
-            if stage:
+            if restricted:
+                expected = rich.improve_with_restricted_pattern_mip(case["newSeatmapData"]["seats"], case["groupsData"], groups,
+                    context, elite, scorer, config, rich.time.perf_counter() + duration)
+            elif stage:
                 tree = ast.parse((ROOT / "src/heuristic_seat_allocator.py").read_text(encoding="utf-8"))
                 function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_run_allocation_single_cabin")
                 def assignment_index(name):
@@ -170,7 +177,7 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 "case.json": {"caseId": case["id"], "direction": "public-test", "groups": case["groupsData"]},
                 "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config,
                 "replay.json": {"pattern_context": dict(protected_mip=True, initial=initial, patterns=patterns,
-                                                          pairs=[], deadline_seconds=duration, protected_stage=stage, special_enabled=special)},
+                                                          pairs=[], deadline_seconds=duration, protected_stage=stage, special_enabled=special, restricted_mip=restricted)},
             }.items():
                 (work / name).write_text(json.dumps(value), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
@@ -191,10 +198,15 @@ class NativeRichPatternContextTests(unittest.TestCase):
         native_d = actual["diagnostics"]
         native_d.pop("seconds"); expected.pop("seconds")
         self.assertAlmostEqual(native_d.pop("score_improvement"), expected.pop("score_improvement"), places=8)
-        self.assertEqual(len(native_d["accepted_components"]), len(expected["accepted_components"]))
-        for a, b in zip(native_d["accepted_components"], expected["accepted_components"]):
-            a.pop("elapsed_seconds"); b.pop("elapsed_seconds")
-            self.assertAlmostEqual(a.pop("delta"), b.pop("delta"), places=8)
+        if restricted:
+            self.assertEqual(len(native_d["accepted_attempts"]), len(expected["accepted_attempts"]))
+            for a, b in zip(native_d["accepted_attempts"], expected["accepted_attempts"]):
+                self.assertAlmostEqual(a.pop("score_improvement"), b.pop("score_improvement"), places=8)
+        else:
+            self.assertEqual(len(native_d["accepted_components"]), len(expected["accepted_components"]))
+            for a, b in zip(native_d["accepted_components"], expected["accepted_components"]):
+                a.pop("elapsed_seconds"); b.pop("elapsed_seconds")
+                self.assertAlmostEqual(a.pop("delta"), b.pop("delta"), places=8)
         self.assertEqual(native_d, json.loads(json.dumps(expected)))
         expected_elite = json.loads(json.dumps(expected_elite))
         self.assertEqual(actual["elite"].keys(), expected_elite.keys())
@@ -205,6 +217,47 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 self.assertAlmostEqual(a.pop("local_score"), b.pop("local_score"), places=8)
                 self.assertEqual(a, b)
         return actual
+
+    def test_rich_restricted_master_matches_frozen_function(self):
+        attempts = accepted = 0
+        for case in self.cases[:11]:
+            with self.subTest(case=case["id"]):
+                result = self.protected_replay(case, {}, restricted=True)
+                attempts += result["diagnostics"]["attempts"]
+                accepted += result["diagnostics"]["accepted"]
+        self.assertGreater(attempts, 0)
+        self.assertGreater(accepted, 0)
+
+    def test_rich_restricted_branching_and_early_returns(self):
+        case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),
+                               (10, {"oldSeat": {"seatNum": "2A", "seatValue": ""}})])
+        for algorithm, variant in [({}, "active"), ({"enable_pattern_local_branching": False}, "active"),
+            ({"pattern_local_branching_initial_radius": 0, "pattern_local_branching_radius_growth": 0,
+              "pattern_local_branching_max_radius": 0, "restricted_pattern_mip_attempts": 5}, "active"),
+            ({"enable_restricted_pattern_mip": False}, "active"), ({}, "expired")]:
+            with self.subTest(algorithm=algorithm, variant=variant):
+                self.protected_replay(case, algorithm, variant, initial_override=[[0, "3A"], [1, "4A"]],
+                    extra_patterns=[(20, [(1, "1A")], []), (10, [(1, "2A")], [])], restricted=True)
+        for empty, global_source in ((True, False), (False, True)):
+            result = self.protected_replay(case, {}, initial_override=[[0, "3A"], [1, "4A"]],
+                extra_patterns=[(20, [(1, "1A")], []), (10, [(1, "2A")], [])],
+                restricted=True, empty_elite=empty, global_source=global_source)
+            if empty: self.assertEqual(result["diagnostics"]["reason"], "no_usable_patterns")
+            else: self.assertFalse(result["diagnostics"]["local_branching"]["enabled"])
+
+    def test_rich_restricted_conditional_cuts_and_fixed_rejection(self):
+        for fixed in (False, True):
+            with self.subTest(fixed=fixed):
+                protected = {"ssr": "TEST_A", "oldSeat": {"seatNum": "1B", "seatValue": ""},
+                             "mandatoryRule": {"needSingleSideEmpty": "Y", "sameRowNoOtherSSR": "Y"}}
+                if fixed: protected["newSeat"] = {"seatNum": "3B"}
+                case = self.synthetic([(20, protected), (10, {"ssr": "TEST_A", "oldSeat": {"seatNum": "1D", "seatValue": ""}})])
+                result = self.protected_replay(case, {"restricted_pattern_mip_attempts": 6},
+                    initial_override=[[0, "3B", "3A"], [1, "1B"]], extra_patterns=[
+                        (20, [(1, "1B")], [(1, ["1A"])]), (10, [(1, "1D")], []), (10, [(1, "2A")], [])], restricted=True)
+                self.assertGreater(result["diagnostics"]["conditional_ssr_rows"], 0)
+                self.assertGreater(result["diagnostics"]["rebuild_failures"], 0)
+                if fixed: self.assertGreater(result["diagnostics"]["hard_invalid_candidates"], 0)
 
     def test_production_protected_and_special_wrappers_match_frozen_pass_loop(self):
         for case in self.cases[:11]:
