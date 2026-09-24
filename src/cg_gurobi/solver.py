@@ -212,6 +212,8 @@ def solve_single_cabin(
     integer_reserve = min(float(cfg["integer_time_limit"]), 0.15 * budget)
     cg_deadline = deadline - integer_reserve
     it = 0
+    root_certified_seconds: Optional[float] = None
+    proven_seconds: Optional[float] = None
     escalation = 1.0
     alpha = float(cfg["dual_smoothing_alpha"])
     center = None
@@ -310,6 +312,7 @@ def solve_single_cabin(
                 else:
                     exact_lp_cost = lp_cost
                     termination = "lp_optimal"
+                    root_certified_seconds = time.perf_counter() - started
                 break
             # 没有新列但有组在时限内未闭合：只要还有时间就放大定价时限重试。
             escalation *= 2.0
@@ -405,10 +408,13 @@ def solve_single_cabin(
             selected, int_cost = bp["incumbent"], bp["incumbent_cost"]
             int_status = "branch_and_price"
         proven_optimal = bool(bp["proven"])
+        if proven_optimal:
+            proven_seconds = time.perf_counter() - started
         _log(log, f"branch-and-price: proven={bp['proven']} nodes={bp['stats']['nodes']} open={bp['open_nodes']} "
                   f"incumbent_cost={bp['incumbent_cost']:.4f} global_lb={bp['global_cost_lower_bound']:.4f}")
     elif exact_lp_cost is not None and selected is not None and int_cost is not None and int_cost <= exact_lp_cost + TOL:
         proven_optimal = True
+        proven_seconds = time.perf_counter() - started
     if selected:
         ok, _ = _validate(selected)
         if not ok:
@@ -441,6 +447,9 @@ def solve_single_cabin(
         "violation_detail": detail,
         "integer_status": int_status,
         "proven_optimal": proven_optimal,
+        "root_certified_seconds": root_certified_seconds,
+        "proven_seconds": proven_seconds,
+        "lp_trajectory": [(round(i["elapsed"], 2), -i["rmp_cost"]) for i in iterations if i["phase"] == 2],
         "bp_bound": (-bp["global_cost_lower_bound"]) if bp is not None else lp_bound,
         "bp_bound_certified": (bp["all_certified"] if bp is not None else lp_bound is not None),
         "branch_and_price": (bp["stats"] | {"open_nodes": bp["open_nodes"], "proven": bp["proven"]}) if bp is not None else None,
@@ -509,10 +518,16 @@ def solve(
         if safe_ok else None
     )
     bp_ok = all(r.get("bp_bound") is not None and r.get("bp_bound_certified") for r in per_cabin.values())
+    root_ok = all(r.get("root_certified_seconds") is not None for r in per_cabin.values())
+    root_certified_seconds = sum(r["root_certified_seconds"] for r in per_cabin.values()) if root_ok else None
+    proven_ok = all(r.get("proven_seconds") is not None for r in per_cabin.values())
+    proven_seconds = sum(r["proven_seconds"] for r in per_cabin.values()) if proven_ok else None
     bp_bound = sum(r["bp_bound"] for r in per_cabin.values()) if bp_ok else None
     return {
         "status": "infeasible" if infeasible else ("complete" if complete else "incomplete"),
         "proven_optimal": complete and all(bool(r.get("proven_optimal")) for r in per_cabin.values()),
+        "root_certified_seconds": root_certified_seconds,
+        "proven_seconds": proven_seconds,
         "bp_bound": bp_bound,
         "assigned_seats": assigned,
         "total_score": None if infeasible else soft,

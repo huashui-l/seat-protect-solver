@@ -49,9 +49,15 @@ def run_legacy(new, old, groups, cfg, seconds):
     r, _ = legacy.run_column_generation(new, old, groups, c["weights"], c)
     m = _metrics(new, old, groups, r["assigned_seats"], c["weights"], c)
     d = r["diagnostics"]
+    traj = {}
+    for cab, tr in (d.get("root_cg_trajectory_by_cabin") or {}).items():
+        traj[cab] = [(round(float(x.get("elapsed_seconds", 0)), 2), x.get("restricted_master_score_estimate"), x.get("incumbent_score")) for x in tr]
+    wall = time.perf_counter() - t
     m.update({"U": d.get("complete_column_space_lp_bound"), "U_cert": bool(d.get("complete_column_space_lp_bound_certified")),
               "safeU": d.get("safe_column_space_lp_bound"), "proven": d.get("proven_optimal"),
-              "time": time.perf_counter() - t}); return m
+              "root_seconds": d.get("root_cg_elapsed_seconds") if d.get("complete_column_space_lp_bound_certified") else None,
+              "proven_seconds": wall if d.get("proven_optimal") else None,
+              "trajectory": traj, "time": wall}); return m
 
 
 CG_OPTIONS: dict = {}
@@ -64,9 +70,11 @@ def run_new(new, old, groups, cfg, seconds):
     t = time.perf_counter()
     r = solve(new, old, groups, c["weights"], c)
     m = _metrics(new, old, groups, r["assigned_seats"], c["weights"], c)
+    traj = {cab: v.get("lp_trajectory", []) for cab, v in r.get("cabins", {}).items()}
     m.update({"U": r["lp_bound"], "U_cert": bool(r["lp_bound_certified"]), "safeU": r["safe_bound"],
               "proven": bool(r.get("proven_optimal")), "bpU": r.get("bp_bound"),
-              "time": time.perf_counter() - t}); return m
+              "root_seconds": r.get("root_certified_seconds"), "proven_seconds": r.get("proven_seconds"),
+              "trajectory": traj, "time": time.perf_counter() - t}); return m
 
 
 def main():

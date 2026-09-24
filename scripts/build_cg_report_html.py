@@ -43,6 +43,21 @@ def merge_new(rows, new_rows):
     return rows
 
 
+def merge_methods(rows, other, methods=("legacy", "new")):
+    """用另一轮结果覆盖指定方法列（计时补测：新旧两法重跑，启发式沿用）。"""
+    if not other:
+        return rows
+    by = {r["instance"]: r for r in other}
+    for r in rows:
+        o = by.get(r["instance"])
+        if not o:
+            continue
+        for m in methods:
+            if o.get(m) and "error" not in o[m]:
+                r[m] = o[m]
+    return rows
+
+
 def bound_of(m):
     if m.get("bpU") is not None and m.get("proven"):
         return m["bpU"], "proven"
@@ -187,6 +202,106 @@ def result_table(rows, ref=None, prefix=""):
     return head + "".join(body) + "</tbody></table></div>"
 
 
+def timing_table(rows_list):
+    """精确方法的时间指标：根 LP 认证用时 / 证明最优用时 / 截停时 gap。"""
+    head = ("<div class='tablewrap'><table><thead><tr><th>算例</th>"
+            "<th class='num'>旧：根 LP 认证 s</th><th class='num'>新：根 LP 认证 s</th>"
+            "<th class='num'>旧：证明最优 s</th><th class='num'>新：证明最优 s</th>"
+            "<th class='num'>旧：截停 gap%</th><th class='num'>新：截停 gap%</th></tr></thead><tbody>")
+    body = []
+    agg = {"legacy": {"root": [], "proven": []}, "new": {"root": [], "proven": []}}
+    both_root = []
+    for title, rows in rows_list:
+        body.append(f"<tr><td colspan='7' class='muted small'>{esc(title)}</td></tr>")
+        for r in rows:
+            o, n = r.get("legacy"), r.get("new")
+            if not o or not n or "error" in o or "error" in n:
+                continue
+            def cell_t(x, key):
+                v = x.get(key)
+                return "—" if v is None else f"{v:.0f}"
+            def gap(x):
+                if x.get("proven"): return "0（已证明）"
+                b, _ = bound_of(x)
+                return "—" if b is None else f"{100*(b-x['score'])/max(1,abs(x['score'])):.2f}"
+            for m in ("legacy", "new"):
+                x = r[m]
+                if x.get("root_seconds") is not None: agg[m]["root"].append(x["root_seconds"])
+                if x.get("proven_seconds") is not None: agg[m]["proven"].append(x["proven_seconds"])
+            if o.get("root_seconds") is not None and n.get("root_seconds") is not None:
+                both_root.append((o["root_seconds"], n["root_seconds"]))
+            name = r["instance"].replace("_groups", "")
+            body.append(f"<tr><td class='name'>{esc(name)}</td><td class='num'>{cell_t(o,'root_seconds')}</td><td class='num'>{cell_t(n,'root_seconds')}</td>"
+                        f"<td class='num'>{cell_t(o,'proven_seconds')}</td><td class='num'>{cell_t(n,'proven_seconds')}</td>"
+                        f"<td class='num'>{gap(o)}</td><td class='num'>{gap(n)}</td></tr>")
+    summ = []
+    for m, lab in (("legacy", "旧"), ("new", "新")):
+        r_, p_ = agg[m]["root"], agg[m]["proven"]
+        summ.append(f"{lab}：根 LP 认证 {len(r_)} 例（中位 {statistics.median(r_):.0f} s）" if r_ else f"{lab}：根 LP 认证 0 例")
+        summ.append(f"证明最优 {len(p_)} 例（中位 {statistics.median(p_):.0f} s）" if p_ else "证明最优 0 例")
+    if both_root:
+        faster = sum(1 for a, b in both_root if b < a - 1e-6)
+        summ.append(f"两法都认证的 {len(both_root)} 例中新方法更快 {faster} 例，用时比中位 {statistics.median([b/max(a,1e-9) for a, b in both_root]):.2f}")
+    return "<p class='small'>" + "；".join(summ) + "。</p>" + head + "".join(body) + "</tbody></table></div>"
+
+
+def convergence_charts(rows, picks):
+    """LP 界（分数口径）随时间的收敛曲线：旧（含 incumbent）与新。"""
+    out = []
+    by = {r["instance"].replace("_groups", ""): r for r in rows}
+    for name in picks:
+        r = by.get(name)
+        if not r or not r.get("legacy") or not r.get("new"):
+            continue
+        series = []
+        for m, lab, cls in (("legacy", "旧 LP 界", "s-legacy"), ("new", "新 LP 界", "s-new")):
+            traj = r[m].get("trajectory") or {}
+            pts = []
+            offset = 0.0
+            for cab, tr in traj.items():   # 舱位顺序运行：时间累加
+                cab_pts = []
+                for t in tr:
+                    el, bound = float(t[0]), t[1]
+                    if bound is None: continue
+                    cab_pts.append((offset + el, float(bound)))
+                if cab_pts:
+                    offset = cab_pts[-1][0]
+                    pts.extend(cab_pts)
+            if len(pts) >= 2:
+                series.append((lab, cls, pts))
+        finals = [(LABEL[m], r[m]["score"]) for m in ("legacy", "new")]
+        if not series:
+            continue
+        xs = [x for _, _, pts in series for x, _ in pts]; ys = [y for _, _, pts in series for _, y in pts] + [v for _, v in finals]
+        x0, x1 = 0.0, max(xs) * 1.05 or 1.0
+        y0, y1 = min(ys), max(ys)
+        pad = (y1 - y0) * 0.08 or 1.0; y0 -= pad; y1 += pad
+        W, H, L, Bm, T, R = 720, 260, 70, 34, 16, 20
+        def X(x): return L + (x - x0) / (x1 - x0) * (W - L - R)
+        def Y(y): return T + (y1 - y) / (y1 - y0) * (H - T - Bm)
+        svg = [f"<svg class='chart' viewBox='0 0 {W} {H}' role='img' aria-label='{esc(name)} 收敛曲线'>"]
+        for k in range(5):
+            yv = y0 + (y1 - y0) * k / 4
+            svg.append(f"<line x1='{L}' y1='{Y(yv):.1f}' x2='{W-R}' y2='{Y(yv):.1f}' class='grid'/>")
+            svg.append(f"<text x='{L-6}' y='{Y(yv)+4:.1f}' class='lbl' text-anchor='end'>{yv:,.0f}</text>")
+        for k in range(6):
+            xv = x0 + (x1 - x0) * k / 5
+            svg.append(f"<text x='{X(xv):.1f}' y='{H-10}' class='lbl' text-anchor='middle'>{xv:.0f}s</text>")
+        for lab, cls, pts in series:
+            d = " ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in pts)
+            svg.append(f"<polyline points='{d}' class='{cls}' fill='none'/>")
+            lx, ly = pts[-1]
+            svg.append(f"<circle cx='{X(lx):.1f}' cy='{Y(ly):.1f}' r='3' class='{cls}-dot'/>")
+        for i, (lab, v) in enumerate(finals):
+            cls = "s-legacy" if i == 0 else "s-new"
+            svg.append(f"<line x1='{L}' y1='{Y(v):.1f}' x2='{W-R}' y2='{Y(v):.1f}' class='{cls} dashed'/>")
+        svg.append(f"<text x='{L}' y='{T-4}' class='lbl'>{esc(name)}　实线：LP 界随时间；虚线：150 s 时的整数解</text>")
+        svg.append("</svg>")
+        out.append("".join(svg))
+    legend = "<p class='legend'><span class='sw s-legacy'></span> 旧列生成　<span class='sw s-new'></span> 新列生成　（纵轴为分数口径，越高越好；LP 界从上方逼近，整数解在下方）</p>"
+    return (legend + "".join(out)) if out else "<p class='muted'>暂无轨迹数据。</p>"
+
+
 def section(title, rows, ref=None, prefix="", note=""):
     if not rows:
         return f"<section><h3>{esc(title)}</h3><p class='muted'>尚未完成。</p></section>"
@@ -228,8 +343,9 @@ def _conclusion_scale(f24f, f24r, ref):
 def main():
     ref = rich_reference()
     fx = merge_new(load("fixtures.json") or [], load("fixtures_new_final.json"))
-    f24f = load("formal24_forward.json") or []
-    f24r = load("formal24_reverse.json") or []
+    f24f = merge_methods(load("formal24_forward.json") or [], load("formal24_forward_timing.json"))
+    f24r = merge_methods(load("formal24_reverse.json") or [], load("formal24_reverse_timing.json"))
+    timing_available = bool(load("formal24_forward_timing.json"))
 
     # 总览数字（Formal24 优先）
     all_rows = [("Formal24 正向", f24f, "forward:"), ("Formal24 反向", f24r, "reverse:")]
@@ -285,6 +401,10 @@ svg .axis{stroke:var(--line);stroke-width:1}
 svg .lbl{font-family:var(--mono);font-size:11px;fill:var(--muted)}
 svg .val{font-family:var(--mono);font-size:11px;fill:var(--ink-2)}
 svg .mark{font-size:13px}svg .k-proven{fill:var(--green)}svg .k-exact{fill:var(--accent)}svg .k-safe{fill:var(--amber)}svg .k-none{fill:var(--muted)}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .s-legacy{stroke:var(--amber);stroke-width:1.8}svg .s-new{stroke:var(--accent);stroke-width:1.8}
+svg .s-legacy-dot{fill:var(--amber)}svg .s-new-dot{fill:var(--accent)}svg .dashed{stroke-dasharray:4 4;stroke-width:1.2}
+.sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:4px}.sw.s-legacy{background:var(--amber)}.sw.s-new{background:var(--accent)}
 svg .bar-pos{fill:var(--accent)}svg .bar-neg{fill:var(--amber)}svg .bar-zero{fill:var(--line)}
 .legend{font-size:12.5px;color:var(--muted);margin:0 0 8px}
 .callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;margin:14px 0;max-width:80ch}
@@ -329,7 +449,7 @@ a{color:var(--accent)}
 </header>
 <nav class="toc">
   <a href="#s0">总览</a><a href="#s1">为什么重做</a><a href="#s2">建模</a><a href="#s3">算法流程</a><a href="#s4">正确性验证</a><a href="#s5">实验设计</a>
-  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#r3">公开验证集</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a>
+  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#r3">公开验证集</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a>
 </nav>
 <main>
 <section id="s0"><h2>总览</h2>{overview_html}
@@ -395,6 +515,13 @@ a{color:var(--accent)}
 <section id="r1"><h2>6 · 结果</h2>{section("Formal24 正向（3-4-3 → 3-3，150 s）", f24f, ref, "forward:", "官方语料；附冻结 Rich 60 s 参考与历史最好整数解 I。")}</section>
 <section id="r2">{section("Formal24 反向（3-3 → 3-4-3，150 s）", f24r, ref, "reverse:")}</section>
 <section id="r3">{section("公开验证集（小规模 6–23 人，60 s）", fx)}</section>
+<section id="rt"><h3>求解时间（精确方法）</h3>
+<p>对精确算法，时间要看"多久拿到证书"而不是墙钟：<b>根 LP 认证用时</b>是所有组定价闭合、拿到精确 U 的时刻，反映定价效率；<b>证明最优用时</b>是分支定价前沿清空的时刻；150 s 内两者都没到的算例给出截停时相对自身界的 gap。{"" if timing_available else "<span class='muted'>（计时补测尚未完成，下表为空或不完整。）</span>"}</p>
+{timing_table([("Formal24 正向", f24f), ("Formal24 反向", f24r)])}
+<h4>收敛曲线</h4>
+{convergence_charts(f24f, ["100_normal", "150_normal", "150_edge", "full_stress"])}
+{convergence_charts(f24r, ["100_normal", "150_edge", "full_stress"])}
+</section>
 
 <section id="s6"><h2>7 · 对新实现的对抗式审计与修复</h2>
 <p>5 个维度（硬约束保真、目标一致性、证书有效性、鲁棒性、测试覆盖）各由一名独立审计者阅读代码并构造反例，25 条原始发现逐条交给 2 名持怀疑立场的核查者尝试驳倒（允许 5 s 内的小实例复现），最后由完整性评审列未覆盖项。结果 22 条成立（均被复现）、3 条被驳回；按根因归并修复如下，并新增 5 个回归测试。</p>

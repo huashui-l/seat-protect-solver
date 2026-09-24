@@ -30,6 +30,19 @@ def rich_reference():
     return ref
 
 
+def merge_methods(rows, other, methods=("legacy", "new")):
+    if not other:
+        return rows
+    by = {r["instance"]: r for r in other}
+    for r in rows:
+        o = by.get(r["instance"])
+        if o:
+            for m in methods:
+                if o.get(m) and "error" not in o[m]:
+                    r[m] = o[m]
+    return rows
+
+
 def merge_new(rows, new_rows):
     """用最终版新方法结果覆盖三方表中的 new 列。"""
     if not new_rows:
@@ -122,14 +135,15 @@ def main():
     sections = []
     sets = [
         ("公开验证集（小规模，6–23 人，60 s）", "fixtures.json", "fixtures_new_final.json", None, ""),
-        ("Formal24 正向（3-4-3→3-3，150 s）", "formal24_forward.json", None, ref, "forward:"),
-        ("Formal24 反向（3-3→3-4-3，150 s）", "formal24_reverse.json", None, ref, "reverse:"),
+        ("Formal24 正向（3-4-3→3-3，150 s）", "formal24_forward.json", "formal24_forward_timing.json", ref, "forward:"),
+        ("Formal24 反向（3-3→3-4-3，150 s）", "formal24_reverse.json", "formal24_reverse_timing.json", ref, "reverse:"),
     ]
     for title, main_json, new_json, r, prefix in sets:
         rows = load(main_json)
         if not rows:
             sections.append(f"## {title}\n\n（尚未完成）\n"); continue
-        rows = merge_new(rows, load(new_json) if new_json else None)
+        other = load(new_json) if new_json else None
+        rows = merge_methods(rows, other) if (new_json and "timing" in new_json) else merge_new(rows, other)
         sections.append(f"## {title}\n\n{summary(rows, r, prefix)}\n\n{table(rows, r, prefix)}\n")
     out = B / "汇总对比.md"
     out.write_text("# 三方对比汇总\n\n" + "\n".join(sections), encoding="utf-8")
