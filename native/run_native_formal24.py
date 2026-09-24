@@ -27,6 +27,27 @@ from src import allocation_evaluator as evaluator
 COMPONENTS = ("score_s", "score_v", "score_p", "score_c", "score_b")
 
 
+def reference_gap_percent(score: float, reference: float) -> float:
+    if not math.isfinite(score) or not math.isfinite(reference):
+        raise ValueError("Gap requires a finite score and reference")
+    return 100.0 * (reference - score) / max(1.0, abs(reference))
+
+
+def gap_statistics(rows: list[dict]) -> dict:
+    gaps = [row["gap_percent"] for row in rows if row["gap_percent"] is not None]
+    if not all(math.isfinite(gap) for gap in gaps):
+        raise ValueError("Gap statistics require finite available gaps")
+    return {
+        "reference_available_count": len(gaps),
+        "reference_unavailable_count": len(rows) - len(gaps),
+        "mean_gap_percent": statistics.mean(gaps) if gaps else None,
+        "median_gap_percent": statistics.median(gaps) if gaps else None,
+        "worst_gap_percent": max(gaps) if gaps else None,
+        **{f"cases_le_{limit}_percent": sum(gap <= limit for gap in gaps) if gaps else None
+           for limit in (1, 2, 5)},
+    }
+
+
 def paired_python_quality(rows: list[dict], tolerance: float = 1e-8) -> dict:
     deltas = [row["delta_vs_python"] for row in rows]
     if not deltas or not all(math.isfinite(delta) for delta in deltas):
@@ -389,10 +410,7 @@ def main() -> None:
             "max_process_wall_seconds": max(row["process_wall_seconds"] for row in rows),
         },
         "quality": {
-            "reference_available_count": 0,
-            "mean_gap_percent": None,
-            "median_gap_percent": None,
-            "worst_gap_percent": None,
+            **gap_statistics(rows),
             "paired_vs_python_60s": paired_python_quality(rows, tolerance),
             "same_60s_budget": args.time_limit == 60,
             "cg_reference_status": "unavailable: no identity-bound CG integer certificate supplied",

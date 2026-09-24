@@ -1,9 +1,31 @@
 import unittest
 
-from native.run_native_formal24 import paired_python_quality, construction_statistic
+from native.run_native_formal24 import (
+    paired_python_quality, construction_statistic, reference_gap_percent, gap_statistics,
+)
 
 
 class NativeFormal24MetricTests(unittest.TestCase):
+    def test_maximization_gap_preserves_negative_improvements_and_small_denominator(self):
+        self.assertEqual(reference_gap_percent(-102, -100), 2.0)
+        self.assertEqual(reference_gap_percent(-99, -100), -1.0)
+        self.assertEqual(reference_gap_percent(-0.02, 0), 2.0)
+        for bad in (float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                reference_gap_percent(-100, bad)
+
+    def test_gap_thresholds_and_missing_references_are_distinct(self):
+        result = gap_statistics([{"gap_percent": gap} for gap in (-1, 1, 2, 5, 6, None)])
+        self.assertEqual(result["reference_available_count"], 5)
+        self.assertEqual(result["reference_unavailable_count"], 1)
+        self.assertEqual(result["mean_gap_percent"], 2.6)
+        self.assertEqual(result["median_gap_percent"], 2)
+        self.assertEqual(result["worst_gap_percent"], 6)
+        self.assertEqual([result[f"cases_le_{i}_percent"] for i in (1, 2, 5)], [2, 3, 4])
+        missing = gap_statistics([{"gap_percent": None}])
+        self.assertIsNone(missing["mean_gap_percent"])
+        self.assertIsNone(missing["cases_le_2_percent"])
+
     def test_cabin_statistics_sum_counts_but_require_all_complete(self):
         result = {"cabin_decomposition": {"cabins": {
             "Business": {"result": {"dfs_nodes": 12, "from_scratch_complete": True}},
