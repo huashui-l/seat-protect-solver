@@ -1,0 +1,15 @@
+{
+  "instance": "forward:full_edge (data/generator_v3_2/d3_official_24cases_2026-09-07/forward/full_edge_groups.json)",
+  "config": {"total_time_limit": 900, "pricing_time_limit": 120, "integer_time_limit": 60, "pricing_workers": 1, "branch_and_price": false},
+  "result": {"status": "complete", "total_score": -1222.4985600029488, "lp_bound": null, "safe_bound": -812.9290505398947, "proven_optimal": false, "hard_violations": 0, "unassigned": 0, "seconds": 900.046},
+  "economy": {"termination": "pricing_not_certified", "columns": 2687, "iterations": 87, "integer_status": "time_limit", "heuristic_score": -1173.5071126345274, "total_score": -1154.6071126345278, "lp_bound": null, "safe_bound": -745.0376031714736},
+  "trajectory_sample": [
+    {"iter": 2, "rmp_cost": 1173.507, "cols": 147, "min_rc": -42.55, "t": 35.8},
+    {"iter": 22, "rmp_cost": 966.356, "cols": 938, "min_rc": -33.40, "t": 68.1},
+    {"iter": 42, "rmp_cost": 891.868, "cols": 1670, "min_rc": -20.92, "t": 96.3},
+    {"iter": 62, "rmp_cost": 860.422, "cols": 2248, "min_rc": -5.00, "t": 350.4},
+    {"iter": 82, "rmp_cost": 841.574, "cols": 2624, "min_rc": -2.83, "t": 788.1},
+    {"iter": 88, "rmp_cost": 839.493, "cols": 2687, "min_rc": null, "t": 834.1, "note": "last round: no new column, but some groups hit the 120 s pricing limit, so not certified"}
+  ],
+  "note": "Recorded from /tmp/diag_full_edge_official.log on 2026-09-24 before the tmp file was cleaned; single-threaded, no branch-and-price."
+}

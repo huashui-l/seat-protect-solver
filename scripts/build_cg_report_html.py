@@ -59,8 +59,8 @@ def merge_methods(rows, other, methods=("legacy", "new")):
 
 
 def bound_of(m):
-    if m.get("bpU") is not None and m.get("proven"):
-        return m["bpU"], "proven"
+    if m.get("proven"):
+        return (m["bpU"] if m.get("bpU") is not None else m["score"]), "proven"
     if m.get("U") is not None:
         return m["U"], "exact"
     if m.get("safeU") is not None:
@@ -231,7 +231,8 @@ def timing_table(rows_list):
             for m in ("legacy", "new"):
                 x = r[m]
                 if x.get("root_seconds") is not None: agg[m]["root"].append(x["root_seconds"])
-                if x.get("proven_seconds") is not None: agg[m]["proven"].append(x["proven_seconds"])
+                pv = x.get("proven_seconds") if x.get("proven_seconds") is not None else (x.get("time") if x.get("proven") else None)
+                if pv is not None: agg[m]["proven"].append(pv)
             if o.get("root_seconds") is not None and n.get("root_seconds") is not None:
                 both_root.append((o["root_seconds"], n["root_seconds"]))
             if o.get("proven") and n.get("proven"):
@@ -243,9 +244,10 @@ def timing_table(rows_list):
                         f"<td class='num'>{cell_t(o,'proven_seconds')}</td><td class='num'>{cell_t(n,'proven_seconds')}</td>"
                         f"<td class='num'>{gap(o)}</td><td class='num'>{gap(n)}</td></tr>")
     summ = []
+    root_cert = {m: sum(1 for _, rows in rows_list for r in rows if r.get(m) and "error" not in r[m] and r[m].get("U") is not None) for m in ("legacy", "new")}
     for m, lab in (("legacy", "旧"), ("new", "新")):
         r_, p_ = agg[m]["root"], agg[m]["proven"]
-        summ.append(f"{lab}：根 LP 认证 {len(r_)} 例（中位 {statistics.median(r_):.0f} s）" if r_ else f"{lab}：根 LP 认证 0 例")
+        summ.append(f"{lab}：拿到精确 U {root_cert[m]} 例" + (f"（有根 LP 认证时刻记录的 {len(r_)} 例中位 {statistics.median(r_):.0f} s）" if r_ else "（旧方法原始运行未记录认证时刻，仅补跑 2 例）" if m == "legacy" else ""))
         summ.append(f"证明最优 {len(p_)} 例（中位 {statistics.median(p_):.0f} s）" if p_ else "证明最优 0 例")
     if both_root:
         faster = sum(1 for a, b in both_root if b < a - 1e-6)
@@ -363,6 +365,16 @@ def convergence_matrix(rows, budget):
 
 
 def section(title, rows, ref=None, prefix="", note="", budget="150 s"):
+    global LABEL
+    saved = dict(LABEL)
+    LABEL = {"heuristic": "启发式 5 s", "legacy": f"旧列生成 {budget}", "new": f"新列生成 {budget}"}
+    try:
+        return _section(title, rows, ref, prefix, note, budget)
+    finally:
+        LABEL = saved
+
+
+def _section(title, rows, ref=None, prefix="", note="", budget="150 s"):
     if not rows:
         return f"<section><h3>{esc(title)}</h3><p class='muted'>尚未完成。</p></section>"
     s = summary_stats(rows, ref, prefix)
@@ -372,21 +384,16 @@ def section(title, rows, ref=None, prefix="", note="", budget="150 s"):
 
 
 def _full_edge_diag_text():
-    p = Path("/tmp/diag_full_edge_official.log")
-    if not p.exists() or "RESULT" not in p.read_text(encoding="utf-8", errors="ignore"):
-        return "（诊断运行中，结果待补。）"
-    txt = p.read_text(encoding="utf-8", errors="ignore")
-    res = json.loads(txt.split("RESULT", 1)[1].splitlines()[0])
-    eco_line = [l for l in txt.splitlines() if l.startswith("ECO")][0]
-    eco = json.loads(eco_line.split("ECO", 1)[1].rsplit(" iters", 1)[0]); iters = int(eco_line.rsplit("iters", 1)[1])
-    its = [l for l in txt.splitlines() if l.startswith("  it")]
-    last = its[-1] if its else ""
-    lp = res.get("lp_bound"); safe = res.get("safe_bound"); score = res.get("total_score")
-    bound = lp if lp is not None else safe
-    gap = f"{100*(bound-score)/abs(score):.1f}%" if (bound is not None and score) else "—"
-    return (f"经济舱 {iters} 轮后 {'根 LP 闭合' if eco.get('termination')=='lp_optimal' else '仍未闭合（' + str(eco.get('termination')) + '）'}，"
-            f"{'精确' if lp is not None else '安全'}上界 {bound:.1f}，整数解 {score:.1f}，整数 gap 约 {gap}；最后一轮：<code>{html.escape(last.strip())}</code>。"
-            f" 与 normal 系列 &lt;1% 的 gap 相比明显偏大。")
+    p = B / "full_edge_official_diag.json"
+    if not p.exists():
+        return "（诊断结果缺失。）"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    res, eco = d["result"], d["economy"]
+    bound = res["lp_bound"] if res["lp_bound"] is not None else res["safe_bound"]
+    gap = 100 * (bound - res["total_score"]) / abs(res["total_score"])
+    return (f"经济舱 {eco['iterations']} 轮、{eco['columns']} 列后根 LP 仍未闭合（部分 8–10 人组的定价在 120 s 内不能证明无负列），"
+            f"安全上界 {bound:.1f}，整数解 {res['total_score']:.1f}，整数 gap 约 {gap:.1f}%；受限主问题成本从第 22 轮的 966 降到第 88 轮的 839，"
+            f"后 500 s 仅下降约 3%。与 normal 系列 &lt;1% 的 gap 相比明显偏大。")
 
 
 def _conclusion_scale(f24f, f24r, ref):
@@ -398,7 +405,8 @@ def _conclusion_scale(f24f, f24r, ref):
         parts.append(f"Formal24 {title}：新方法最好或并列 {s['wins']['new']}/{s['n']}（旧 {s['wins']['legacy']}/{s['n']}），精确 U 新 {s['cert']['new']} / 旧 {s['cert']['legacy']}，"
                      f"证明最优 新 {s['proven']['new']} / 旧 {s['proven']['legacy']}，优于 Rich 60 s {sum(1 for d in s['d_new_rich'] if d > 1e-6)}/{len(s['d_new_rich'])}，"
                      f"优于历史最好 I {sum(1 for d in s['d_new_best'] if d > 1e-6)}/{len(s['d_new_best'])}")
-    return "；".join(parts) + "。小/中规模全面不劣于旧实现且认证更多；full_edge 类（保护空座密集）实例两边均未认证，新方法在该例落后，根因是 LP 松弛弱而非实现缺陷。" if parts else "（待 Formal24 结果）"
+    return "；".join(parts) + ("。反向 12 例新方法全部不劣于旧实现（8 例严格更好）；正向 12 例中 9 例不劣于旧实现，3 例略劣（100_edge −1.0、full_normal −3.2、full_edge −39.4），旧方法在正向 100_stress 48 s 证明最优而新方法未认证。"
+                              "正向 full_edge 是唯一低于历史最好 I 的算例；保护空座密集的满载 edge 例两边均未认证，根因是 LP 松弛弱而非实现缺陷。") if parts else "（待 Formal24 结果）"
 
 
 def main():
@@ -512,7 +520,7 @@ a{color:var(--accent)}
 </header>
 <nav class="toc">
   <a href="#s0">总览</a><a href="#s1">为什么重做</a><a href="#s2">建模</a><a href="#s3">算法流程</a><a href="#s4">正确性验证</a><a href="#s5">实验设计</a>
-  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a><a href="#r3">附录：公开验证集</a><a href="#s7">结论与后续</a>
+  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#r3">附录：公开验证集</a><a href="#s7">结论与后续</a>
 </nav>
 <main>
 <section id="s0"><h2>总览</h2>{overview_html}
@@ -521,8 +529,8 @@ a{color:var(--accent)}
 <section id="s1"><h2>1 · 为什么重做</h2>
 <p>对旧列生成（8100 行、四种定价器调度、HiGHS）的审计用穷举复现了三处高严重度证书缺陷：DFS 在"只找负列"模式下把历史候选的检验数当作域最小值上报（CG-01）；历史候选不受分支域约束（CG-02）；跨对偶搬运界里条件 SSR 标志对偶的键少一维、增量恒为 0（H2）。三者叠加可在零次精确定价下输出 <code>proven_optimal=True</code>。探针还显示调度层在真实数据上退化：标签 DP 从未启用，≥7 人组 DFS 从不闭合却每次先跑满 3–15 s，快速轮与精确轮在同一对偶上哈希级重复。结论：旧实现的 U 与 proven 标记不可信，遂归档旧代码，仅沿用其建模信息，以 Gurobi 从零重写直接定价列生成。</p>
 <h3>1.1 旧列生成的历史记录（2026-08-13 实验说明）</h3>
-<p>当时的正式协议是列生成 3600 s、单次 MP2 120 s、4 组并行。在那一版 24 例语料上：17/24 得到 U，其中仅 3 例为精确 LP 上界、14 例为逐组安全下界修正的安全 U，7 例在 3600 s 内无界；无界的 7 例中最耗时组均为 7–10 人并叠加陪护/SSR/保护空座，单组累计定价时间 1000–3200 s。受控实验显示单组从 8 人到 9 人时 DFS 节点从 6 万跃升到 100 万以上，120 s MP2 时限内不再闭合。启发式 H5 相对列池整数解 I 平均差 14.3%（最大 46.5%），H20 平均差 8.5%。</p>
-<div class="callout warn">这份记录<b>不能</b>与本报告的 Formal24 数字直接对比：其语料是 generator v3.2 之前的版本（每例强制含 10 人组，同名算例分值约为现在的两倍），舱位当时仍是软惩罚项而非硬约束；其 14 例安全 U 来自审计前代码，正是 CG-01 假下界会污染的路径。本报告把它作为"旧路线在长预算下也难以给出可信证书"的背景证据，原文存档于 <code>reports/audit-2026-09-23/参考/</code>。</div></section>
+<p>当时的正式协议是列生成 3600 s、单次 MP2 120 s、4 组并行。在那一版 24 例语料上：17/24 得到 U，其中仅 3 例为精确 LP 上界、14 例为逐组安全下界修正的安全 U，7 例在 3600 s 内无界；无界的 7 例中最耗时组均为 7–10 人，其中 6 例叠加陪护/SSR/保护空座，单组累计定价时间约 995–3237 s。受控实验显示单组从 8 人到 9 人时 DFS 节点从 6 万跃升到 100 万以上，120 s MP2 时限内不再闭合。启发式 H5 相对列池整数解 I 平均差 14.3%（最大 46.5%），H20 平均差 8.5%。</p>
+<div class="callout warn">这份记录<b>不能</b>与本报告的 Formal24 数字直接对比：其语料是 generator v3.2 之前的版本（每例强制含 10 人组，同名算例的分值量级与现在不同，正向 I 值比现在高 0.9–1.8 倍），舱位当时仍是软惩罚项而非硬约束；其 14 例安全 U 来自审计前代码，正是 CG-01 假下界会污染的路径。本报告把它作为"旧路线在长预算下也难以给出可信证书"的背景证据，原文存档于 <code>reports/audit-2026-09-23/参考/</code>。</div></section>
 
 <section id="s2"><h2>2 · 建模</h2>
 <p>全部取自《任务需求、数学模型与实现说明》第 3–6 章，以 <code>allocation_evaluator.py</code> 为业务语义的唯一裁判：距离/价值/属性分、紧凑度、婴儿影响系数都直接调用评估器函数计算，列成本与独立评分逐位一致。</p>
@@ -566,7 +574,7 @@ a{color:var(--accent)}
 <section id="s4"><h2>4 · 正确性验证</h2>
 <ul>
 <li><b>穷举对照</b>（tests/test_cg_gurobi.py）：6 个语义场景（普通组、单双侧保护、陪护+出口排、条件 SSR 隔离、跨组婴儿、固定座位+保护）旅客—座位全排列求全局最优，断言 U ≥ 最优且 I = 最优。</li>
-<li><b>公开验证集 11 例</b>：完整合法、软分与评估器逐位一致、旧实现证明过的 LP 值逐位复现；两个满载算例证明最优（-116.79、-122.025，5 个分支节点对旧实现 279 个）。</li>
+<li><b>公开验证集 11 例</b>：完整合法、软分与评估器逐位一致、旧实现证明过的 LP 值逐位复现；11 例全部证明最优，两个满载算例（-116.79、-122.025）与旧实现的分支定价结果一致。</li>
 <li><b>无效输入</b>：混舱、超容量、非整数 id、固定座位冲突在入口被拒绝；结构不可行（如 CHD 无同组陪护者）由 Phase I 认证并贯通到顶层。</li>
 <li><b>自审计</b>：每次定价 MIP 目标 vs 按主问题系数重算的约化成本；每个整数解列成本之和 vs 评估器软分；不一致即抛错，全程未触发。</li>
 <li><b>对抗式审计</b>：五维度独立审计 + 每条发现两名核查者驳斥 + 完整性评审，见第 6 节。</li>
@@ -574,7 +582,7 @@ a{color:var(--accent)}
 
 <section id="s5"><h2>5 · 实验设计</h2>
 <ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）仅作正确性回归放在附录。两者都是旧实现正式协议使用过的数据，不另加自生成算例。</li>
-<li><b>方法</b>：项目启发式 5 s（V1 生产口径）；旧列生成 150 s（归档版，含其分支定价，4 线程默认）；新列生成 150 s（默认配置，6 定价线程）。</li>
+<li><b>方法</b>：项目启发式 5 s（V1 生产口径）；旧列生成 150 s（归档版，含其分支定价，4 线程默认）；新列生成 150 s（默认配置，6 定价线程）。新方法 24 例全部以审计修复后代码重跑；旧方法沿用首轮结果，仅正向 150_normal、full_normal 为补记根 LP 认证时刻重跑一次，其中 full_normal 重跑未再拿到精确 U（首轮 −970.49，重跑仅安全界 −962.72），说明该例旧方法的收敛处于 150 s 边界，报告按重跑值记录。</li>
 <li><b>指标</b>：完整合法（硬违规/未分配）、软分及 s/v/p/c/b 分项、界与证书类型、相对自身界的 gap、耗时。全部由独立评估器重算；串行运行避免计时干扰。</li></ul>
 <div class="callout warn">口径提醒：新旧列生成都是 150 s，Rich 参考是 60 s 单次运行，启发式是 5 s；跨方法比较看软分与界，不比耗时。相对自身界的 gap 依赖界的紧度，旧实现的安全界在困难例上极松（曾出现 +912 这样的无意义值），其 gap 均值不能当作质量差距。</div></section>
 
@@ -618,7 +626,8 @@ a{color:var(--accent)}
 </main></div>
 """
     diag = _full_edge_diag_text()
-    page = page.replace("{FULL_EDGE_DIAG}", diag).replace("{CONCLUSION_SCALE}", _conclusion_scale(f24f, f24r, ref))
+    concl = _conclusion_scale(f24f, f24r, ref)
+    page = page.replace("{FULL_EDGE_DIAG}", diag).replace("{CONCLUSION_SCALE}", concl)
     OUT.write_text(page, encoding="utf-8")
     print(f"written {OUT} ({OUT.stat().st_size//1024} KB)")
 
