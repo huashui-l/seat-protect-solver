@@ -90,6 +90,8 @@ class Instance:
         self.w_c = float(self.weights.get("w_c", -2.0))
         if self.w_c > 0:
             raise ValueError("紧凑度权重 w_c 必须非正，线性化才是精确的")
+        if float(self.weights.get("w_b", -0.3)) > 0:
+            raise ValueError("婴儿影响权重 w_b 必须非正，单侧线性化 b_uv >= I_u + O_v - 1 才是精确的")
 
         self.groups: List[Group] = []
         self.passengers: Dict[PassengerKey, Passenger] = {}
@@ -105,14 +107,26 @@ class Instance:
         if mixed:
             raise ValueError(f"同行组必须舱位同质，混舱组: {mixed}")
         seen: Set[PassengerKey] = set()
+        seen_gid: Set[int] = set()
         for group in self.groups_data:
-            gid = int(group["groupId"])
+            gid_raw = group.get("groupId")
+            if isinstance(gid_raw, bool) or not isinstance(gid_raw, int):
+                raise ValueError(f"groupId 必须是整数（评估器按原始键匹配）: {gid_raw!r}")
+            gid = gid_raw
+            if gid in seen_gid:
+                raise ValueError(f"重复的 groupId: {gid}")
+            seen_gid.add(gid)
             cabin = evaluator.group_cabin_class(group)
             if cabin is None:
                 raise ValueError(f"同行组缺少唯一有效舱位: groupId={gid}")
             passengers: List[Passenger] = []
             for raw in group.get("psrs", []):
-                key = (gid, int(raw["hostnum"]))
+                host_raw = raw.get("hostnum")
+                if isinstance(host_raw, bool) or not isinstance(host_raw, int):
+                    raise ValueError(f"hostnum 必须是整数（评估器按原始键匹配）: groupId={gid}, hostnum={host_raw!r}")
+                if not isinstance(raw.get("oldSeat", {}) or {}, dict):
+                    raise ValueError(f"oldSeat 必须是对象: groupId={gid}, hostnum={host_raw}")
+                key = (gid, host_raw)
                 if key in seen:
                     raise ValueError(f"重复的 (groupId, hostnum): {key}")
                 seen.add(key)
@@ -126,7 +140,7 @@ class Instance:
                     cross = False
                 fixed = (raw.get("newSeat") or {}).get("seatNum") or None
                 passengers.append(Passenger(
-                    key=key, gid=gid, hostnum=int(raw["hostnum"]), cabin=cabin, ssr=ssr,
+                    key=key, gid=gid, hostnum=host_raw, cabin=cabin, ssr=ssr,
                     rule=rule, fixed_seat=fixed,
                     both_side=mandatory.get("needBothSideEmpty", "N") == "Y",
                     single_side=mandatory.get("needSingleSideEmpty", "N") == "Y",
@@ -145,8 +159,9 @@ class Instance:
         """第 4.10 节：每个舱位的真实旅客 + 固定保护空座需求不得超过该舱目标座位数。"""
         demand: Dict[str, int] = {}
         for p in self.passengers.values():
-            need = 1 + (2 if p.both_side else 0) + (1 if p.single_side and not p.both_side else 0)
-            demand[p.cabin] = demand.get(p.cabin, 0) + need
+            both = 2 if (p.both_side and self.require_two_neighbors) else 0
+            single = 1 if (p.single_side and not p.both_side) else 0
+            demand[p.cabin] = demand.get(p.cabin, 0) + 1 + both + single
         capacity: Dict[str, int] = {}
         for c in self.cabin_of_seat.values():
             capacity[c] = capacity.get(c, 0) + 1
@@ -192,7 +207,7 @@ class Instance:
                     p.raw, self.old_topology, self.topology, sid, self.weights, self.config
                 )
                 p.score[sid] = comp["distance"] + comp["value"] + comp["preference"]
-        # 固定座位互斥
+        # 固定座位互斥，且不得落在另一名固定双侧保护旅客的确定性保护空座上（§4.4）
         owners: Dict[str, PassengerKey] = {}
         for p in self.passengers.values():
             if p.fixed_seat:
@@ -201,6 +216,13 @@ class Instance:
                         f"两名旅客固定到同一座位: {owners[p.fixed_seat]} 与 {p.key} -> {p.fixed_seat}"
                     )
                 owners[p.fixed_seat] = p.key
+        for p in self.passengers.values():
+            if p.fixed_seat and p.both_side:
+                for t in self.both_side_neighbors(p.fixed_seat):
+                    if t in owners:
+                        raise ValueError(
+                            f"固定旅客 {p.key} 的双侧保护空座 {t} 被另一名固定旅客 {owners[t]} 占用"
+                        )
 
     # ------------------------------------------------------------------ 拓扑
     def both_side_neighbors(self, sid: str) -> List[str]:

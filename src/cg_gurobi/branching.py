@@ -1,11 +1,17 @@
-"""分支定价：在根 LP 之上按“同行组 g 是否占用座位 s”二分。
+"""分支定价（最优先搜索）。
 
-- 左子节点：组 g 必须占用 s（该组不含 s 的列禁用；定价加 Σ_p x_ps = 1）；
-- 右子节点：组 g 不得占用 s（该组含 s 的列禁用；定价加 Σ_p x_ps = 0）。
-分支只改变列的上界和定价的临时约束，不重建主问题。每个节点做完整
-列生成直到该节点认证（所有组 Cutoff/Optimal）或时间耗尽；未认证节点
-以其安全界（RMP + Σ min(0, lb_g)）作为节点界，无安全界则不能关闭。
-全局 U = 已关闭/开放节点界的最大值；开放节点为空且全部认证时 proven。
+分支规则分两级：
+1. ('seat', gid, seat, must)：组 g 是否占用座位 s（列级：看 col.occupied）；
+2. ('pax', gid, hostnum, seat, must)：旅客 (g, hostnum) 是否坐座位 s。
+先按 (组, 座位) 用量选最接近 0.5 的分支；若组级用量已整数但 y 仍分数
+（同座位集合的不同排列/不同保护空座选择），再按旅客级用量分支；两级都
+找不到分数用量而 y 仍分数时，该节点标为未认证（不冒充整数解）。
+
+节点关闭规则：
+- 受限主问题 LP 不可行 ≠ 节点不可行（没有 Farkas 定价），一律记为未认证；
+- 只有当 LP 解中所有列 y ∈ {0,1} 时才把它当候选整数解，且必须通过调用方
+  提供的 validate() （独立评估器：硬违规为 0，成本按评估器重算）才能成为 incumbent；
+- proven 仅当前沿为空且所有处理过的节点都被认证。
 """
 from __future__ import annotations
 
@@ -14,21 +20,20 @@ import math
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-import gurobipy as gp
 from gurobipy import GRB
 
 from .instance import Instance
 from .master import Master
 from .pricing import Column, GroupPricer, TOL, reduced_cost
 
-Rule = Tuple[int, str, bool]   # (gid, seat, must_use)
+Rule = Tuple  # ('seat', gid, seat, must) | ('pax', gid, hostnum, seat, must)
 
 
 @dataclass(order=True)
 class Node:
-    bound_cost: float                 # 父节点 LP 成本（越小越优先）
+    bound_cost: float
     serial: int
     depth: int = field(compare=False)
     rules: Tuple[Rule, ...] = field(compare=False, default=())
@@ -36,85 +41,129 @@ class Node:
 
 def _column_respects(col: Column, rules: Sequence[Rule]) -> bool:
     occupied = set(col.occupied)
-    for gid, seat, must in rules:
-        if col.gid != gid:
-            continue
-        if must and seat not in occupied:
-            return False
-        if not must and seat in occupied:
-            return False
+    assignment = dict(col.assignment)
+    for rule in rules:
+        if rule[0] == 'seat':
+            _, gid, seat, must = rule
+            if col.gid != gid:
+                continue
+            if must != (seat in occupied):
+                return False
+        else:
+            _, gid, hostnum, seat, must = rule
+            if col.gid != gid:
+                continue
+            if must != (assignment.get((gid, hostnum)) == seat):
+                return False
     return True
 
 
-def _choose_branch(master: Master, rules: Sequence[Rule]) -> Optional[Rule]:
-    """选 Σ_{k∋s} y_gk 最接近 0.5 的 (g, s)。"""
+def _pricing_rules(rules: Sequence[Rule], gid: int) -> List[Tuple]:
+    out = []
+    for rule in rules:
+        if rule[1] != gid:
+            continue
+        if rule[0] == 'seat':
+            out.append(('seat', rule[2], rule[3]))
+        else:
+            out.append(('pax', rule[2], rule[3], rule[4]))
+    return out
+
+
+def _choose_branch(master: Master, rules: Sequence[Rule]) -> Tuple[Optional[Rule], bool]:
+    """返回 (分支规则或 None, LP 是否已整数)。"""
     values = master.lp_values()
-    usage: Dict[Tuple[int, str], float] = {}
+    integral = all(v > 1.0 - 1e-6 for v in values.values())
+    if integral:
+        return None, True
+    seat_usage: Dict[Tuple[int, str], float] = {}
+    pax_usage: Dict[Tuple[int, int, str], float] = {}
     for idx, val in values.items():
         col = master.columns[idx]
         for s in col.occupied:
-            usage[(col.gid, s)] = usage.get((col.gid, s), 0.0) + val
-    ruled = {(g, s) for g, s, _ in rules}
-    best, best_key = 1.0, None
-    for key, f in usage.items():
-        if key in ruled or f < 1e-6 or f > 1 - 1e-6:
+            seat_usage[(col.gid, s)] = seat_usage.get((col.gid, s), 0.0) + val
+        for (gid, hostnum), s in col.assignment:
+            pax_usage[(gid, hostnum, s)] = pax_usage.get((gid, hostnum, s), 0.0) + val
+    ruled_seat = {(r[1], r[2]) for r in rules if r[0] == 'seat'}
+    ruled_pax = {(r[1], r[2], r[3]) for r in rules if r[0] == 'pax'}
+    best, key = 1.0, None
+    for k, f in seat_usage.items():
+        if k in ruled_seat or f < 1e-6 or f > 1 - 1e-6:
             continue
         if abs(f - 0.5) < best:
-            best, best_key = abs(f - 0.5), key
-    return (best_key[0], best_key[1], True) if best_key else None
+            best, key = abs(f - 0.5), k
+    if key is not None:
+        return ('seat', key[0], key[1], True), False
+    for k, f in pax_usage.items():
+        if k in ruled_pax or f < 1e-6 or f > 1 - 1e-6:
+            continue
+        if abs(f - 0.5) < best:
+            best, key = abs(f - 0.5), k
+    if key is not None:
+        return ('pax', key[0], key[1], key[2], True), False
+    return None, False
 
 
 def branch_and_price(
     inst: Instance, master: Master, pricers: Dict[int, GroupPricer], executor: ThreadPoolExecutor,
     *, root_cost: float, incumbent_cost: float, incumbent: Optional[List[Column]],
     deadline: float, cfg: Dict[str, Any], log: Callable[[str], None],
+    validate: Callable[[List[Column]], Tuple[bool, float]],
 ) -> Dict[str, Any]:
-    workers = max(1, int(cfg.get("pricing_workers", 4)))
+    """validate(columns) -> (合法?, 成本=-评估器软分)。"""
     node_limit = int(cfg.get("bp_node_limit", 200))
     int_time = float(cfg.get("bp_integer_time_limit", 5.0))
     frontier: List[Node] = [Node(root_cost, 0, 0, ())]
     serial = 1
     processed = 0
-    closed_bounds: List[float] = []          # 已关闭节点（剪枝或整数）的界，供全局 U 使用
-    open_uncertified: List[float] = []       # 未认证节点的安全界
-    all_certified = True
-    stats = {"nodes": 0, "columns_added": 0, "incumbent_updates": 0, "pruned": 0, "infeasible": 0}
+    open_uncertified: List[float] = []
+    stats = {"nodes": 0, "columns_added": 0, "incumbent_updates": 0, "pruned": 0,
+             "lp_infeasible_uncertified": 0, "fractional_unbranchable": 0, "timeout_uncertified": 0}
     best_cost, best_cols = incumbent_cost, incumbent
+
+    def apply_rules(rules: Sequence[Rule]) -> None:
+        for col, var in zip(master.columns, master.column_vars):
+            var.UB = GRB.INFINITY if _column_respects(col, rules) else 0.0
+        master.model.update()
 
     while frontier and processed < node_limit and time.perf_counter() < deadline:
         node = heapq.heappop(frontier)
         if node.bound_cost >= best_cost - TOL:
             stats["pruned"] += 1
-            closed_bounds.append(node.bound_cost)
             continue
         processed += 1
         stats["nodes"] += 1
-        # 应用分支：禁用违反规则的列
-        for col, var in zip(master.columns, master.column_vars):
-            var.UB = GRB.INFINITY if _column_respects(col, node.rules) else 0.0
-        master.model.update()
+        apply_rules(node.rules)
         node_cost: Optional[float] = None
         node_certified = False
-        node_infeasible = False
-        node_safe: Optional[float] = None
+        node_infeasible_certified = False
+        lp_failed = False
         escalation = 1.0
         while time.perf_counter() < deadline:
             status, lp_cost, art = master.solve_lp()
             if status != "optimal":
-                node_infeasible = True; break
+                if master.phase_one:
+                    lp_failed = True      # Phase I 带人工列本不应不可行：视为求解失败
+                    break
+                # 受限主问题不可行 ≠ 节点不可行：进入节点级 Phase I，用 Phase I 对偶定价
+                master.set_phase(True)
+                continue
+            if master.phase_one and art <= TOL:
+                master.set_phase(False)
+                continue
+            phase_one = master.phase_one
             duals = master.duals()
-            remaining = deadline - time.perf_counter()
+            remaining = max(0.05, deadline - time.perf_counter())
             limit = max(0.05, min(float(cfg.get("pricing_time_limit", 60.0)) * escalation, remaining / 2))
 
-            def price(g):
-                gid = g.gid
-                extra = [(s, must) for gg, s, must in node.rules if gg == gid]
-                return pricers[gid].price_with_rules(duals, extra, phase_one=False, time_limit=limit)
+            def price(g, _duals=duals, _limit=limit, _rules=node.rules, _p1=phase_one):
+                return pricers[g.gid].price_with_rules(_duals, _pricing_rules(_rules, g.gid), phase_one=_p1, time_limit=_limit)
 
-            outs = list(executor.map(price, inst.groups))
+            outs = [o for o in executor.map(price, inst.groups) if o is not None]
+            if len(outs) != len(inst.groups):
+                break
             cols = [c for o in outs for c in o.columns
-                    if _column_respects(c, node.rules) and reduced_cost(c, duals, False) < -TOL]
-            # 新列在其他节点也可能被使用；加入后按当前规则设上界
+                    if _column_respects(c, node.rules) and reduced_cost(c, duals, phase_one) < -TOL]
             before = len(master.columns)
             master.add_columns(cols)
             for col, var in zip(master.columns[before:], master.column_vars[before:]):
@@ -122,75 +171,90 @@ def branch_and_price(
             master.model.update()
             added = len(master.columns) - before
             stats["columns_added"] += added
-            certified = all(o.certified for o in outs)
-            lbs = [o.lower_bound for o in outs]
-            if all(math.isfinite(v) for v in lbs):
-                cand = lp_cost + sum(min(0.0, v) for v in lbs)
-                node_safe = cand if node_safe is None else max(node_safe, cand)
             if added == 0:
-                if certified:
-                    node_cost, node_certified = lp_cost, True
-                else:
-                    escalation *= 2.0
-                    if time.perf_counter() + 1.0 >= deadline:
-                        break
-                    continue
-                break
-        if node_infeasible:
-            stats["infeasible"] += 1
-            closed_bounds.append(math.inf)
+                if all(o.certified for o in outs):
+                    if phase_one:
+                        node_infeasible_certified = True   # 人工列仍为正且无负列：节点不可行
+                    else:
+                        node_cost, node_certified = lp_cost, True
+                    break
+                escalation *= 2.0
+                if time.perf_counter() + 1.0 >= deadline:
+                    break
+        if master.phase_one:
+            master.set_phase(False)
+        if lp_failed:
+            stats["lp_infeasible_uncertified"] += 1
+            open_uncertified.append(node.bound_cost)
+            log(f"node {processed} depth={node.depth}: master LP failed -> uncertified")
+            continue
+        if node_infeasible_certified:
+            stats["infeasible_certified"] = stats.get("infeasible_certified", 0) + 1
+            log(f"node {processed} depth={node.depth}: certified infeasible (Phase I)")
             continue
         if not node_certified:
-            all_certified = False
-            if node_safe is not None:
-                open_uncertified.append(node_safe)
-            else:
-                open_uncertified.append(node.bound_cost)
-            log(f"node {processed} depth={node.depth}: not certified within time; safe={node_safe}")
+            stats["timeout_uncertified"] += 1
+            open_uncertified.append(node.bound_cost)
+            log(f"node {processed} depth={node.depth}: pricing not certified within time")
             continue
         bound = node_cost
         log(f"node {processed} depth={node.depth} rules={len(node.rules)} lp={bound:.4f} incumbent={best_cost:.4f} frontier={len(frontier)}")
         if bound >= best_cost - TOL:
             stats["pruned"] += 1
-            closed_bounds.append(bound)
             continue
-        # 节点整数启发式（列池 MIP，受当前规则约束）
+        # 节点整数启发式（列池 MIP，受当前规则约束）；结果经独立评估器验证
         int_status, selected, int_cost = master.solve_integer(min(int_time, max(0.5, deadline - time.perf_counter())))
-        if selected is not None and int_cost is not None and int_cost < best_cost - TOL:
-            best_cost, best_cols = int_cost, selected
-            stats["incumbent_updates"] += 1
-            log(f"node {processed}: incumbent improved to cost {best_cost:.4f}")
+        if selected is not None:
+            ok, true_cost = validate(selected)
+            if ok and true_cost < best_cost - TOL:
+                best_cost, best_cols = true_cost, selected
+                stats["incumbent_updates"] += 1
+                log(f"node {processed}: incumbent improved to cost {best_cost:.4f}")
         if bound >= best_cost - TOL:
             stats["pruned"] += 1
-            closed_bounds.append(bound)
             continue
-        master.solve_lp()  # 恢复 LP 解以选分支
-        choice = _choose_branch(master, node.rules)
-        if choice is None:
-            # LP 已整数（或无可分支对）：该节点解就是最优整数解
-            closed_bounds.append(bound)
+        master.solve_lp()
+        choice, integral = _choose_branch(master, node.rules)
+        if integral:
             selected = [master.columns[i] for i, v in master.lp_values().items() if v > 0.5]
-            if len({c.gid for c in selected}) == len(inst.groups) and bound < best_cost - TOL:
-                best_cost, best_cols = bound, selected
-                stats["incumbent_updates"] += 1
+            if len({c.gid for c in selected}) == len(inst.groups):
+                ok, true_cost = validate(selected)
+                if ok and true_cost < best_cost - TOL:
+                    best_cost, best_cols = true_cost, selected
+                    stats["incumbent_updates"] += 1
+            # LP 整数点：该节点最优值就是 bound（若验证失败，说明主问题与评估器不一致，按未认证处理）
+            if not ok:
+                open_uncertified.append(bound)
+                log(f"node {processed}: integral LP failed evaluator validation -> uncertified")
             continue
-        gid, seat, _ = choice
-        heapq.heappush(frontier, Node(bound, serial, node.depth + 1, node.rules + ((gid, seat, True),))); serial += 1
-        heapq.heappush(frontier, Node(bound, serial, node.depth + 1, node.rules + ((gid, seat, False),))); serial += 1
+        if choice is None:
+            stats["fractional_unbranchable"] += 1
+            open_uncertified.append(bound)
+            log(f"node {processed}: fractional LP with no branchable usage -> uncertified")
+            continue
+        if choice[0] == 'seat':
+            _, gid, seat, _ = choice
+            left, right = ('seat', gid, seat, True), ('seat', gid, seat, False)
+        else:
+            _, gid, hostnum, seat, _ = choice
+            left, right = ('pax', gid, hostnum, seat, True), ('pax', gid, hostnum, seat, False)
+        heapq.heappush(frontier, Node(bound, serial, node.depth + 1, node.rules + (left,))); serial += 1
+        heapq.heappush(frontier, Node(bound, serial, node.depth + 1, node.rules + (right,))); serial += 1
 
-    # 复位列上界
     for var in master.column_vars:
         var.UB = GRB.INFINITY
     master.model.update()
     open_bounds = [n.bound_cost for n in frontier] + open_uncertified
-    proven = not frontier and all_certified and processed <= node_limit
-    # 全局成本下界 = 开放节点界与已关闭节点界的最小值（成本口径）
-    global_lb_candidates = open_bounds + [b for b in closed_bounds if math.isfinite(b)] + ([best_cost] if best_cols else [])
-    global_cost_lb = min(global_lb_candidates) if global_lb_candidates else root_cost
-    if not all_certified and not open_uncertified:
-        global_cost_lb = root_cost
+    all_certified = not open_uncertified
+    proven = (not frontier) and all_certified and best_cols is not None
+    # 全局成本下界：开放/未认证节点界的最小值；若无则 incumbent 即最优
+    if open_bounds:
+        global_cost_lb = min(min(open_bounds), best_cost if best_cols is not None else math.inf)
+    else:
+        global_cost_lb = best_cost if best_cols is not None else root_cost
     return {
         "proven": proven, "incumbent_cost": best_cost, "incumbent": best_cols,
-        "global_cost_lower_bound": min(global_cost_lb, best_cost) if best_cols else global_cost_lb,
+        "global_cost_lower_bound": global_cost_lb,
         "open_nodes": len(frontier), "stats": stats, "all_certified": all_certified,
+        "node_limit_reached": processed >= node_limit and bool(frontier),
     }

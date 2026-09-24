@@ -114,18 +114,21 @@ class Master:
         return added
 
     # ------------------------------------------------------------ 阶段切换
-    def start_phase_two(self) -> None:
-        if not self.phase_one:
-            return
+    def set_phase(self, phase_one: bool) -> None:
+        """切换 Phase I（最小化人工列）/ Phase II（真实成本）。分支节点可反复切换。"""
         for art in self.artificial.values():
-            art.UB = 0.0
-            art.Obj = 0.0
+            art.UB = 1.0 if phase_one else 0.0
+            art.Obj = 1.0 if phase_one else 0.0
         for col, var in zip(self.columns, self.column_vars):
-            var.Obj = col.cost
+            var.Obj = 0.0 if phase_one else col.cost
         for pair, b in self.baby_var.items():
-            b.Obj = -self.inst.baby_pairs[pair]   # 成本 = -B(u,v) >= 0
-        self.phase_one = False
+            b.Obj = 0.0 if phase_one else -self.inst.baby_pairs[pair]   # 成本 = -B(u,v) >= 0
+        self.phase_one = phase_one
         self.model.update()
+
+    def start_phase_two(self) -> None:
+        if self.phase_one:
+            self.set_phase(False)
 
     # ------------------------------------------------------------------ 求解
     def solve_lp(self) -> Tuple[str, float, float]:

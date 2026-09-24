@@ -239,17 +239,27 @@ class GroupPricer:
         m.update()
 
     # ------------------------------------------------------------------ 定价
-    def price_with_rules(self, duals: Duals, rules: Sequence[Tuple[str, bool]], *, phase_one: bool, time_limit: float) -> PricingOutcome:
-        """带分支规则的定价：(seat, must_use) —— 组必须/不得占用该座位。"""
+    def price_with_rules(self, duals: Duals, rules: Sequence[Tuple], *, phase_one: bool, time_limit: float) -> PricingOutcome:
+        """带分支规则的定价。规则：('seat', seat, must) 组是否占用座位；('pax', hostnum, seat, must) 旅客是否坐该座位。"""
         m = self.model
         temp = []
-        for seat, must in rules:
-            expr = self.occupant_expr.get(seat)
-            if expr is None:
-                if must:
-                    return PricingOutcome(self.group.gid, "infeasible", math.inf, [], math.inf, 0.0)
-                continue
-            temp.append(m.addConstr(expr == (1.0 if must else 0.0)))
+        for rule in rules:
+            if rule[0] == 'seat':
+                _, seat, must = rule
+                expr = self.occupant_expr.get(seat)
+                if expr is None:
+                    if must:
+                        return PricingOutcome(self.group.gid, "infeasible", math.inf, [], math.inf, 0.0)
+                    continue
+                temp.append(m.addConstr(expr == (1.0 if must else 0.0)))
+            else:
+                _, hostnum, seat, must = rule
+                var = self.x.get(((self.group.gid, hostnum), seat))
+                if var is None:
+                    if must:
+                        return PricingOutcome(self.group.gid, "infeasible", math.inf, [], math.inf, 0.0)
+                    continue
+                temp.append(m.addConstr(var == (1.0 if must else 0.0)))
         try:
             return self.price(duals, phase_one=phase_one, time_limit=time_limit)
         finally:

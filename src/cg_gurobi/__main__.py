@@ -8,6 +8,18 @@ from pathlib import Path
 from .solver import solve
 
 
+def _sanitize(obj):
+    """把 inf/nan 转成 None，保证输出是合法 JSON。"""
+    import math
+    if isinstance(obj, float):
+        return None if (math.isinf(obj) or math.isnan(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Gurobi 直接定价列生成")
     parser.add_argument("--config", type=Path, default=Path("config.json"))
@@ -31,11 +43,11 @@ def main() -> None:
     old = json.loads(args.old_seatmap.read_text(encoding="utf-8-sig"))["seats"]
     groups = json.loads(args.groups.read_text(encoding="utf-8-sig"))["groups"]
     result = solve(new, old, groups, config.get("weights", {}), config)
-    summary = {k: v for k, v in result.items() if k not in ("assigned_seats", "score_detail", "violation_detail")}
+    summary = _sanitize({k: v for k, v in result.items() if k not in ("assigned_seats", "score_detail", "violation_detail")})
     print(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        serializable = dict(result)
+        serializable = _sanitize(dict(result))
         serializable["assigned_seats"] = {f"{k[0]}:{k[1]}": v for k, v in result["assigned_seats"].items()}
         args.output.write_text(json.dumps(serializable, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 

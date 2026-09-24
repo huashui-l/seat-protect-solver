@@ -116,14 +116,25 @@ def solve_single_cabin(
 
     inst = Instance(new_seats, old_seats, groups_data, weights, config)
     master = Master(inst, env)
+
+    def _validate(columns: List[Column]) -> Tuple[bool, float]:
+        """独立评估器复核一组列：硬违规为 0 且全员就座才合法；成本 = -软分。"""
+        a: Dict[PassengerKey, str] = {}
+        for c in columns:
+            a.update(c.as_dict())
+        v, u, _ = evaluator.count_hard_constraint_violations(list(new_seats), list(groups_data), a, dict(config))
+        if v or u:
+            return False, math.inf
+        sc, _ = evaluator.calculate_soft_score(list(new_seats), list(old_seats), list(groups_data), a, dict(weights), dict(config))
+        return True, -sc
+
     workers = max(1, int(cfg["pricing_workers"]))
+    # Gurobi Env 不是线程安全的：每个定价器独占一个 Env，线程池任意调度都不会共享。
     worker_envs: List[gp.Env] = []
-    for _ in range(workers):
+    pricers: Dict[int, GroupPricer] = {}
+    for g in inst.groups:
         e = gp.Env(empty=True); e.setParam("OutputFlag", 0); e.start(); worker_envs.append(e)
-    pricers = {
-        g.gid: GroupPricer(inst, g, worker_envs[idx % workers])
-        for idx, g in enumerate(inst.groups)
-    }
+        pricers[g.gid] = GroupPricer(inst, g, e)
     executor = ThreadPoolExecutor(max_workers=workers)
     build_seconds = time.perf_counter() - started
 
@@ -167,6 +178,7 @@ def solve_single_cabin(
         except Exception as exc:  # 启发式失败不影响精确路线
             _log(log, f"heuristic warm start failed: {type(exc).__name__}: {exc}")
             warm_columns = 0
+    greedy_columns: List[Column] = []
     if warm_mode in ("greedy", "heuristic") and warm_columns < len(inst.groups):
         blocked: set = set()
         for g in inst.groups:
@@ -182,6 +194,12 @@ def solve_single_cabin(
                 master.add_columns([col])
                 blocked.update(col.resources)
                 warm_columns += 1
+                greedy_columns.append(col)
+        if not heuristic_columns and len(greedy_columns) == len(inst.groups):
+            ok, cost = _validate(greedy_columns)      # 贪心只保证座位互斥，条件 SSR 等需评估器确认
+            if ok:
+                heuristic_columns = list(greedy_columns)
+                heuristic_score = -cost
         _log(log, f"warm start: {warm_columns}/{len(inst.groups)} groups seeded in {time.perf_counter()-started:.2f}s")
 
     iterations: List[Dict[str, Any]] = []
@@ -190,7 +208,8 @@ def solve_single_cabin(
     safe_lp_cost: Optional[float] = None
     root_lp_cost: Optional[float] = None
     infeasible_certified = False
-    integer_reserve = min(float(cfg["integer_time_limit"]), max(2.0, 0.15 * (deadline - started)))
+    budget = max(0.1, deadline - started)
+    integer_reserve = min(float(cfg["integer_time_limit"]), 0.15 * budget)
     cg_deadline = deadline - integer_reserve
     it = 0
     escalation = 1.0
@@ -219,7 +238,7 @@ def solve_single_cabin(
         all_certified = True
         lbs: Dict[int, float] = {}
         phase_one = master.phase_one
-        per_group_limit = min(per_group * workers * escalation, max(float(cfg["pricing_time_limit"]), remaining * 0.5))
+        per_group_limit = max(0.05, min(per_group * workers * escalation, float(cfg["pricing_time_limit"]) * escalation, remaining))
         # 对偶平滑（Wentges）：只用于发现列；认证与下界一律用原始对偶
         if alpha > 0.0 and not phase_one:
             if center is None or lp_cost < center_cost - 1e-9:
@@ -307,12 +326,16 @@ def solve_single_cabin(
         "warm_start_columns": warm_columns,
         "warm_start_mode": warm_mode,
         "mispricing_rounds": mispricing_rounds,
-        "dive": dive_stats if 'dive_stats' in dir() else None,
+        "dive": None,
         "heuristic_score": heuristic_score,
         "pricing_workers": workers,
     }
     if infeasible_certified:
-        result.update({"status": "infeasible", "assigned_seats": {}, "total_score": None})
+        result.update({"status": "infeasible", "assigned_seats": {}, "total_score": None, "hard_violations": None,
+                       "unassigned": len(inst.passengers), "integer_status": "infeasible", "proven_optimal": False,
+                       "lp_bound": None, "lp_bound_certified": False, "safe_bound": None, "bp_bound": None,
+                       "bp_bound_certified": False, "rmp_lp_cost": None, "gap_absolute": None,
+                       "seconds": time.perf_counter() - started, "heuristic_score": heuristic_score})
         executor.shutdown(wait=True)
         for e in worker_envs:
             e.dispose()
@@ -354,6 +377,7 @@ def solve_single_cabin(
         finally:
             master.unfix_all()
         _log(log, f"dive: fixed={dive_stats['fixed']} rounds={dive_stats['rounds']} columns_added={dive_stats['columns_added']} cols={len(master.columns)}")
+    result["dive"] = dive_stats
 
     # 整数解：列池整数主问题
     int_status, selected, int_cost = ("phase_one", None, None)
@@ -364,7 +388,7 @@ def solve_single_cabin(
                               or int_cost > -heuristic_score + TOL):
         # 列池 MIP 无解或劣于启发式：退回启发式方案（它也在列池中，本不应发生，作保险）
         selected, int_cost, int_status = list(heuristic_columns), -heuristic_score, f"{int_status}->heuristic_fallback"
-    # 分支定价：根 LP 已认证且列池整数解与 LP 有差距时，二分 (组, 座位) 关闭 gap
+    # 分支定价：根 LP 已认证且列池整数解与 LP 有差距时，二分关闭 gap
     bp: Optional[Dict[str, Any]] = None
     proven_optimal = False
     if (
@@ -375,6 +399,7 @@ def solve_single_cabin(
         bp = branch_and_price(
             inst, master, pricers, executor, root_cost=exact_lp_cost, incumbent_cost=int_cost,
             incumbent=selected, deadline=deadline, cfg=cfg, log=lambda msg: _log(log, "bp " + msg),
+            validate=_validate,
         )
         if bp["incumbent"] is not None and bp["incumbent_cost"] < int_cost - TOL:
             selected, int_cost = bp["incumbent"], bp["incumbent_cost"]
@@ -384,6 +409,14 @@ def solve_single_cabin(
                   f"incumbent_cost={bp['incumbent_cost']:.4f} global_lb={bp['global_cost_lower_bound']:.4f}")
     elif exact_lp_cost is not None and selected is not None and int_cost is not None and int_cost <= exact_lp_cost + TOL:
         proven_optimal = True
+    if selected:
+        ok, _ = _validate(selected)
+        if not ok:
+            # 主问题与评估器不一致：不返回非法方案，退回启发式并记录
+            _log(log, "WARNING: integer solution failed evaluator validation; falling back")
+            selected = list(heuristic_columns) if heuristic_columns else None
+            int_status = f"{int_status}->invalid_fallback"
+            proven_optimal = False
     assigned: Dict[PassengerKey, str] = {}
     if selected:
         for col in selected:
@@ -449,7 +482,7 @@ def solve(
     order = sorted(by_cabin, key=lambda c: sum(1 for s in new_seats if s.get("seatClass") == c))
     for idx, cabin in enumerate(order):
         seats_c = [s for s in new_seats if s.get("seatClass") == cabin]
-        old_c = [s for s in old_seats if s.get("seatClass") == cabin]
+        old_c = list(old_seats)   # 旧座位图只用于评分，必须整张传入（旅客原座位可能在其他舱）
         remaining = deadline - time.perf_counter()
         share = remaining if idx == len(order) - 1 else remaining * max(0.1, len(seats_c) / max(1, len(new_seats)))
         per_cabin[cabin] = solve_single_cabin(
@@ -467,6 +500,7 @@ def solve(
         list(new_seats), list(old_seats), list(groups_data), assigned, dict(weights), dict(config)
     )
     complete = violations == 0 and unassigned == 0 and all(r.get("status") == "complete" for r in per_cabin.values())
+    infeasible = any(r.get("status") == "infeasible" for r in per_cabin.values())
     exact_ok = all(r.get("lp_bound") is not None for r in per_cabin.values())
     safe_ok = all((r.get("lp_bound") is not None or r.get("safe_bound") is not None) for r in per_cabin.values())
     lp_bound = sum(r["lp_bound"] for r in per_cabin.values()) if exact_ok else None
@@ -477,11 +511,11 @@ def solve(
     bp_ok = all(r.get("bp_bound") is not None and r.get("bp_bound_certified") for r in per_cabin.values())
     bp_bound = sum(r["bp_bound"] for r in per_cabin.values()) if bp_ok else None
     return {
-        "status": "complete" if complete else "incomplete",
+        "status": "infeasible" if infeasible else ("complete" if complete else "incomplete"),
         "proven_optimal": complete and all(bool(r.get("proven_optimal")) for r in per_cabin.values()),
         "bp_bound": bp_bound,
         "assigned_seats": assigned,
-        "total_score": soft,
+        "total_score": None if infeasible else soft,
         "score_detail": soft_detail,
         "hard_violations": violations,
         "unassigned": unassigned,

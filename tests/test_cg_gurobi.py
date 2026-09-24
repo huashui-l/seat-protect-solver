@@ -161,3 +161,90 @@ class PublicFixtureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_GUROBI, "gurobipy 不可用")
+class AuditRegressionTests(unittest.TestCase):
+    """2026-09-24 对抗式审计确认的缺陷回归。"""
+
+    def _cfg(self, **over):
+        cfg = _config()
+        cfg["cg_gurobi"].update({"warm_start": "greedy", "pricing_workers": 1, **over})
+        return cfg
+
+    def test_same_occupancy_permutations_are_branched_not_closed(self):
+        """同座位集合的旅客排列在 LP 中分数混合时，分支定价必须继续分支而不是当作整数解。"""
+        from src.cg_gurobi import solve
+        cfg = self._cfg()
+        cab = gen.CabinConfig.from_dict({"name": "Economy", "startRow": 1, "endRow": 2, "seatLabels": ["A", "B", "C"],
+                                         "aisleAfter": [], "seatClass": "Economy", "bassinetRows": [], "exitRows": [],
+                                         "extraLegroomRows": [], "toiletRows": []})
+        sm = gen.generate_aircraft("BF", [cab], [])
+        groups = _groups((1, [_pax(1, "1A", "UM", rowflag="Y"), _pax(2, "2A")]),
+                         (2, [_pax(1, "1C", "UM", new="1C")]))
+        best = _brute_force(sm, groups, cfg)
+        r = solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        self.assertEqual("complete", r["status"])
+        self.assertEqual((0, 0), (r["hard_violations"], r["unassigned"]))
+        self.assertAlmostEqual(best, r["total_score"], places=6)
+        self.assertTrue(r["proven_optimal"])
+
+    def test_old_seat_in_other_cabin_is_scored_like_the_evaluator(self):
+        """分舱求解必须用整张旧座位图评分。"""
+        from src.cg_gurobi import solve
+        cfg = self._cfg()
+        biz = gen.CabinConfig.from_dict({"name": "Business", "startRow": 1, "endRow": 2, "seatLabels": ["A", "B", "C", "D"],
+                                         "aisleAfter": ["B"], "seatClass": "Business", "bassinetRows": [], "exitRows": [],
+                                         "extraLegroomRows": [], "toiletRows": []})
+        eco = gen.CabinConfig.from_dict({"name": "Economy", "startRow": 3, "endRow": 4, "seatLabels": ["A", "B", "C", "D"],
+                                         "aisleAfter": ["B"], "seatClass": "Economy", "bassinetRows": [], "exitRows": [],
+                                         "extraLegroomRows": [], "toiletRows": []})
+        sm = gen.generate_aircraft("BF", [biz, eco], [])
+        p = _pax(1, "4D"); p["cabin"] = "C"
+        groups = _groups((1, [p]))
+        r = solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        self.assertEqual("complete", r["status"])
+        score, _ = evaluator.calculate_soft_score(sm["seats"], sm["seats"], groups, r["assigned_seats"], cfg["weights"], cfg)
+        self.assertAlmostEqual(score, r["total_score"], places=8)
+        # 单人组：穷举所有商务舱座位即全局最优
+        best = max(evaluator.calculate_soft_score(sm["seats"], sm["seats"], groups, {(1, 1): s["seatId"]}, cfg["weights"], cfg)[0]
+                   for s in sm["seats"] if s["seatClass"] == "Business")
+        self.assertAlmostEqual(best, r["total_score"], places=6)
+        self.assertTrue(r["proven_optimal"])
+
+    def test_certified_infeasible_input_is_reported_as_infeasible(self):
+        from src.cg_gurobi import solve
+        cfg = self._cfg()
+        sm = _seatmap(1, ["A", "B", "C", "D"])
+        groups = _groups((1, [_pax(1, "1B", both="Y", new="1B")]), (2, [_pax(1, "1C", new="1C")]))
+        with self.assertRaises(ValueError):   # 固定座位落在另一固定双侧旅客的保护空座上：输入层拒绝
+            solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        # 容量必要条件（§4.10）在输入层拒绝：两名双侧保护旅客需要 6 个资源 > 4 座
+        groups = _groups((1, [_pax(1, "1B", both="Y")]), (2, [_pax(1, "1A", both="Y")]))
+        with self.assertRaises(ValueError):
+            solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        # 容量满足但结构不可行（CHD 需同组成人陪护而组内无人）：Phase I 认证不可行并贯通到顶层
+        groups = _groups((1, [_pax(1, "1A", "CHD")]), (2, [_pax(1, "1C")]))
+        r = solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        self.assertEqual("infeasible", r["status"])
+        self.assertIsNone(r["total_score"])
+
+    def test_non_integer_ids_are_rejected(self):
+        from src.cg_gurobi import solve
+        cfg = self._cfg()
+        sm = _seatmap(1, ["A", "B", "C"])
+        groups = _groups(("1", [_pax(1, "1A")]))
+        with self.assertRaises(ValueError):
+            solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        groups = _groups((1, [_pax("1", "1A")]))
+        with self.assertRaises(ValueError):
+            solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+
+    def test_tiny_budget_still_returns_complete_solution(self):
+        from src.cg_gurobi import solve
+        cfg = self._cfg(total_time_limit=2.0, integer_time_limit=1.0)
+        sm = _seatmap(2, ["A", "B", "C"])
+        groups = _groups((1, [_pax(1, "1A"), _pax(2, "1B"), _pax(3, "2C")]), (2, [_pax(1, "2A"), _pax(2, "1C")]))
+        r = solve(sm["seats"], sm["seats"], groups, cfg["weights"], cfg)
+        self.assertEqual("complete", r["status"])
+        self.assertEqual((0, 0), (r["hard_violations"], r["unassigned"]))

@@ -24,7 +24,7 @@
 | `lp_bound` / `lp_bound_certified` | 根节点完整列空间 LP 上界。只有某轮**所有组**的定价均 Optimal/Cutoff 且无负列时才置真 |
 | `safe_bound` | L_RMP + Σ min(0, lb_g) 取负；lb_g 来自 Gurobi ObjBound，任一组无有限下界则为空 |
 | `bp_bound` / `proven_optimal` | 分支定价后的全局界；所有节点认证且前沿为空才 `proven_optimal` |
-| `total_score` | 列池整数解，经独立评估器复核（硬违规必须为 0，软分必须与列成本一致，否则抛错） |
+| `total_score` | 整数解经独立评估器复核：硬违规不为 0 的候选不会被采用（退回启发式方案并在 `integer_status` 标记 fallback）；软分与列成本不一致时抛错 |
 
 ## 运行
 
