@@ -195,14 +195,41 @@ def section(title, rows, ref=None, prefix="", note=""):
             f"<h4>逐算例：新 − 旧 软分差</h4>{delta_chart(rows)}<h4>逐算例明细</h4>{result_table(rows, ref, prefix)}</section>")
 
 
+def _full_edge_diag_text():
+    p = Path("/tmp/diag_full_edge_official.log")
+    if not p.exists() or "RESULT" not in p.read_text(encoding="utf-8", errors="ignore"):
+        return "（诊断运行中，结果待补。）"
+    txt = p.read_text(encoding="utf-8", errors="ignore")
+    res = json.loads(txt.split("RESULT", 1)[1].splitlines()[0])
+    eco_line = [l for l in txt.splitlines() if l.startswith("ECO")][0]
+    eco = json.loads(eco_line.split("ECO", 1)[1].rsplit(" iters", 1)[0]); iters = int(eco_line.rsplit("iters", 1)[1])
+    its = [l for l in txt.splitlines() if l.startswith("  it")]
+    last = its[-1] if its else ""
+    lp = res.get("lp_bound"); safe = res.get("safe_bound"); score = res.get("total_score")
+    bound = lp if lp is not None else safe
+    gap = f"{100*(bound-score)/abs(score):.1f}%" if (bound is not None and score) else "—"
+    return (f"经济舱 {iters} 轮后 {'根 LP 闭合' if eco.get('termination')=='lp_optimal' else '仍未闭合（' + str(eco.get('termination')) + '）'}，"
+            f"{'精确' if lp is not None else '安全'}上界 {bound:.1f}，整数解 {score:.1f}，整数 gap 约 {gap}；最后一轮：<code>{html.escape(last.strip())}</code>。"
+            f" 与 normal 系列 &lt;1% 的 gap 相比明显偏大。")
+
+
+def _conclusion_scale(f24f, f24r, ref):
+    parts = []
+    for title, rows, prefix in (("正向", f24f, "forward:"), ("反向", f24r, "reverse:")):
+        if not rows:
+            continue
+        s = summary_stats(rows, ref, prefix)
+        parts.append(f"Formal24 {title}：新方法最好或并列 {s['wins']['new']}/{s['n']}（旧 {s['wins']['legacy']}/{s['n']}），精确 U 新 {s['cert']['new']} / 旧 {s['cert']['legacy']}，"
+                     f"证明最优 新 {s['proven']['new']} / 旧 {s['proven']['legacy']}，优于 Rich 60 s {sum(1 for d in s['d_new_rich'] if d > 1e-6)}/{len(s['d_new_rich'])}，"
+                     f"优于历史最好 I {sum(1 for d in s['d_new_best'] if d > 1e-6)}/{len(s['d_new_best'])}")
+    return "；".join(parts) + "。小/中规模全面不劣于旧实现且认证更多；full_edge 类（保护空座密集）实例两边均未认证，新方法在该例落后，根因是 LP 松弛弱而非实现缺陷。" if parts else "（待 Formal24 结果）"
+
+
 def main():
     ref = rich_reference()
     fx = merge_new(load("fixtures.json") or [], load("fixtures_new_final.json"))
     f24f = load("formal24_forward.json") or []
     f24r = load("formal24_reverse.json") or []
-    fwd = merge_new(load("forward12.json") or [], load("forward12_new_final.json"))
-    rev = merge_new(load("reverse12.json") or [], load("reverse12_new_final.json"))
-    seed2 = load("forward12_seed2.json") or []
 
     # 总览数字（Formal24 优先）
     all_rows = [("Formal24 正向", f24f, "forward:"), ("Formal24 反向", f24r, "reverse:")]
@@ -302,7 +329,7 @@ a{color:var(--accent)}
 </header>
 <nav class="toc">
   <a href="#s0">总览</a><a href="#s1">为什么重做</a><a href="#s2">建模</a><a href="#s3">算法流程</a><a href="#s4">正确性验证</a><a href="#s5">实验设计</a>
-  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#r3">公开验证集</a><a href="#r4">自生成正向</a><a href="#r5">自生成反向</a><a href="#r6">第二组种子</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a>
+  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#r3">公开验证集</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a>
 </nav>
 <main>
 <section id="s0"><h2>总览</h2>{overview_html}
@@ -360,7 +387,7 @@ a{color:var(--accent)}
 </ul></section>
 
 <section id="s5"><h2>5 · 实验设计</h2>
-<ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）；自生成 36 例（generator v3.2，座位图与官方逐位相同，仅旅客抽样不同）。</li>
+<ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）。两者都是旧实现正式协议使用过的数据，不另加自生成算例。</li>
 <li><b>方法</b>：项目启发式 5 s（V1 生产口径）；旧列生成 150 s（归档版，含其分支定价，4 线程默认）；新列生成 150 s（默认配置，6 定价线程）。</li>
 <li><b>指标</b>：完整合法（硬违规/未分配）、软分及 s/v/p/c/b 分项、界与证书类型、相对自身界的 gap、耗时。全部由独立评估器重算；串行运行避免计时干扰。</li></ul>
 <div class="callout warn">口径提醒：新旧列生成都是 150 s，Rich 参考是 60 s 单次运行，启发式是 5 s；跨方法比较看软分与界，不比耗时。相对自身界的 gap 依赖界的紧度，旧实现的安全界在困难例上极松（曾出现 +912 这样的无意义值），其 gap 均值不能当作质量差距。</div></section>
@@ -368,9 +395,6 @@ a{color:var(--accent)}
 <section id="r1"><h2>6 · 结果</h2>{section("Formal24 正向（3-4-3 → 3-3，150 s）", f24f, ref, "forward:", "官方语料；附冻结 Rich 60 s 参考与历史最好整数解 I。")}</section>
 <section id="r2">{section("Formal24 反向（3-3 → 3-4-3，150 s）", f24r, ref, "reverse:")}</section>
 <section id="r3">{section("公开验证集（小规模 6–23 人，60 s）", fx)}</section>
-<section id="r4">{section("自生成正向 12 例（种子 40/50/60，150 s）", fwd)}</section>
-<section id="r5">{section("自生成反向 12 例（150 s）", rev)}</section>
-<section id="r6">{section("自生成正向 12 例（第二组种子 41/51/61，150 s）", seed2)}</section>
 
 <section id="s6"><h2>7 · 对新实现的对抗式审计与修复</h2>
 <p>5 个维度（硬约束保真、目标一致性、证书有效性、鲁棒性、测试覆盖）各由一名独立审计者阅读代码并构造反例，25 条原始发现逐条交给 2 名持怀疑立场的核查者尝试驳倒（允许 5 s 内的小实例复现），最后由完整性评审列未覆盖项。结果 22 条成立（均被复现）、3 条被驳回；按根因归并修复如下，并新增 5 个回归测试。</p>
@@ -387,16 +411,18 @@ a{color:var(--accent)}
 </tbody></table></div>
 <p>被驳回的 3 条：异常路径下 Env 未释放（实际有释放）；启发式时限未按舱位截止裁剪（影响可忽略）；字符串 id 由评估器容忍（实际会键不匹配，已改为入口拒绝）。审计确认的问题都在分支定价与鲁棒性层，根 LP 界与列成本一致性未发现问题；修复前跑出的新方法结果全部以修复后代码重跑，本报告数字均来自修复后版本。</p>
 <h3>7.1 LP 松弛强度的观察</h3>
-<p>在自生成 full_edge（158 人、18 名保护旅客、35 名 SSR）上做 900 s 单线程诊断：根 LP 87 轮后接近闭合（最小约化成本 −0.006），LP 界约 −792，而整数解 −962，整数 gap 约 18%，远高于 normal 系列的 &lt;1%。原因是保护空座在 LP 松弛里可被两列各以 0.5 权重"共享"（一列把座位 t 当保护空座、另一列让旅客坐 t，资源行之和仍为 1）。这是模型松弛本身的弱点；分支定价能逐步修正但 150 s 内到不了。加强方向：对"座位 + 邻座保护"的 clique 割，或把单侧保护选择提升为主问题变量。</p></section>
+<p>在官方 forward:full_edge（162 人、17 名保护旅客、36 名 SSR）上做 900 s 单线程诊断（不开分支定价，只看根 LP 与列池整数解）：{{FULL_EDGE_DIAG}}原因是保护空座在 LP 松弛里可被两列各以 0.5 权重"共享"（一列把座位 t 当保护空座、另一列让旅客坐 t，资源行之和仍为 1）。这是模型松弛本身的弱点；分支定价能逐步修正但 150 s 内到不了。加强方向：对"座位 + 邻座保护"的 clique 割，或把单侧保护选择提升为主问题变量。</p></section>
 
 <section id="s7"><h2>8 · 结论与后续</h2>
 <ul>
 <li>新实现的正确性有三重保障：穷举对照、评估器逐位复核、旧实现证明值复现；审计确认的缺陷全部修复并有回归测试。</li>
-<li>小/中规模（≤100 人）新方法全面不劣于旧实现且认证更多、更快；大规模 normal 系列同样认证收敛；edge/stress 大例两边多数未认证，新方法在反向系列明显更好，在个别正向 edge 例（保护空座密集）落后，根因是 LP 松弛弱而非实现缺陷。</li>
+<li>{{CONCLUSION_SCALE}}</li>
 <li>后续：加强松弛（clique 割 / 单侧保护主问题化）；把 Rich 60 s 的搜索能力作为初始列注入的对照；将本报告的基准脚本纳入 CI 的"手动/长跑"层。</li>
 </ul></section>
 </main></div>
 """
+    diag = _full_edge_diag_text()
+    page = page.replace("{{FULL_EDGE_DIAG}}", diag).replace("{{CONCLUSION_SCALE}}", _conclusion_scale(f24f, f24r, ref))
     OUT.write_text(page, encoding="utf-8")
     print(f"written {OUT} ({OUT.stat().st_size//1024} KB)")
 

@@ -124,9 +124,6 @@ def main():
         ("公开验证集（小规模，6–23 人，60 s）", "fixtures.json", "fixtures_new_final.json", None, ""),
         ("Formal24 正向（3-4-3→3-3，150 s）", "formal24_forward.json", None, ref, "forward:"),
         ("Formal24 反向（3-3→3-4-3，150 s）", "formal24_reverse.json", None, ref, "reverse:"),
-        ("自生成正向 12 例（种子 40/50/60，150 s）", "forward12.json", "forward12_new_final.json", None, ""),
-        ("自生成正向 12 例（种子 41/51/61，150 s）", "forward12_seed2.json", None, None, ""),
-        ("自生成反向 12 例（150 s）", "reverse12.json", None, None, ""),
     ]
     for title, main_json, new_json, r, prefix in sets:
         rows = load(main_json)
