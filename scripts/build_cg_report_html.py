@@ -612,7 +612,7 @@ a{color:var(--accent)}
 </main></div>
 """
     diag = _full_edge_diag_text()
-    page = page.replace("{{FULL_EDGE_DIAG}}", diag).replace("{{CONCLUSION_SCALE}}", _conclusion_scale(f24f, f24r, ref))
+    page = page.replace("{FULL_EDGE_DIAG}", diag).replace("{CONCLUSION_SCALE}", _conclusion_scale(f24f, f24r, ref))
     OUT.write_text(page, encoding="utf-8")
     print(f"written {OUT} ({OUT.stat().st_size//1024} KB)")
 
