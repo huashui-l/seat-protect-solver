@@ -2529,35 +2529,61 @@ RichLnsAssignment RichLnsWorkspace::best_group_assignment(int group_index, const
     if (std::all_of(keys.begin(), keys.end(), [&](int p) { return problem.passengers[p].ssr.empty() && !needs_care(p); }))
         return best_matching(keys, seats);
     RichLnsAssignment result;
-    std::vector<size_t> permutation(seats.size());
-    for (size_t i = 0; i < seats.size(); ++i) permutation[i] = i;
-    size_t index = 0;
-    do {
-        if (index % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) { stopped_by_deadline = true; break; }
-        ++index;
-        bool feasible = true;
-        for (size_t i = 0; i < keys.size(); ++i)
-            if (!state_.rich_seat_feasible(keys[i], seats[permutation[i]], -1, -1, released_seats)) { feasible = false; break; }
-        if (!feasible) continue;
-        for (size_t i = 0; i < keys.size(); ++i) {
+    const size_t n = keys.size();
+    std::vector<std::vector<bool>> feasible(n, std::vector<bool>(n));
+    std::vector<std::vector<double>> scores(n, std::vector<double>(n));
+    for (size_t i = 0; i < n; ++i) for (size_t j = 0; j < n; ++j) {
+        feasible[i][j] = state_.rich_seat_feasible(keys[i], seats[j], -1, -1, released_seats);
+        if (feasible[i][j]) scores[i][j] = passenger_score(keys[i], seats[j]);
+    }
+    std::vector<int> selected(n, -1);
+    std::vector<bool> used(n);
+    size_t nodes = 0;
+    // Input order preserves the first permutation on equal scores. Independent
+    // row maxima are an admissible bound even before enforcing seat uniqueness.
+    const auto search = [&](auto&& self, size_t depth, double score) -> void {
+        if (stopped_by_deadline) return;
+        if (nodes++ % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) {
+            stopped_by_deadline = true; return;
+        }
+        double bound = score;
+        for (size_t i = depth; i < n; ++i) {
+            double best = -std::numeric_limits<double>::infinity();
+            for (size_t j = 0; j < n; ++j)
+                if (!used[j] && feasible[i][j]) best = std::max(best, scores[i][j]);
+            if (!std::isfinite(best)) return;
+            bound += best;
+        }
+        if (bound < result.score - 1e-9) return;
+        for (size_t i = 0; i < depth; ++i) {
             if (!needs_care(keys[i])) continue;
             const auto rule = ssr_rule(problem, problem.passengers[keys[i]]);
-            const auto& seat = problem.seats[seats[permutation[i]]];
+            const auto& seat = problem.seats[seats[selected[i]]];
             const auto& neighbors = rule.caregiver_allow_cross_aisle ? seat.row_neighbors : seat.same_block_neighbors;
-            bool caregiver = false;
-            for (size_t j = 0; j < keys.size(); ++j)
-                if (j != i && problem.passengers[keys[j]].ssr.empty()
-                    && std::find(neighbors.begin(), neighbors.end(), seats[permutation[j]]) != neighbors.end()) caregiver = true;
-            if (!caregiver) { feasible = false; break; }
+            bool possible = false;
+            for (size_t k = 0; k < n && !possible; ++k) {
+                if (k == i || !problem.passengers[keys[k]].ssr.empty()) continue;
+                for (size_t j = 0; j < n && !possible; ++j) {
+                    const bool available = k < depth ? selected[k] == static_cast<int>(j) : !used[j] && feasible[k][j];
+                    if (available && std::find(neighbors.begin(), neighbors.end(), seats[j]) != neighbors.end()) possible = true;
+                }
+            }
+            if (!possible) return;
         }
-        if (!feasible) continue;
-        double score = 0.0;
-        for (size_t i = 0; i < keys.size(); ++i) score += passenger_score(keys[i], seats[permutation[i]]);
-        if (score > result.score) {
-            result.score = score; result.seats.clear();
-            for (size_t j : permutation) result.seats.push_back(seats[j]);
+        if (depth == n) {
+            if (score > result.score) {
+                result.score = score; result.seats.clear();
+                for (int j : selected) result.seats.push_back(seats[j]);
+            }
+            return;
         }
-    } while (std::next_permutation(permutation.begin(), permutation.end()));
+        for (size_t j = 0; j < n; ++j) if (!used[j] && feasible[depth][j]) {
+            selected[depth] = static_cast<int>(j); used[j] = true;
+            self(self, depth + 1, score + scores[depth][j]);
+            used[j] = false; selected[depth] = -1;
+        }
+    };
+    search(search, 0, 0.0);
     return result;
 }
 

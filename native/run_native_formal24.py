@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 import math
+import platform
 import statistics
 import subprocess
 import sys
@@ -205,7 +206,7 @@ def main() -> None:
             "--config", str(args.config), "--output", str(output_path),
             "--time-limit", str(args.time_limit), "--seed", str(args.seed),
             "--construction-objective", args.construction_objective,
-        ], cwd=ROOT, capture_output=True, text=True)
+        ], cwd=ROOT, capture_output=True, text=True, timeout=args.time_limit)
         process_wall = time.perf_counter() - started
         if completed.returncode != 0 or not output_path.exists():
             raise RuntimeError(f"{case_id}: native process failed: {completed.stderr}")
@@ -283,6 +284,7 @@ def main() -> None:
             "score_detail": {key: detail[key] for key in (*COMPONENTS, "total_soft_score")},
             "native_wall_seconds": float(result["wall_seconds"]),
             "process_wall_seconds": process_wall,
+            "time_protocol_pass": process_wall < args.time_limit,
             "input_sha256": sha256(case_path),
             "violation_detail": violation_detail,
             "rich_candidate_complete": bool(result.get("rich_candidate_complete", False)),
@@ -332,8 +334,15 @@ def main() -> None:
             "seed": args.seed,
             "time_limit_seconds": args.time_limit,
             "production_python_callback_count": 0,
+            "threads": 1,
+            "platform": platform.platform(),
+            "cpu": platform.processor(),
+            "working_tree_diff_sha256": hashlib.sha256(subprocess.check_output(
+                ["git", "diff", "HEAD"], cwd=ROOT
+            )).hexdigest(),
         },
         "case_count": len(rows),
+        "time_protocol_pass_count": sum(row["time_protocol_pass"] for row in rows),
         "valid_complete_count": len(valid),
         "unassigned_total": sum(row["unassigned"] for row in rows),
         "native_hard_violations_total": sum(row["native_hard_violations"] for row in rows),
@@ -402,7 +411,8 @@ def main() -> None:
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps({key: value for key, value in summary.items() if key != "cases"}, indent=2))
-    if len(valid) != len(rows) or summary["evaluator_consistent_count"] != len(rows):
+    if (len(valid) != len(rows) or summary["evaluator_consistent_count"] != len(rows)
+            or summary["time_protocol_pass_count"] != len(rows)):
         raise SystemExit(1)
     if args.require_python_parity and not summary["quality"]["paired_vs_python_60s"]["all_cases_nonregressing"]:
         raise SystemExit(1)
