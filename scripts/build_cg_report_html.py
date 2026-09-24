@@ -356,8 +356,10 @@ def _conclusion_scale(f24f, f24r, ref):
 def main():
     ref = rich_reference()
     fx = merge_new(load("fixtures.json") or [], load("fixtures_new_final.json"))
-    f24f = merge_methods(load("formal24_forward.json") or [], load("formal24_forward_timing.json"))
-    f24r = merge_methods(load("formal24_reverse.json") or [], load("formal24_reverse_timing.json"))
+    f24f = merge_methods(load("formal24_forward.json") or [], load("formal24_forward_timing.json"), ("new",))
+    f24f = merge_methods(f24f, load("formal24_forward_legacy_timing.json"), ("legacy",))
+    f24r = merge_methods(load("formal24_reverse.json") or [], load("formal24_reverse_timing.json"), ("new",))
+    f24r = merge_methods(f24r, load("formal24_reverse_legacy_timing.json"), ("legacy",))
     timing_available = bool(load("formal24_forward_timing.json"))
 
     # 总览数字（Formal24 优先）

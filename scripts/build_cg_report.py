@@ -143,7 +143,11 @@ def main():
         if not rows:
             sections.append(f"## {title}\n\n（尚未完成）\n"); continue
         other = load(new_json) if new_json else None
-        rows = merge_methods(rows, other) if (new_json and "timing" in new_json) else merge_new(rows, other)
+        if new_json and "timing" in new_json:
+            rows = merge_methods(rows, other, ("new",))
+            rows = merge_methods(rows, load(new_json.replace("_timing", "_legacy_timing")), ("legacy",))
+        else:
+            rows = merge_new(rows, other)
         sections.append(f"## {title}\n\n{summary(rows, r, prefix)}\n\n{table(rows, r, prefix)}\n")
     out = B / "汇总对比.md"
     out.write_text("# 三方对比汇总\n\n" + "\n".join(sections), encoding="utf-8")
