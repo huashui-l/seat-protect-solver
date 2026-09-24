@@ -35,7 +35,7 @@ def _cfg(config: Mapping[str, Any]) -> Dict[str, Any]:
     c.setdefault("pricing_time_limit", 60.0)
     c.setdefault("integer_time_limit", 30.0)
     c.setdefault("max_iterations", 10_000)
-    c.setdefault("pricing_workers", 4)
+    c.setdefault("pricing_workers", 6)
     c.setdefault("dive", True)
     c.setdefault("branch_and_price", True)
     c.setdefault("bp_node_limit", 200)
@@ -44,7 +44,7 @@ def _cfg(config: Mapping[str, Any]) -> Dict[str, Any]:
     c.setdefault("warm_start", "heuristic")   # heuristic | greedy | none
     c.setdefault("heuristic_seconds", 5.0)
     c.setdefault("dual_smoothing_alpha", 0.0)      # 0 关闭；Wentges 平滑系数
-    c.setdefault("pricing_early_stop", False)       # 非认证轮：找到足够负的列即停
+    c.setdefault("pricing_early_stop", True)        # 非认证轮：找到足够负的列即停
     c.setdefault("early_stop_fraction", 0.3)
     c.setdefault("early_stop_floor", 0.5)
     c.setdefault("log", True)

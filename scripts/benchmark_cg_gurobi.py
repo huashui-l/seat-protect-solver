@@ -54,14 +54,18 @@ def run_legacy(new, old, groups, cfg, seconds):
               "time": time.perf_counter() - t}); return m
 
 
+CG_OPTIONS: dict = {}
+
+
 def run_new(new, old, groups, cfg, seconds):
     from src.cg_gurobi import solve
     c = copy.deepcopy(cfg); c["cg_gurobi"] = {"total_time_limit": seconds, "pricing_time_limit": min(60.0, seconds / 3),
-                                             "integer_time_limit": min(30.0, seconds / 5), "log": False}
+                                             "integer_time_limit": min(30.0, seconds / 5), "log": False, **CG_OPTIONS}
     t = time.perf_counter()
     r = solve(new, old, groups, c["weights"], c)
     m = _metrics(new, old, groups, r["assigned_seats"], c["weights"], c)
     m.update({"U": r["lp_bound"], "U_cert": bool(r["lp_bound_certified"]), "safeU": r["safe_bound"],
+              "proven": bool(r.get("proven_optimal")), "bpU": r.get("bp_bound"),
               "time": time.perf_counter() - t}); return m
 
 
@@ -76,7 +80,9 @@ def main():
     ap.add_argument("--only", default="", help="逗号分隔的实例名过滤")
     ap.add_argument("--output", required=True)
     ap.add_argument("--json-output")
+    ap.add_argument("--cg-options", default="{}", help="JSON，覆盖新列生成的 cg_gurobi 配置")
     args = ap.parse_args()
+    CG_OPTIONS.update(json.loads(args.cg_options))
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8-sig"))
     new = json.load(open(args.new_seatmap))["seats"]; old = json.load(open(args.old_seatmap))["seats"]
     methods = args.methods.split(",")
