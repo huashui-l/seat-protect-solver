@@ -102,6 +102,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--time-limit", type=float, required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--case-id", action="append", default=[],
+                        help="screen only these cases; output is explicitly not a full Formal24 gate")
     parser.add_argument("--require-python-parity", action="store_true",
                         help="fail on any Python-60s regression; requires a 60-second group-first run")
     parser.add_argument("--audit-reference-only", action="store_true",
@@ -194,6 +196,11 @@ def main() -> None:
                           "config_sha256": sha256(args.config), "reference_csv_sha256": sha256(reference_csv),
                           "solver_launched": False}, indent=2))
         return
+    if args.case_id:
+        unknown = set(args.case_id) - set(case_ids)
+        if unknown:
+            raise ValueError(f"Unknown screen cases: {sorted(unknown)}")
+        case_paths = [path for path in case_paths if read_json(path)["caseId"] in args.case_id]
     allocation_dir.mkdir(parents=True)
     for case_path in case_paths:
         raw = read_json(case_path)
@@ -237,7 +244,6 @@ def main() -> None:
         candidate_details.append(detail)
         baseline_details.append(baseline_detail)
         rich_details.append(rich_detail)
-        reference = references[case_id]
         row = {
             "case_id": case_id,
             "returncode": completed.returncode,
@@ -254,7 +260,9 @@ def main() -> None:
                 float(result["individual_score"])
                 - sum(detail[key] for key in ("score_s", "score_v", "score_p"))
             ),
-            "gap_frozen_union_reference": (reference - external_score) / max(1.0, abs(reference)),
+            "reference_type": "unavailable",
+            "reference_value": None,
+            "gap_percent": None,
             "python_60s_score": python_score,
             "delta_vs_python": external_score - python_score,
             "gap_CG_percent": None,
@@ -342,6 +350,7 @@ def main() -> None:
             )).hexdigest(),
         },
         "case_count": len(rows),
+        "full_formal24": len(rows) == 24,
         "time_protocol_pass_count": sum(row["time_protocol_pass"] for row in rows),
         "valid_complete_count": len(valid),
         "unassigned_total": sum(row["unassigned"] for row in rows),
@@ -380,8 +389,10 @@ def main() -> None:
             "max_process_wall_seconds": max(row["process_wall_seconds"] for row in rows),
         },
         "quality": {
-            "mean_gap_frozen_union_reference": statistics.mean(row["gap_frozen_union_reference"] for row in rows),
-            "median_gap_frozen_union_reference": statistics.median(row["gap_frozen_union_reference"] for row in rows),
+            "reference_available_count": 0,
+            "mean_gap_percent": None,
+            "median_gap_percent": None,
+            "worst_gap_percent": None,
             "paired_vs_python_60s": paired_python_quality(rows, tolerance),
             "same_60s_budget": args.time_limit == 60,
             "cg_reference_status": "unavailable: no identity-bound CG integer certificate supplied",

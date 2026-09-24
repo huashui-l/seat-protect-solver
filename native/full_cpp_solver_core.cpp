@@ -2577,6 +2577,51 @@ RichLnsAssignment RichLnsWorkspace::best_group_assignment(int group_index, const
             }
             return;
         }
+        // With only ordinary passengers left, caregiver availability depends
+        // on the remaining seat set, not on the identities assigned to it.
+        // Collapse that factorial tail to an exact subset assignment DP.
+        if (std::all_of(keys.begin() + depth, keys.end(), [&](int p) {
+                return problem.passengers[p].ssr.empty() && !needs_care(p);
+            })) {
+            std::vector<size_t> remaining;
+            for (size_t j = 0; j < n; ++j) if (!used[j]) remaining.push_back(j);
+            const size_t count = size_t{1} << remaining.size();
+            const auto popcount = [](size_t mask) {
+                size_t value = 0; while (mask) { mask &= mask - 1; ++value; } return value;
+            };
+            std::vector<double> best(count, -std::numeric_limits<double>::infinity());
+            best.back() = 0.0;
+            for (size_t mask = count - 1; mask-- > 0;) {
+                if (mask % 128 == 0 && std::chrono::steady_clock::now() >= deadline_) {
+                    stopped_by_deadline = true; return;
+                }
+                const size_t i = depth + popcount(mask);
+                for (size_t j = 0; j < remaining.size(); ++j) {
+                    const size_t bit = size_t{1} << j;
+                    if (!(mask & bit) && feasible[i][remaining[j]])
+                        best[mask] = std::max(best[mask], scores[i][remaining[j]] + best[mask | bit]);
+                }
+            }
+            if (!std::isfinite(best[0])) return;
+            size_t mask = 0;
+            double total = score;
+            for (size_t i = depth; i < n; ++i) {
+                for (size_t j = 0; j < remaining.size(); ++j) {
+                    const size_t bit = size_t{1} << j;
+                    if (!(mask & bit) && feasible[i][remaining[j]]
+                        && scores[i][remaining[j]] + best[mask | bit] >= best[mask] - 1e-10) {
+                        selected[i] = static_cast<int>(remaining[j]);
+                        total += scores[i][remaining[j]]; mask |= bit; break;
+                    }
+                }
+            }
+            if (total > result.score) {
+                result.score = total; result.seats.clear();
+                for (int j : selected) result.seats.push_back(seats[j]);
+            }
+            for (size_t i = depth; i < n; ++i) selected[i] = -1;
+            return;
+        }
         for (size_t j = 0; j < n; ++j) if (!used[j] && feasible[depth][j]) {
             selected[depth] = static_cast<int>(j); used[j] = true;
             self(self, depth + 1, score + scores[depth][j]);
