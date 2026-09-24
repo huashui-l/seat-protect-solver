@@ -179,6 +179,8 @@ MP2固定一个同行组，在该组各旅客所属舱位的完整座位—保�
 
 旧的 HiGHS 列生成已归档到 `archive/legacy_column_generation/`（其定价证书层的缺陷见 `reports/audit-2026-09-23/列生成正确性审计.md`）。新的精确路线是 `src/cg_gurobi/`：按同行组直接定价的 Dantzig–Wolfe 列生成 + 分支定价，只依赖本文档第 6 节模型和独立评估器语义，用法与证书口径见 `src/cg_gurobi/README.md`。
 
+Formal24 上与启发式、旧实现、Rich 60 s 参考的完整对比报告：`reports/audit-2026-09-23/列生成重做报告.html`（由 `scripts/build_cg_report_html.py` 生成）；基准脚本 `scripts/benchmark_cg_gurobi.py`。
+
 ## 7. 项目结构
 
 ```text
