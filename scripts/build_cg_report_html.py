@@ -512,7 +512,7 @@ a{color:var(--accent)}
 </header>
 <nav class="toc">
   <a href="#s0">总览</a><a href="#s1">为什么重做</a><a href="#s2">建模</a><a href="#s3">算法流程</a><a href="#s4">正确性验证</a><a href="#s5">实验设计</a>
-  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#r3">公开验证集</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a>
+  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#s7">结论与后续</a><a href="#r3">附录：公开验证集</a><a href="#s7">结论与后续</a>
 </nav>
 <main>
 <section id="s0"><h2>总览</h2>{overview_html}
@@ -570,14 +570,13 @@ a{color:var(--accent)}
 </ul></section>
 
 <section id="s5"><h2>5 · 实验设计</h2>
-<ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）。两者都是旧实现正式协议使用过的数据，不另加自生成算例。</li>
+<ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）仅作正确性回归放在附录。两者都是旧实现正式协议使用过的数据，不另加自生成算例。</li>
 <li><b>方法</b>：项目启发式 5 s（V1 生产口径）；旧列生成 150 s（归档版，含其分支定价，4 线程默认）；新列生成 150 s（默认配置，6 定价线程）。</li>
 <li><b>指标</b>：完整合法（硬违规/未分配）、软分及 s/v/p/c/b 分项、界与证书类型、相对自身界的 gap、耗时。全部由独立评估器重算；串行运行避免计时干扰。</li></ul>
 <div class="callout warn">口径提醒：新旧列生成都是 150 s，Rich 参考是 60 s 单次运行，启发式是 5 s；跨方法比较看软分与界，不比耗时。相对自身界的 gap 依赖界的紧度，旧实现的安全界在困难例上极松（曾出现 +912 这样的无意义值），其 gap 均值不能当作质量差距。</div></section>
 
 <section id="r1"><h2>6 · 结果</h2>{section("Formal24 正向（3-4-3 → 3-3，150 s）", f24f, ref, "forward:", "官方语料；附冻结 Rich 60 s 参考与历史最好整数解 I。")}</section>
 <section id="r2">{section("Formal24 反向（3-3 → 3-4-3，150 s）", f24r, ref, "reverse:")}</section>
-<section id="r3">{section("公开验证集（小规模 6–23 人，60 s）", fx, budget="60 s")}</section>
 <section id="rt"><h3>求解时间（精确方法）</h3>
 <p>对精确算法，时间要看"多久拿到证书"而不是墙钟：<b>根 LP 认证用时</b>是所有组定价闭合、拿到精确 U 的时刻，反映定价效率；<b>证明最优用时</b>是分支定价前沿清空的时刻；150 s 内两者都没到的算例给出截停时相对自身界的 gap。{"" if timing_available else "<span class='muted'>（计时补测尚未完成，下表为空或不完整。）</span>"}</p>
 {timing_table([("Formal24 正向", f24f), ("Formal24 反向", f24r)])}
@@ -609,6 +608,10 @@ a{color:var(--accent)}
 <li>{{CONCLUSION_SCALE}}</li>
 <li>后续：加强松弛（clique 割 / 单侧保护主问题化）；把 Rich 60 s 的搜索能力作为初始列注入的对照；将本报告的基准脚本纳入 CI 的"手动/长跑"层。</li>
 </ul></section>
+
+<section id="r3"><h2>附录 · 公开验证集（正确性回归）</h2>
+<p class="small muted">仓库自带的 11 个小规模算例（6–23 人），只用于正确性回归：小到可以穷举验证，且旧实现在其上有已证明的最优值可供逐位复现。不参与主结论，也不再重复运行。</p>
+{section("公开验证集（60 s）", fx, budget="60 s")}</section>
 </main></div>
 """
     diag = _full_edge_diag_text()
