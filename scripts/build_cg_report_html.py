@@ -364,6 +364,43 @@ def convergence_matrix(rows, budget):
             f"时限内未收敛 = 只有安全界或无界，解质量看软分与截停 gap。</p>{matrix}{detail}")
 
 
+def long_budget_section(f150, l600, n600, ref, prefix, title):
+    """600 s 长预算：只对 150 s 未证明的运行重跑；与 150 s 结果并列。"""
+    if not l600 and not n600:
+        return f"<section><h3>{esc(title)}</h3><p class='muted'>600 s 长预算尚未完成。</p></section>"
+    by150 = {r["instance"]: r for r in f150}
+    by600 = {}
+    for rows, m in ((l600 or [], "legacy"), (n600 or [], "new")):
+        for r in rows:
+            if r.get(m) and "error" not in r[m]:
+                by600.setdefault(r["instance"], {})[m] = r[m]
+    head = ("<div class='tablewrap'><table><thead><tr><th>算例</th><th>方法</th>"
+            "<th class='num'>150 s 软分</th><th class='num'>600 s 软分</th><th class='num'>Δ</th>"
+            "<th>150 s 状态</th><th>600 s 状态</th><th class='num'>600 s 界</th><th class='num'>600 s gap%</th><th class='num'>用时 s</th><th class='num'>Rich 60 s</th><th class='num'>历史 I</th></tr></thead><tbody>")
+    body = []; stats = {"legacy": {"n": 0, "proven": 0, "root": 0, "improved": 0, "dsum": 0.0}, "new": {"n": 0, "proven": 0, "root": 0, "improved": 0, "dsum": 0.0}}
+    for inst in sorted(by600):
+        name = inst.replace("_groups", ""); key = prefix + name
+        first = True
+        for m in ("legacy", "new"):
+            x6 = by600[inst].get(m)
+            if not x6:
+                continue
+            x1 = by150.get(inst, {}).get(m, {})
+            st1, st6 = convergence_state(x1) if x1 else "none", convergence_state(x6)
+            b, kind = bound_of(x6)
+            gap = "0" if st6 == "proven" else ("—" if b is None else f"{100*(b-x6['score'])/max(1,abs(x6['score'])):.2f}")
+            d = x6["score"] - x1.get("score", x6["score"])
+            st = stats[m]; st["n"] += 1; st["proven"] += st6 == "proven"; st["root"] += st6 == "root"; st["improved"] += d > 1e-6; st["dsum"] += d
+            rich = ref.get(key, {}).get("rich60"); best = ref.get(key, {}).get("best_I")
+            body.append(f"<tr class='m-{m}'>{('<td class=name rowspan=' + str(len(by600[inst])) + '>' + esc(name) + '</td>') if first else ''}<td>{LABEL[m].replace('150 s','')}</td>"
+                        f"<td class='num'>{fmt(x1.get('score'),3) if x1 else '—'}</td><td class='num strong'>{fmt(x6['score'],3)}</td><td class='num'>{d:+.2f}</td>"
+                        f"<td class='{STATE_CLASS[st1]}'>{STATE_LABEL[st1]}</td><td class='{STATE_CLASS[st6]}'>{STATE_LABEL[st6]}</td>"
+                        f"<td class='num'>{fmt(b,3)}</td><td class='num'>{gap}</td><td class='num'>{x6['time']:.0f}</td><td class='num'>{fmt(rich,2)}</td><td class='num'>{fmt(best,2)}</td></tr>")
+            first = False
+    summ = "；".join(f"{'旧' if m=='legacy' else '新'}：重跑 {st['n']} 例，600 s 内证明最优 {st['proven']}、根 LP 收敛 {st['root']}、仍未收敛 {st['n']-st['proven']-st['root']}；软分改善 {st['improved']} 例，均值 {st['dsum']/max(1,st['n']):+.2f}" for m, st in stats.items() if st["n"])
+    return f"<section><h3>{esc(title)}</h3><p class='small'>只对 150 s 内未证明最优的运行重跑，预算 600 s，其余设置不变；旧方法同样重跑。{summ}。</p>{head}{''.join(body)}</tbody></table></div></section>"
+
+
 def section(title, rows, ref=None, prefix="", note="", budget="150 s"):
     global LABEL
     saved = dict(LABEL)
@@ -417,6 +454,8 @@ def main():
     f24r = merge_methods(load("formal24_reverse.json") or [], load("formal24_reverse_timing.json"), ("new",))
     f24r = merge_methods(f24r, load("formal24_reverse_legacy_timing.json"), ("legacy",))
     timing_available = bool(load("formal24_forward_timing.json"))
+    l600f, n600f = load("formal24_forward_600s_legacy.json"), load("formal24_forward_600s_new.json")
+    l600r, n600r = load("formal24_reverse_600s_legacy.json"), load("formal24_reverse_600s_new.json")
 
     # 总览数字（Formal24 优先）
     all_rows = [("Formal24 正向", f24f, "forward:"), ("Formal24 反向", f24r, "reverse:")]
@@ -520,7 +559,7 @@ a{color:var(--accent)}
 </header>
 <nav class="toc">
   <a href="#s0">总览</a><a href="#s1">为什么重做</a><a href="#s2">建模</a><a href="#s3">算法流程</a><a href="#s4">正确性验证</a><a href="#s5">实验设计</a>
-  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#rt">求解时间</a><a href="#s6">审计与修复</a><a href="#r3">附录：公开验证集</a><a href="#s7">结论与后续</a>
+  <a href="#r1">Formal24 正向</a><a href="#r2">Formal24 反向</a><a href="#rt">求解时间</a><a href="#r600">600 s 长预算</a><a href="#s6">审计与修复</a><a href="#r3">附录：公开验证集</a><a href="#s7">结论与后续</a>
 </nav>
 <main>
 <section id="s0"><h2>总览</h2>{overview_html}
@@ -595,6 +634,10 @@ a{color:var(--accent)}
 {convergence_charts(f24f, ["100_normal", "150_normal", "150_edge", "full_stress"])}
 {convergence_charts(f24r, ["100_normal", "150_edge", "full_stress"])}
 </section>
+
+<section id="r600"><h2>6.5 · 600 s 长预算：150 s 未收敛的运行能否收敛</h2>
+{long_budget_section(f24f, l600f, n600f, ref, "forward:", "Formal24 正向")}
+{long_budget_section(f24r, l600r, n600r, ref, "reverse:", "Formal24 反向")}</section>
 
 <section id="s6"><h2>7 · 对新实现的对抗式审计与修复</h2>
 <p>5 个维度（硬约束保真、目标一致性、证书有效性、鲁棒性、测试覆盖）各由一名独立审计者阅读代码并构造反例，25 条原始发现逐条交给 2 名持怀疑立场的核查者尝试驳倒（允许 5 s 内的小实例复现），最后由完整性评审列未覆盖项。结果 22 条成立（均被复现）、3 条被驳回；按根因归并修复如下，并新增 5 个回归测试。</p>
