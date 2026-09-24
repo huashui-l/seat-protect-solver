@@ -2122,6 +2122,11 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
     result.owner_regrets.resize(count, 0.0);
     result.costs.resize(count, std::vector<double>(seats));
     result.rankings.resize(count);
+    std::vector<int> assigned_passengers, assigned_infants;
+    for (int p = 0; p < count; ++p) if (state.passenger_to_seat[p] >= 0) {
+        assigned_passengers.push_back(p);
+        if (problem.passengers[p].ssr == "BSCT") assigned_infants.push_back(p);
+    }
     const auto seat_value = [&](const Seat& seat) {
         if (!std::isnan(seat.explicit_value)) return seat.explicit_value;
         double value = seat.cabin == "Business" ? problem.business_seat_value : 0.0;
@@ -2154,10 +2159,10 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
                 if (seat.near_toilet != preference.first) score += problem.weight_t * preference.second;
             double impact = 0.0;
             if (passenger.group_id != -1) {
-                for (int other = 0; other < count; ++other) {
+                const auto& affecting = passenger.ssr == "BSCT" ? assigned_passengers : assigned_infants;
+                for (int other : affecting) {
                     const int assigned = state.passenger_to_seat[other];
-                    if (assigned < 0 || problem.passengers[other].group_id == passenger.group_id) continue;
-                    if (passenger.ssr != "BSCT" && problem.passengers[other].ssr != "BSCT") continue;
+                    if (problem.passengers[other].group_id == passenger.group_id) continue;
                     const auto& other_seat = problem.seats[assigned];
                     if (seat.row == other_seat.row && seat.subrow == other_seat.subrow)
                         impact += 1.0 / (1.0 + std::abs(seat.x - other_seat.x));
