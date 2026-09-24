@@ -315,11 +315,59 @@ def convergence_charts(rows, picks):
     return (legend + "".join(out)) if out else "<p class='muted'>暂无轨迹数据。</p>"
 
 
-def section(title, rows, ref=None, prefix="", note=""):
+def convergence_state(m):
+    """三类收敛状态：proven / root / none。"""
+    if m.get("proven"):
+        return "proven"
+    if m.get("U") is not None:
+        return "root"
+    return "none"
+
+
+STATE_LABEL = {"proven": "证明最优", "root": "根 LP 收敛（未证明）", "none": "时限内未收敛"}
+STATE_CLASS = {"proven": "k-proven", "root": "k-exact", "none": "k-safe"}
+
+
+def convergence_matrix(rows, budget):
+    counts = {m: {"proven": 0, "root": 0, "none": 0} for m in ("legacy", "new")}
+    per = []
+    for r in rows:
+        o, n = r.get("legacy"), r.get("new")
+        if not o or not n or "error" in o or "error" in n:
+            continue
+        so, sn = convergence_state(o), convergence_state(n)
+        counts["legacy"][so] += 1; counts["new"][sn] += 1
+        def t(x, st):
+            if st == "proven":
+                v = x.get("proven_seconds") if x.get("proven_seconds") is not None else x.get("time")
+                return f"{v:.0f} s 证明"
+            if st == "root":
+                v = x.get("root_seconds")
+                return f"根 LP {v:.0f} s；截停 gap {100*(x['U']-x['score'])/max(1,abs(x['score'])):.2f}%" if v is not None else f"截停 gap {100*(x['U']-x['score'])/max(1,abs(x['score'])):.2f}%"
+            b, _ = bound_of(x)
+            return "无界" if b is None else f"安全界 gap {100*(b-x['score'])/max(1,abs(x['score'])):.1f}%"
+        per.append((r["instance"].replace("_groups", ""), so, t(o, so), sn, t(n, sn)))
+    if not per:
+        return ""
+    n = len(per)
+    head = ("<div class='tablewrap'><table class='plain'><thead><tr><th>方法</th>"
+            "<th class='num'>证明最优</th><th class='num'>根 LP 收敛（未证明）</th><th class='num'>时限内未收敛</th></tr></thead><tbody>")
+    body = "".join(f"<tr><td>{LABEL[m]}</td><td class='num k-proven'>{counts[m]['proven']}</td><td class='num k-exact'>{counts[m]['root']}</td><td class='num k-safe'>{counts[m]['none']}</td></tr>" for m in ("legacy", "new"))
+    matrix = head + body + "</tbody></table></div>"
+    detail = ("<div class='tablewrap'><table><thead><tr><th>算例</th><th>旧列生成</th><th>说明</th><th>新列生成</th><th>说明</th></tr></thead><tbody>"
+              + "".join(f"<tr><td class='name'>{esc(name)}</td><td class='{STATE_CLASS[so]}'>{STATE_LABEL[so]}</td><td class='small'>{to}</td>"
+                        f"<td class='{STATE_CLASS[sn]}'>{STATE_LABEL[sn]}</td><td class='small'>{tn}</td></tr>" for name, so, to, sn, tn in per)
+              + "</tbody></table></div>")
+    return (f"<h4>收敛状态（预算 {budget}）</h4><p class='small muted'>证明最优 = 分支定价前沿清空并全部认证，求解提前结束；根 LP 收敛 = 所有组定价闭合、拿到精确上界，但整数 gap 未在时限内关闭；"
+            f"时限内未收敛 = 只有安全界或无界，解质量看软分与截停 gap。</p>{matrix}{detail}")
+
+
+def section(title, rows, ref=None, prefix="", note="", budget="150 s"):
     if not rows:
         return f"<section><h3>{esc(title)}</h3><p class='muted'>尚未完成。</p></section>"
     s = summary_stats(rows, ref, prefix)
     return (f"<section><h3>{esc(title)}</h3>{('<p>'+note+'</p>') if note else ''}{stat_tiles(s)}"
+            f"{convergence_matrix(rows, budget)}"
             f"<h4>逐算例：新 − 旧 软分差</h4>{delta_chart(rows)}<h4>逐算例明细</h4>{result_table(rows, ref, prefix)}</section>")
 
 
@@ -529,7 +577,7 @@ a{color:var(--accent)}
 
 <section id="r1"><h2>6 · 结果</h2>{section("Formal24 正向（3-4-3 → 3-3，150 s）", f24f, ref, "forward:", "官方语料；附冻结 Rich 60 s 参考与历史最好整数解 I。")}</section>
 <section id="r2">{section("Formal24 反向（3-3 → 3-4-3，150 s）", f24r, ref, "reverse:")}</section>
-<section id="r3">{section("公开验证集（小规模 6–23 人，60 s）", fx)}</section>
+<section id="r3">{section("公开验证集（小规模 6–23 人，60 s）", fx, budget="60 s")}</section>
 <section id="rt"><h3>求解时间（精确方法）</h3>
 <p>对精确算法，时间要看"多久拿到证书"而不是墙钟：<b>根 LP 认证用时</b>是所有组定价闭合、拿到精确 U 的时刻，反映定价效率；<b>证明最优用时</b>是分支定价前沿清空的时刻；150 s 内两者都没到的算例给出截停时相对自身界的 gap。{"" if timing_available else "<span class='muted'>（计时补测尚未完成，下表为空或不完整。）</span>"}</p>
 {timing_table([("Formal24 正向", f24f), ("Formal24 反向", f24r)])}
