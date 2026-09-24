@@ -211,6 +211,8 @@ def timing_table(rows_list):
     body = []
     agg = {"legacy": {"root": [], "proven": []}, "new": {"root": [], "proven": []}}
     both_root = []
+    both_proven = []
+    only = {"legacy": 0, "new": 0}
     for title, rows in rows_list:
         body.append(f"<tr><td colspan='7' class='muted small'>{esc(title)}</td></tr>")
         for r in rows:
@@ -219,6 +221,8 @@ def timing_table(rows_list):
                 continue
             def cell_t(x, key):
                 v = x.get(key)
+                if key == "proven_seconds" and v is None and x.get("proven"):
+                    v = x.get("time")   # 求到最优即停：墙钟即证明用时
                 return "—" if v is None else f"{v:.0f}"
             def gap(x):
                 if x.get("proven"): return "0（已证明）"
@@ -230,6 +234,10 @@ def timing_table(rows_list):
                 if x.get("proven_seconds") is not None: agg[m]["proven"].append(x["proven_seconds"])
             if o.get("root_seconds") is not None and n.get("root_seconds") is not None:
                 both_root.append((o["root_seconds"], n["root_seconds"]))
+            if o.get("proven") and n.get("proven"):
+                both_proven.append((o["time"], n["time"]))
+            elif o.get("proven") or n.get("proven"):
+                only["legacy" if o.get("proven") else "new"] += 1
             name = r["instance"].replace("_groups", "")
             body.append(f"<tr><td class='name'>{esc(name)}</td><td class='num'>{cell_t(o,'root_seconds')}</td><td class='num'>{cell_t(n,'root_seconds')}</td>"
                         f"<td class='num'>{cell_t(o,'proven_seconds')}</td><td class='num'>{cell_t(n,'proven_seconds')}</td>"
@@ -241,7 +249,12 @@ def timing_table(rows_list):
         summ.append(f"证明最优 {len(p_)} 例（中位 {statistics.median(p_):.0f} s）" if p_ else "证明最优 0 例")
     if both_root:
         faster = sum(1 for a, b in both_root if b < a - 1e-6)
-        summ.append(f"两法都认证的 {len(both_root)} 例中新方法更快 {faster} 例，用时比中位 {statistics.median([b/max(a,1e-9) for a, b in both_root]):.2f}")
+        summ.append(f"两法都拿到根 LP 认证的 {len(both_root)} 例中新方法更快 {faster} 例，用时比中位 {statistics.median([b/max(a,1e-9) for a, b in both_root]):.2f}")
+    if both_proven:
+        faster = sum(1 for a, b in both_proven if b < a - 1e-6)
+        summ.append(f"两法都证明最优的 {len(both_proven)} 例（求到最优即停）中新方法更快 {faster} 例，用时比中位 {statistics.median([b/max(a,1e-9) for a, b in both_proven]):.2f}")
+    if only["legacy"] or only["new"]:
+        summ.append(f"仅一方证明最优：旧 {only['legacy']} 例，新 {only['new']} 例")
     return "<p class='small'>" + "；".join(summ) + "。</p>" + head + "".join(body) + "</tbody></table></div>"
 
 
