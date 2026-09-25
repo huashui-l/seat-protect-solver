@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "corpus": "generator-v3.2 d4 smooth multi-aircraft",
+  "corpus_id": "d4_smooth_multi_aircraft_2026-09-25",
+  "generator_version": "generator-v3.2",
+  "description": "Four aircraft transitions, six built-in layouts, four evenly interpolated normal-to-edge difficulty levels.",
+  "seed_base": 20260925,
+  "difficulty_definition": {
+    "source_low": "normal",
+    "source_high": "edge",
+    "levels": [
+      {
+        "name": "d00",
+        "interpolation": 0.0
+      },
+      {
+        "name": "d33",
+        "interpolation": 0.3333333333333333
+      },
+      {
+        "name": "d66",
+        "interpolation": 0.6666666666666666
+      },
+      {
+        "name": "d100",
+        "interpolation": 1.0
+      }
+    ]
+  },
+  "seatmaps": [
+    {
+      "layout": "2-2",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/2-2seatmap.json",
+      "aircraft_model": "Generic-RJ-26-2-2",
+      "total_seats": 98,
+      "sha256": "b5cb23efc259e1003b14338b650f84bfc3b36351dada6a066227e20955e4ab40"
+    },
+    {
+      "layout": "2-3",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/2-3seatmap.json",
+      "aircraft_model": "Generic-NB-28-2-3",
+      "total_seats": 137,
+      "sha256": "ed875b1a4330e110a522615821663d8091597d4ca34641e6ea93012c179b9a6a"
+    },
+    {
+      "layout": "2-4-2",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/2-4-2seatmap.json",
+      "aircraft_model": "Generic-WB-37-2-4-2",
+      "total_seats": 284,
+      "sha256": "2947f82a81e4bd9c2b7842727d3d3125d1a79d6ba9e76f50460d4515eae39db8"
+    },
+    {
+      "layout": "3-3",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/3-3seatmap.json",
+      "aircraft_model": "Generic-NB-32-3-3",
+      "total_seats": 184,
+      "sha256": "e956ee3288b6d4b9c1db20fc74adca4e61f61a762c35c0549ba645e1859df5e4"
+    },
+    {
+      "layout": "3-3-3",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/3-3-3seatmap.json",
+      "aircraft_model": "Generic-WB-40-3-3-3",
+      "total_seats": 339,
+      "sha256": "64c062edee88dde1faefc85daaca0f9f9e95dfcd86cbf842233ca0f349632a0e"
+    },
+    {
+      "layout": "3-4-3",
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/seatmaps/3-4-3seatmap.json",
+      "aircraft_model": "Generic-WB-36-3-4-3",
+      "total_seats": 336,
+      "sha256": "9c8afef7f308ce353ecaf46287d2dc195b26a7c10126ecac8509c967deb6f454"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "d4:rj22_to_nb23:d00",
+      "direction": "rj22_to_nb23",
+      "difficulty_level": "d00",
+      "difficulty_interpolation": 0.0,
+      "seed": 20260925,
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 61,
+      "fixed_seats": 12,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/rj22_to_nb23_d00_groups.json",
+      "sha256": "36c039ca46fe5eb797ee84e71f3706a202fcd1a44113e993b0959b0ea5acd857"
+    },
+    {
+      "case_id": "d4:rj22_to_nb23:d33",
+      "direction": "rj22_to_nb23",
+      "difficulty_level": "d33",
+      "difficulty_interpolation": 0.3333333333333333,
+      "seed": 20260926,
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 59,
+      "fixed_seats": 9,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/rj22_to_nb23_d33_groups.json",
+      "sha256": "c41d5786c2177e7b762250c751853285ba4cbbec55b3045f118d8e87e3f3dd7b"
+    },
+    {
+      "case_id": "d4:rj22_to_nb23:d66",
+      "direction": "rj22_to_nb23",
+      "difficulty_level": "d66",
+      "difficulty_interpolation": 0.6666666666666666,
+      "seed": 20260927,
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 59,
+      "fixed_seats": 6,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/rj22_to_nb23_d66_groups.json",
+      "sha256": "37562874c2f9c8a1d9faa2816c8ac20b6ea1273b950a39fda4bba6effbd315fc"
+    },
+    {
+      "case_id": "d4:rj22_to_nb23:d100",
+      "direction": "rj22_to_nb23",
+      "difficulty_level": "d100",
+      "difficulty_interpolation": 1.0,
+      "seed": 20260928,
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 56,
+      "fixed_seats": 3,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/rj22_to_nb23_d100_groups.json",
+      "sha256": "012fe3b0946616c75cf68cf74bb7cc69d7bbfbb371603cfd9d6388aac19f39db"
+    },
+    {
+      "case_id": "d4:nb23_to_rj22:d00",
+      "direction": "nb23_to_rj22",
+      "difficulty_level": "d00",
+      "difficulty_interpolation": 0.0,
+      "seed": 20261025,
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 61,
+      "fixed_seats": 12,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb23_to_rj22_d00_groups.json",
+      "sha256": "b4bb7d72f9dc9b5890882b06f38a929b72d3f6f84eeff8e69a5a276ba2a0bd07"
+    },
+    {
+      "case_id": "d4:nb23_to_rj22:d33",
+      "direction": "nb23_to_rj22",
+      "difficulty_level": "d33",
+      "difficulty_interpolation": 0.3333333333333333,
+      "seed": 20261026,
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 59,
+      "fixed_seats": 9,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb23_to_rj22_d33_groups.json",
+      "sha256": "68c5344873cef4b9ba21baa6047d228262876fe1c0de91d1704a967c45e9d4d5"
+    },
+    {
+      "case_id": "d4:nb23_to_rj22:d66",
+      "direction": "nb23_to_rj22",
+      "difficulty_level": "d66",
+      "difficulty_interpolation": 0.6666666666666666,
+      "seed": 20261027,
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 59,
+      "fixed_seats": 6,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb23_to_rj22_d66_groups.json",
+      "sha256": "c2b07e20ebae3d781ba83650e873387a9de326bb329b4a1aa553cf451807bf7d"
+    },
+    {
+      "case_id": "d4:nb23_to_rj22:d100",
+      "direction": "nb23_to_rj22",
+      "difficulty_level": "d100",
+      "difficulty_interpolation": 1.0,
+      "seed": 20261028,
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "requested_passengers": 65,
+      "passenger_count": 65,
+      "traveler_count": 57,
+      "fixed_seats": 3,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb23_to_rj22_d100_groups.json",
+      "sha256": "e9d7c903073e43ab0ac903937b41d3080a46a5cbceb5c9adcb64f63e981f0d5a"
+    },
+    {
+      "case_id": "d4:nb33_to_wb242:d00",
+      "direction": "nb33_to_wb242",
+      "difficulty_level": "d00",
+      "difficulty_interpolation": 0.0,
+      "seed": 20261125,
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "requested_passengers": 120,
+      "passenger_count": 120,
+      "traveler_count": 116,
+      "fixed_seats": 23,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb33_to_wb242_d00_groups.json",
+      "sha256": "cdfe5fd93b5258c15e66c4c6880fd4b50538f83f10ae5accc6111f290bc640e7"
+    },
+    {
+      "case_id": "d4:nb33_to_wb242:d33",
+      "direction": "nb33_to_wb242",
+      "difficulty_level": "d33",
+      "difficulty_interpolation": 0.3333333333333333,
+      "seed": 20261126,
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "requested_passengers": 120,
+      "passenger_count": 120,
+      "traveler_count": 114,
+      "fixed_seats": 17,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb33_to_wb242_d33_groups.json",
+      "sha256": "11d237ecc19daa45f4b7cb09a455b4c9b32043bbb032cbc82a00f09494d26d3a"
+    },
+    {
+      "case_id": "d4:nb33_to_wb242:d66",
+      "direction": "nb33_to_wb242",
+      "difficulty_level": "d66",
+      "difficulty_interpolation": 0.6666666666666666,
+      "seed": 20261127,
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "requested_passengers": 120,
+      "passenger_count": 120,
+      "traveler_count": 112,
+      "fixed_seats": 11,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb33_to_wb242_d66_groups.json",
+      "sha256": "6b7ff6136c74749e183ff09be2c60d33fc294f9dc3cf06af0e472331e363678c"
+    },
+    {
+      "case_id": "d4:nb33_to_wb242:d100",
+      "direction": "nb33_to_wb242",
+      "difficulty_level": "d100",
+      "difficulty_interpolation": 1.0,
+      "seed": 20261128,
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "requested_passengers": 120,
+      "passenger_count": 120,
+      "traveler_count": 108,
+      "fixed_seats": 5,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/nb33_to_wb242_d100_groups.json",
+      "sha256": "37314c4dd9beed294a86d9436d7769b315a52444d124d62788d72b585be10464"
+    },
+    {
+      "case_id": "d4:wb343_to_wb333:d00",
+      "direction": "wb343_to_wb333",
+      "difficulty_level": "d00",
+      "difficulty_interpolation": 0.0,
+      "seed": 20261225,
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "requested_passengers": 180,
+      "passenger_count": 180,
+      "traveler_count": 174,
+      "fixed_seats": 35,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/wb343_to_wb333_d00_groups.json",
+      "sha256": "b14b08b9e4b79a5a580eb5236996cfb1c32ce3b7d2683c09ef40b68a3afc8b21"
+    },
+    {
+      "case_id": "d4:wb343_to_wb333:d33",
+      "direction": "wb343_to_wb333",
+      "difficulty_level": "d33",
+      "difficulty_interpolation": 0.3333333333333333,
+      "seed": 20261226,
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "requested_passengers": 180,
+      "passenger_count": 180,
+      "traveler_count": 172,
+      "fixed_seats": 26,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/wb343_to_wb333_d33_groups.json",
+      "sha256": "b605c0444fbed75dc28a0ad9d84fc746a9e567bd8d31e8ad194e118deb49d81e"
+    },
+    {
+      "case_id": "d4:wb343_to_wb333:d66",
+      "direction": "wb343_to_wb333",
+      "difficulty_level": "d66",
+      "difficulty_interpolation": 0.6666666666666666,
+      "seed": 20261227,
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "requested_passengers": 180,
+      "passenger_count": 180,
+      "traveler_count": 168,
+      "fixed_seats": 17,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/wb343_to_wb333_d66_groups.json",
+      "sha256": "233f985ec6dcbe711ebc18c0b72e126f97ac07e772da09467afad1b2a7bc954b"
+    },
+    {
+      "case_id": "d4:wb343_to_wb333:d100",
+      "direction": "wb343_to_wb333",
+      "difficulty_level": "d100",
+      "difficulty_interpolation": 1.0,
+      "seed": 20261228,
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "requested_passengers": 180,
+      "passenger_count": 180,
+      "traveler_count": 165,
+      "fixed_seats": 8,
+      "relative_path": "data/generator_v3_2/d4_smooth_multi_aircraft_2026-09-25/cases/wb343_to_wb333_d100_groups.json",
+      "sha256": "9494724ffb7b654847c6dfe3fcc26a5d354e9741f9439fbd1691fa23d7600e60"
+    }
+  ]
+}
