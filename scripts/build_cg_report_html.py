@@ -401,6 +401,38 @@ def long_budget_section(f150, l600, n600, ref, prefix, title):
     return f"<section><h3>{esc(title)}</h3><p class='small'>只对 150 s 内未证明最优的运行重跑，预算 600 s，其余设置不变；旧方法同样重跑。{summ}。</p>{head}{''.join(body)}</tbody></table></div></section>"
 
 
+def instance_profile_table(f24f, f24r, n600f, n600r):
+    """24 例的同行组规模分布，并标出新方法 150 s / 600 s 的收敛状态。"""
+    import collections, glob
+    D = ROOT / "data/generator_v3_2/d3_official_24cases_2026-09-07"
+    six = {}
+    for d, rows in (("forward", n600f or []), ("reverse", n600r or [])):
+        for r in rows:
+            six[(d, r["instance"])] = r["new"]
+    base = {}
+    for d, rows in (("forward", f24f), ("reverse", f24r)):
+        for r in rows:
+            base[(d, r["instance"])] = r["new"]
+    head = ("<div class='tablewrap'><table><thead><tr><th>算例</th><th class='num'>人数</th><th class='num'>组数</th><th class='num'>最大组</th>"
+            "<th class='num'>≥7 人组</th><th class='num'>≥9 人组</th><th>组规模分布（人数:组数）</th><th>新 150 s</th><th>新 600 s</th></tr></thead><tbody>")
+    body = []
+    for d in ("forward", "reverse"):
+        body.append(f"<tr><td colspan='9' class='muted small'>{'正向 3-4-3 → 3-3' if d == 'forward' else '反向 3-3 → 3-4-3'}</td></tr>")
+        for f in sorted(glob.glob(str(D / d / "*_groups.json"))):
+            inst = Path(f).name.replace(".json", "")
+            g = json.loads(Path(f).read_text(encoding="utf-8-sig"))["groups"]
+            sizes = collections.Counter(len(x["psrs"]) for x in g)
+            dist = " ".join(f"{k}:{v}" for k, v in sorted(sizes.items()))
+            b = base.get((d, inst)); x6 = six.get((d, inst))
+            s1 = convergence_state(b) if b else "none"
+            s6 = convergence_state(x6) if x6 else (s1 if s1 == "proven" else "none")
+            note6 = "" if x6 else ("<span class='muted small'>（150 s 已证明，未重跑）</span>" if s1 == "proven" else "")
+            body.append(f"<tr><td class='name'>{esc(inst.replace('_groups',''))}</td><td class='num'>{sum(len(x['psrs']) for x in g)}</td><td class='num'>{len(g)}</td>"
+                        f"<td class='num strong'>{max(sizes)}</td><td class='num'>{sum(v for k, v in sizes.items() if k >= 7)}</td><td class='num'>{sum(v for k, v in sizes.items() if k >= 9)}</td>"
+                        f"<td class='small'>{dist}</td><td class='{STATE_CLASS[s1]}'>{STATE_LABEL[s1]}</td><td class='{STATE_CLASS[s6]}'>{STATE_LABEL[s6]}{note6}</td></tr>")
+    return head + "".join(body) + "</tbody></table></div>"
+
+
 def section(title, rows, ref=None, prefix="", note="", budget="150 s"):
     global LABEL
     saved = dict(LABEL)
@@ -623,6 +655,10 @@ a{color:var(--accent)}
 <ul><li><b>数据</b>：Formal24 官方 24 例（正向 3-4-3→3-3、反向 3-3→3-4-3；50/100/150/full × normal/stress/edge；附冻结的 Rich Python 60 s 参考分与历史最好整数解 I）；公开验证集 11 例（6–23 人）仅作正确性回归放在附录。两者都是旧实现正式协议使用过的数据，不另加自生成算例。</li>
 <li><b>方法</b>：项目启发式 5 s（V1 生产口径）；旧列生成 150 s（归档版，含其分支定价，4 线程默认）；新列生成 150 s（默认配置，6 定价线程）。新方法 24 例全部以审计修复后代码重跑；旧方法沿用首轮结果，仅正向 150_normal、full_normal 为补记根 LP 认证时刻重跑一次，其中 full_normal 重跑未再拿到精确 U（首轮 −970.49，重跑仅安全界 −962.72），说明该例旧方法的收敛处于 150 s 边界，报告按重跑值记录。</li>
 <li><b>指标</b>：完整合法（硬违规/未分配）、软分及 s/v/p/c/b 分项、界与证书类型、相对自身界的 gap、耗时。全部由独立评估器重算；串行运行避免计时干扰。</li></ul>
+<h3>5.1 算例画像：同行组规模与收敛状态</h3>
+<p>列生成的定价子问题按同行组分解，定价难度随组内人数指数增长（旧记录的受控实验：单组 8 人 6 万节点、9 人 100 万节点）。下表列出 24 例的组规模分布，并标出新方法在 150 s / 600 s 的收敛状态。正反向使用相同的旅客生成规则，组规模分布逐例相同。</p>
+{instance_profile_table(f24f, f24r, n600f, n600r)}
+<div class="callout">规律：<b>能否收敛几乎只取决于最大组规模</b>。最大组 ≤7 人的 8 例（全部 normal 档与 50_stress）在 150 s 内全部证明最优或根 LP 收敛；最大组 8 人的 4 例（100_stress、full_stress）600 s 内两例证明/收敛、两例仍差 3–4%；最大组 9–10 人的 12 例（全部 edge 档与 150_stress）除 100_edge 外 600 s 仍不能闭合，gap 5–33%。edge 档每例含 3–6 个 ≥7 人组，其中 2–4 个 9–10 人组，这些组的定价 MIP 在 120 s 内不能证明无负列，是收敛的瓶颈；full_edge 还叠加了保护空座密集导致的松弛弱。</div>
 <div class="callout warn">口径提醒：新旧列生成都是 150 s，Rich 参考是 60 s 单次运行，启发式是 5 s；跨方法比较看软分与界，不比耗时。相对自身界的 gap 依赖界的紧度，旧实现的安全界在困难例上极松（曾出现 +912 这样的无意义值），其 gap 均值不能当作质量差距。</div></section>
 
 <section id="r1"><h2>6 · 结果</h2>{section("Formal24 正向（3-4-3 → 3-3，150 s）", f24f, ref, "forward:", "官方语料；附冻结 Rich 60 s 参考与历史最好整数解 I。")}</section>
