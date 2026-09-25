@@ -123,6 +123,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--time-limit", type=float, required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--r0-reference", type=Path,
+                        help="explicit frozen R0 union-pool integer fallback; never a CG/LP bound")
     parser.add_argument("--case-id", action="append", default=[],
                         help="screen only these cases; output is explicitly not a full Formal24 gate")
     parser.add_argument("--require-python-parity", action="store_true",
@@ -193,6 +195,7 @@ def main() -> None:
     if len(case_ids) != 24 or len(reference_rows) != 24 or len(rich_raw["cases"]) != 24 or len(set(case_ids)) != 24 or set(case_ids) != set(references) or set(case_ids) != set(rich_cases):
         raise ValueError("Formal24 requires exactly 24 unique cases matching both frozen references")
     audited_python = {}
+    audited_r0 = {}
     for case_path in case_paths:
         raw = read_json(case_path)
         case_id, direction = raw["caseId"], raw["direction"]
@@ -212,6 +215,15 @@ def main() -> None:
         if hard or missing or not math.isfinite(score) or abs(score - python_scores[case_id]) > 1e-7:
             raise ValueError(f"{case_id}: frozen Python allocation fails current legality/objective contract")
         audited_python[case_id] = (score, detail, sha256(allocation))
+        if args.r0_reference:
+            r0_path = args.r0_reference / "references" / f"{case_id.replace(':', '_')}.json"
+            r0 = read_json(r0_path)
+            r0_assignment = assignment_map(r0)
+            hard, missing, _ = evaluator.count_hard_constraint_violations(new_seats, raw["groups"], r0_assignment, config)
+            score, _ = evaluator.calculate_soft_score(new_seats, old_seats, raw["groups"], r0_assignment, config["weights"], config)
+            if hard or missing or not math.isfinite(score) or abs(score - r0["total_score"]) > 1e-8:
+                raise ValueError(f"{case_id}: R0 fails current legality/objective contract")
+            audited_r0[case_id] = (score, sha256(r0_path))
     if args.audit_reference_only:
         print(json.dumps({"reference_cases_audited": len(audited_python),
                           "config_sha256": sha256(args.config), "reference_csv_sha256": sha256(reference_csv),
@@ -281,9 +293,11 @@ def main() -> None:
                 float(result["individual_score"])
                 - sum(detail[key] for key in ("score_s", "score_v", "score_p"))
             ),
-            "reference_type": "unavailable",
-            "reference_value": None,
-            "gap_percent": None,
+            "reference_type": "R0_pool_integer" if case_id in audited_r0 else "unavailable",
+            "reference_value": audited_r0[case_id][0] if case_id in audited_r0 else None,
+            "reference_sha256": audited_r0[case_id][1] if case_id in audited_r0 else None,
+            "gap_percent": reference_gap_percent(external_score, audited_r0[case_id][0]) if case_id in audited_r0 else None,
+            "gap_R0_pool_integer": reference_gap_percent(external_score, audited_r0[case_id][0]) if case_id in audited_r0 else None,
             "python_60s_score": python_score,
             "delta_vs_python": external_score - python_score,
             "gap_CG_percent": None,
@@ -350,6 +364,8 @@ def main() -> None:
         "provenance": {
             "corpus": str(args.corpus.resolve()),
             "reference": str(args.reference.resolve()),
+            "r0_reference": str(args.r0_reference.resolve()) if args.r0_reference else None,
+            "gap_units": "percent",
             "config": str(args.config.resolve()),
             "config_sha256": sha256(args.config),
             "python_reference_csv_sha256": sha256(reference_csv),
