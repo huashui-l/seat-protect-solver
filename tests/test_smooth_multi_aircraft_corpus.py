@@ -20,6 +20,9 @@ def test_smooth_corpus_manifest_and_files_are_consistent():
         "2-2", "2-3", "2-4-2", "3-3", "3-3-3", "3-4-3"
     }
 
+    for item in manifest["seatmaps"]:
+        assert sha256(ROOT / item["relative_path"]) == item["sha256"]
+
     by_direction = {}
     for case in manifest["cases"]:
         path = ROOT / case["relative_path"]
