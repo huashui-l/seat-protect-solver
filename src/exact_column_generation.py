@@ -2547,6 +2547,10 @@ def _price_group_exact_dfs(
             infant_mask,
             active_flag_mask,
             caregiver_dominance_state(),
+            min_row,
+            max_row,
+            min_x,
+            max_x,
         )
         previous_cost = state_best_cost.get(state)
         if (
