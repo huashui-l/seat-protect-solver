@@ -1092,7 +1092,13 @@ RichStructuredWindows build_rich_structured_windows(const Problem& problem, int 
         return std::make_tuple(shortage, mismatch, span <= std::max(0, current_metric.row_span - 2) ? 0 : 1,
             span, std::abs(center - result.old_center), window.size(), window);
     };
-    std::stable_sort(result.all_row_windows.begin(), result.all_row_windows.end(), [&](const auto& a, const auto& b) { return key(a) < key(b); });
+    // Window priorities are immutable: compute each seat/value scan only once.
+    using WindowKey = decltype(key(std::vector<int>{}));
+    std::vector<WindowKey> window_keys;
+    for (const auto& window : result.all_row_windows) window_keys.push_back(key(window));
+    std::stable_sort(window_keys.begin(), window_keys.end());
+    for (size_t i = 0; i < window_keys.size(); ++i)
+        result.all_row_windows[i] = std::get<6>(window_keys[i]);
     result.row_windows = result.all_row_windows;
     if (result.row_windows.size() > static_cast<size_t>(problem.rich.structured_pattern_window_limit))
         result.row_windows.resize(problem.rich.structured_pattern_window_limit);

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <future>
 #include <limits>
 #include <numeric>
 #include <set>
@@ -206,10 +207,10 @@ bool group_caregivers_satisfied(
     for (int passenger : group.passengers) {
         const Passenger& cared = problem.passengers[passenger];
         const auto rule_item = problem.ssr_rules.find(cared.ssr);
-        const bool requires = cared.need_cared
+        const bool requires_care = cared.need_cared
             || (rule_item != problem.ssr_rules.end()
                 && rule_item->second.requires_caregiver);
-        if (!requires) continue;
+        if (!requires_care) continue;
         const int seat = state.passenger_to_seat[passenger];
         if (seat < 0) return false;
         const bool allow_cross = cared.need_cared && cared.ssr.empty()
@@ -941,7 +942,25 @@ GroupConstructionResult construct_rich_m1(
     AssignmentState state = initialize_rich_assignment(problem);
     const auto cache = build_rich_candidate_cache(problem, state);
     const auto construction_deadline = at(construction_window.deadline);
+    std::vector<std::future<AssignmentSnapshot>> alternatives;
+    if (problem.rich_stage_budgets.business_time_limit <= 5.0
+        && problem.rich_stage_budgets.business_time_limit >= 1.0) {
+        for (double pressure : {0.0, 2.0})
+            alternatives.push_back(std::async(std::launch::async, [&, pressure]() {
+                auto local = problem;
+                local.rich.old_seat_reservation_pressure = pressure;
+                auto candidate = initialize_rich_assignment(local);
+                const auto candidate_cache = build_rich_candidate_cache(local, candidate);
+                construct_rich_assignment(local, candidate, candidate_cache, construction_deadline);
+                GroupConstructionResult repair_diagnostics;
+                repair_rich_assignment(local, candidate, candidate_cache.rankings,
+                    construction_deadline, repair_diagnostics);
+                return candidate.save();
+            }));
+    }
     const auto diagnostics = construct_rich_assignment(problem, state, cache, construction_deadline);
+    std::vector<AssignmentSnapshot> alternative_states;
+    for (auto& alternative : alternatives) alternative_states.push_back(alternative.get());
     result.rich_dfs_attempted = diagnostics.search.dfs_attempted;
     result.rich_dfs_succeeded = diagnostics.search.dfs_succeeded;
     result.rich_dfs_nodes = diagnostics.search.dfs_nodes;
@@ -970,6 +989,20 @@ GroupConstructionResult construct_rich_m1(
     const auto repair_window = schedule.begin("repair", repair_started, result.rich_construction_unassigned);
     repair_rich_assignment(problem, state, cache.rankings, at(repair_window.deadline), result);
     result.rich_elite_store.capture(state, "repair");
+    bool complete = validate_complete_assignment(problem, state.passenger_to_seat) == 0;
+    double selected_score = evaluate_soft_score(problem, state.passenger_to_seat);
+    for (auto& snapshot : alternative_states) {
+        if (validate_complete_assignment(problem, snapshot.passenger_to_seat) != 0) continue;
+        AssignmentState candidate(problem);
+        candidate.restore(snapshot);
+        result.rich_elite_store.capture(candidate, "construction_alternative");
+        const double candidate_score = evaluate_soft_score(problem, candidate.passenger_to_seat);
+        if (!complete || candidate_score > selected_score + kTolerance) {
+            state.restore(std::move(snapshot));
+            selected_score = candidate_score;
+            complete = true;
+        }
+    }
     const double repair_finished = elapsed();
     schedule.finish("repair", repair_window, repair_finished);
     result.rich_stage_timing["repair"] = {

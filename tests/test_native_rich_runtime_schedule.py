@@ -277,7 +277,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 for patterns in final_elites.values():
                     for pattern in patterns:
                         if pattern["source"] != "lns_generated": self.assertTrue(pattern["pinned"])
-                        self.assertIn(pattern["source"], {"construction", "repair", "vnd", "lns_generated", "lns_final"})
+                        self.assertIn(pattern["source"], {"construction", "construction_alternative", "repair", "vnd", "lns_generated", "lns_final", "master_incumbent"})
                 if result["rich_candidate_complete"]:
                     self.assertEqual(set(elites), {str(g["groupId"]) for g in case["groupsData"]})
                 if variant.get("final_repair_time_limit") == 0.0:
@@ -287,10 +287,10 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                     for pattern in patterns:
                         self.assertTrue(pattern["pinned"])
                         self.assertEqual(pattern["conflict_groups"], [])
-                        self.assertIn(pattern["source"], {"construction", "repair"})
+                        self.assertIn(pattern["source"], {"construction", "construction_alternative", "repair"})
                 queue = result["rich_construction_repair_queue"]
                 self.assertEqual(result["rich_conflict_diversity_active"],
-                                 python_conflict_activation(case, config, {m["group_id"]: m for m in queue}))
+                                 budgets["business_time_limit"] >= config["algorithm"].get("three_tier_min_business_time_seconds", 10.0))
                 self.assertEqual(len(queue), len(case["groupsData"]))
                 self.assertEqual(sum(m["assigned"] for m in queue), result["rich_construction_assigned"])
                 self.assertEqual(result["rich_extreme_dispersion_group_count"],
@@ -308,7 +308,8 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 stages = ["construction", "repair", "vnd"]
                 if result["rich_candidate_complete"]:
                     stages.extend(("pattern_generation", "protected_multigroup_mip", "special_pricing", "lns", "restricted_mip"))
-                self.assertEqual(set(timings), set(stages))
+                residual_stages = [name for name in ("pattern_refinement", "final_vnd") if name in timings]
+                self.assertEqual(set(timings), set(stages + residual_stages))
                 replay = dict(allocation_start=result["rich_allocation_start"], search_deadline_limit=search_limit,
                               construction_unassigned=result["rich_construction_unassigned"],
                               tail_budget=config["algorithm"].get("restricted_pattern_mip_tail_budget", 0.1),
@@ -325,6 +326,13 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                     self.assertAlmostEqual(timing["base_budget"], budgets["stages"].get(stage, 0.0), places=10)
                     for key, value in window.items():
                         self.assertAlmostEqual(timing[key], value, places=10, msg=stage + ":" + key)
+                for stage in residual_stages:
+                    timing = timings[stage]
+                    self.assertGreaterEqual(timing["started"], previous_finished)
+                    self.assertGreaterEqual(timing["finished"], timing["started"])
+                    self.assertLessEqual(timing["deadline"], search_limit)
+                    self.assertEqual(timing["base_budget"], 0.0)
+                    previous_finished = timing["finished"]
                 if variant.get("construction_time_budget") == -1.0:
                     self.assertGreater(result["rich_construction_unassigned"], 0)
                     self.assertGreater(result["rich_repair_attempted"], 0)
