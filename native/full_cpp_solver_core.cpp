@@ -1079,7 +1079,13 @@ RichStructuredWindows build_rich_structured_windows(const Problem& problem, int 
     for (int width = result.minimum_width; width <= max_width; ++width)
         for (int start = 0; start + width <= static_cast<int>(rows.size()); ++start) {
             std::vector<int> window(rows.begin() + start, rows.begin() + start + width);
-            if (std::includes(window.begin(), window.end(), fixed_rows.begin(), fixed_rows.end())) result.all_row_windows.push_back(std::move(window));
+            if (!std::includes(window.begin(), window.end(), fixed_rows.begin(), fixed_rows.end())) continue;
+            const bool covered = std::all_of(options.begin(), options.end(), [&](const auto& domain) {
+                return std::any_of(domain.begin(), domain.end(), [&](const auto& option) {
+                    return std::binary_search(window.begin(), window.end(), problem.seats[option.seat].row);
+                });
+            });
+            if (covered) result.all_row_windows.push_back(std::move(window));
         }
     const auto key = [&](const std::vector<int>& window) {
         std::map<std::string, int> available;
@@ -1963,7 +1969,7 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
         generate_rich_value_block_patterns(problem, g, cache.all_options, metric, windows, active_types, group_deadline, patterns);
         std::map<Key, size_t> position;
         for (size_t i = 0; i < patterns.size(); ++i) position[key(patterns[i].pattern)] = i;
-        const double per_window_limit = std::max(0.06, per_group_limit / static_cast<double>(std::max(size_t{1}, windows.row_windows.size())));
+        const double per_window_limit = std::max(0.008, per_group_limit / static_cast<double>(std::max(size_t{1}, windows.row_windows.size())));
         for (const auto& rows : windows.row_windows) {
             if (Clock::now() >= group_deadline) break;
             set_number("dfs_discovery_time_limit", per_window_limit);

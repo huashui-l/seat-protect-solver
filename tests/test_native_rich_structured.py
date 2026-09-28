@@ -988,7 +988,15 @@ class NativeRichStructuredTests(unittest.TestCase):
             exec(compile(ast.Module(body=[difficult_statement], type_ignores=[]), "frozen_difficult", "exec"), namespace)
             if namespace["difficult"]: expected["difficult_groups"].append(group["groupId"])
             exec(window_code, namespace)
-            expected["windows"][str(group["groupId"])] = {k: namespace[k] for k in ("minimum_width", "old_center", "all_row_windows", "row_windows")}
+            # Native search omits windows that cannot cover every passenger domain.
+            # Preserve frozen Python ordering for all remaining windows.
+            windows = [w for w in namespace["all_row_windows"] if all(
+                any(int(new.seat_map[o.seat_id]["row"]) in w for o in domain)
+                for domain in namespace["cache"].all_options)]
+            expected["windows"][str(group["groupId"])] = {
+                "minimum_width": namespace["minimum_width"], "old_center": namespace["old_center"],
+                "all_row_windows": windows,
+                "row_windows": windows[:max(1, int(config["algorithm"].get("structured_pattern_window_limit", 12)))]}
         expected = json.loads(json.dumps(expected))
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
