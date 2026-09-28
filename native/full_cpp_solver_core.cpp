@@ -1987,7 +1987,7 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
     };
     std::vector<int> pending;
     for (int g : order.ordered_groups) if (difficult.count(g)) pending.push_back(g);
-    const size_t workers = problem.rich_stage_budgets.business_time_limit <= 5.0 ? 4 : 1;
+    const size_t workers = problem.rich_stage_budgets.business_time_limit <= 5.0 ? 5 : 1;
     for (size_t begin = 0; begin < pending.size(); begin += workers) {
         if (Clock::now() >= deadline) { diagnostics.stopped_by_deadline = true; break; }
         const size_t end = std::min(pending.size(), begin + workers);
