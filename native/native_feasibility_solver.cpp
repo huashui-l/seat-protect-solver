@@ -256,6 +256,15 @@ FeasibilityResult solve_feasibility_mip(
                     result.rich_master_time_limit = result.rich_restricted.enabled ? std::max(0.0, restricted_window.deadline - restricted_started) : 0.0;
                     result.rich_master_attempts = result.rich_restricted.attempts;
                     result.rich_master_last_radius = result.rich_restricted.radius_history.empty() ? -1 : result.rich_restricted.radius_history.back();
+                    // Recombined group patterns can expose new improving exchanges.
+                    // Charge polishing to the same global search deadline.
+                    const double polish_started = elapsed();
+                    if (polish_started + 0.01 < search_seconds) {
+                        improve_rich_vnd_m2(problem, search_deadline, group_result);
+                        group_result.rich_stage_timing["final_vnd"] = {
+                            0.0, search_seconds - polish_started, polish_started, elapsed(),
+                            search_seconds, 0.0, 0.0};
+                    }
                 }
             }
             // Q1/Q2A are independent fallback improvements, not frozen Rich
