@@ -268,9 +268,11 @@ class NativeRichStructuredTests(unittest.TestCase):
         prefix = construction_prefix()
         sources = set()
         overlapping_infant_seen = False
-        for original in self.cases[:11]:
+        # Node-limited differential coverage exercises both the serial long
+        # profile and concurrent short profile without wall-time truncation.
+        for original, business_limit in ((case, limit) for case in self.cases[:11] for limit in (120.0, 5.0)):
             config = copy.deepcopy(self.config)
-            config["algorithm"].update(business_time_limit_seconds=120.0, adaptive_stage_budgets=False,
+            config["algorithm"].update(business_time_limit_seconds=business_limit, adaptive_stage_budgets=False,
                                        construction_time_budget=60.0, small_group_dfs_time_limit=20.0,
                                        structured_pattern_dfs_per_group=120.0)
             config.setdefault("column_generation", {})["dfs_node_limit"] = 100
@@ -278,7 +280,7 @@ class NativeRichStructuredTests(unittest.TestCase):
                                  original["groupsData"], config["weights"], config)["context"].assigned_seats
             variants = ("active", "disabled", "expired", "partial") if original is self.cases[0] else ("active",)
             for variant in variants:
-                with self.subTest(case=original["id"], variant=variant):
+                with self.subTest(case=original["id"], variant=variant, business_limit=business_limit):
                     current = dict(assignments)
                     variant_config = copy.deepcopy(config)
                     if variant == "disabled": variant_config["algorithm"]["enable_structured_pattern_generation"] = False

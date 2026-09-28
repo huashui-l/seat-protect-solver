@@ -969,7 +969,10 @@ int main(int argc, char** argv) {
         }
         std::vector<std::vector<int>> rankings;
         if (const auto* mode = replay.find("rank_only"); mode && mode->bool_or()) {
-            const auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            auto cache = full_cpp::build_rich_candidate_cache(problem, state);
+            if (const auto* group = replay.find("target_group"))
+                cache = full_cpp::build_rich_candidate_cache(problem, state, &cache.owner_regrets,
+                    static_cast<int>(group->number));
             std::cout << std::setprecision(17) << "{\"passengers\":[";
             for (size_t p = 0; p < cache.rankings.size(); ++p) {
                 if (p) std::cout << ',';

@@ -13,6 +13,7 @@
 #include <charconv>
 #include <cstring>
 #include <functional>
+#include <future>
 #include <numeric>
 
 namespace full_cpp {
@@ -1940,24 +1941,19 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
         for (const auto& o : pattern.placements) signatures.emplace_back(o.passenger_index, o.seat, o.blocked);
         return Key{signatures, pattern.blocked_by};
     };
-    size_t remaining_groups = difficult.size();
-    for (int g : order.ordered_groups) {
-        if (Clock::now() >= deadline) { diagnostics.stopped_by_deadline = true; break; }
-        if (!difficult.count(g)) continue;
-        const double share = std::chrono::duration<double>(deadline - Clock::now()).count()
-            / static_cast<double>(std::max(size_t{1}, remaining_groups--));
+    struct GroupSearch {
+        std::vector<RichTieredPattern> patterns;
+        long long nodes = 0;
+        int windows = 0;
+    };
+    const auto search_group = [&](int g, double group_budget) {
+        GroupSearch result;
+        auto local_pricing = pricing;
         const auto& group = problem.groups[g]; const auto& metric = metrics.at(group.id);
-        const int target_span = std::max(0, metric.row_span - 2);
-        if (metric.row_span >= 2) ++diagnostics.extreme_groups_attempted;
-        ++diagnostics.groups_attempted;
         const auto cache = build_rich_pricing_cache(problem, g, fixed);
         std::vector<int> targets;
         for (int p : group.passengers) targets.push_back(assignment[p]);
-        diagnostics.three_tier_active = problem.rich_three_tier_active;
         auto patterns = generate_rich_rigid_relaxed_patterns(problem, g, targets, cache.all_options, active_types);
-        const double group_budget = problem.rich_stage_budgets.business_time_limit <= 5.0
-            ? std::min(per_group_limit, std::max(0.008, share * 1.4))
-            : (order.full_resource_global_blocks ? std::max(per_group_limit, 0.16) : per_group_limit);
         const auto group_deadline = std::min(deadline, after(Clock::now(), group_budget));
         const auto windows = build_rich_structured_windows(problem, g, cache.all_options, metric);
         generate_rich_value_block_patterns(problem, g, cache.all_options, metric, windows, active_types, group_deadline, patterns);
@@ -1966,36 +1962,67 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
         const double per_window_limit = std::max(0.008, per_group_limit / static_cast<double>(std::max(size_t{1}, windows.row_windows.size())));
         for (const auto& rows : windows.row_windows) {
             if (Clock::now() >= group_deadline) break;
-            set_number("dfs_discovery_time_limit", per_window_limit);
+            local_pricing.object["dfs_discovery_time_limit"].number = per_window_limit;
             auto window_cache = filter_rich_pricing_window(problem, cache, rows);
             if (std::any_of(window_cache.all_options.begin(), window_cache.all_options.end(), [](const auto& options) { return options.empty(); })) continue;
-            ++diagnostics.row_windows_attempted;
+            ++result.windows;
             RichPricingDuals duals; duals.group[group.id] = 1.0e12;
-            const auto priced = price_rich_group_dfs(problem, g, pricing, duals, baby, {}, {},
+            const auto priced = price_rich_group_dfs(problem, g, local_pricing, duals, baby, {}, {},
                 std::min(group_deadline, after(Clock::now(), per_window_limit)), window_cache, false, false, false, active_types);
-            diagnostics.dfs_nodes += priced.nodes;
+            result.nodes += priced.nodes;
             for (const auto& pattern : priced.patterns) {
                 const auto identity = key(pattern); const auto found = position.find(identity);
                 if (found == position.end()) { position[identity] = patterns.size(); patterns.push_back({pattern, "rebuilt"}); }
                 else patterns[found->second] = {pattern, "rebuilt"};
             }
         }
-        int accepted = 0;
-        for (const auto& item : patterns) {
-            auto proposal = assignment;
-            for (int p : group.passengers) proposal[p] = -1;
-            int low = std::numeric_limits<int>::max(), high = std::numeric_limits<int>::min();
-            for (const auto& entry : item.pattern.assignments) {
-                proposal[entry.first] = entry.second;
-                low = std::min(low, problem.seats[entry.second].row); high = std::max(high, problem.seats[entry.second].row);
+        result.patterns = std::move(patterns);
+        return result;
+    };
+    std::vector<int> pending;
+    for (int g : order.ordered_groups) if (difficult.count(g)) pending.push_back(g);
+    const size_t workers = problem.rich_stage_budgets.business_time_limit <= 5.0 ? 4 : 1;
+    for (size_t begin = 0; begin < pending.size(); begin += workers) {
+        if (Clock::now() >= deadline) { diagnostics.stopped_by_deadline = true; break; }
+        const size_t end = std::min(pending.size(), begin + workers);
+        const double share = std::chrono::duration<double>(deadline - Clock::now()).count()
+            * static_cast<double>(workers) / static_cast<double>(pending.size() - begin);
+        const double group_budget = workers > 1
+            ? std::min(per_group_limit, std::max(0.008, share * 1.4))
+            : (order.full_resource_global_blocks ? std::max(per_group_limit, 0.16) : per_group_limit);
+        std::vector<std::future<GroupSearch>> futures;
+        for (size_t i = begin; i < end; ++i)
+            futures.push_back(std::async(workers > 1 ? std::launch::async : std::launch::deferred,
+                search_group, pending[i], group_budget));
+        // Merge in the original priority order, independent of worker completion.
+        for (size_t i = begin; i < end; ++i) {
+            const int g = pending[i];
+            auto searched = futures[i - begin].get();
+            const auto& group = problem.groups[g];
+            const auto& metric = metrics.at(group.id);
+            const int target_span = std::max(0, metric.row_span - 2);
+            diagnostics.three_tier_active = problem.rich_three_tier_active;
+            diagnostics.extreme_groups_attempted += metric.row_span >= 2;
+            ++diagnostics.groups_attempted;
+            diagnostics.row_windows_attempted += searched.windows;
+            diagnostics.dfs_nodes += searched.nodes;
+            int accepted = 0;
+            for (const auto& item : searched.patterns) {
+                auto proposal = assignment;
+                for (int p : group.passengers) proposal[p] = -1;
+                int low = std::numeric_limits<int>::max(), high = std::numeric_limits<int>::min();
+                for (const auto& entry : item.pattern.assignments) {
+                    proposal[entry.first] = entry.second;
+                    low = std::min(low, problem.seats[entry.second].row); high = std::max(high, problem.seats[entry.second].row);
+                }
+                const double score = evaluate_rich_group_score(problem, proposal, g).total();
+                const int span = item.pattern.assignments.empty() ? 0 : high - low;
+                if (metric.row_span >= 2 && span <= target_span) ++diagnostics.span_reducing_patterns;
+                recorder(g, item, score, item.source == "global_value_block");
+                ++diagnostics.tier_counts.at(item.source); ++accepted;
             }
-            const double score = evaluate_rich_group_score(problem, proposal, g).total();
-            const int span = item.pattern.assignments.empty() ? 0 : high - low;
-            if (metric.row_span >= 2 && span <= target_span) ++diagnostics.span_reducing_patterns;
-            recorder(g, item, score, item.source == "global_value_block");
-            ++diagnostics.tier_counts.at(item.source); ++accepted;
+            if (accepted) { ++diagnostics.groups_with_patterns; diagnostics.patterns_generated += accepted; }
         }
-        if (accepted) { ++diagnostics.groups_with_patterns; diagnostics.patterns_generated += accepted; }
     }
     diagnostics.seconds = std::chrono::duration<double>(Clock::now() - started).count();
     diagnostics.stopped_by_deadline = diagnostics.stopped_by_deadline || Clock::now() >= deadline;
@@ -2115,12 +2142,14 @@ std::vector<std::pair<int, int>> rich_placement_domain(
 }
 
 RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state,
-    const std::vector<double>* frozen_owner_regrets) {
+    const std::vector<double>* frozen_owner_regrets, int target_group) {
+    if (target_group >= 0 && !frozen_owner_regrets)
+        throw std::runtime_error("group candidate cache requires frozen owner regrets");
     RichCandidateCache result;
     const int count = static_cast<int>(problem.passengers.size());
     const int seats = static_cast<int>(problem.seats.size());
     result.owner_regrets.resize(count, 0.0);
-    result.costs.resize(count, std::vector<double>(seats));
+    result.costs.resize(count);
     result.rankings.resize(count);
     std::vector<int> assigned_passengers, assigned_infants;
     for (int p = 0; p < count; ++p) if (state.passenger_to_seat[p] >= 0) {
@@ -2135,9 +2164,13 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
         return value;
     };
     std::unordered_map<std::string, int> owners;
+    for (int p = 0; p < count; ++p)
+        if (problem.old_seat_index.count(problem.passengers[p].old_seat))
+            owners[problem.passengers[p].old_seat] = p;
     for (int p = 0; p < count; ++p) {
         const auto& passenger = problem.passengers[p];
-        if (problem.old_seat_index.count(passenger.old_seat)) owners[passenger.old_seat] = p;
+        if (target_group >= 0 && passenger.group != target_group) continue;
+        result.costs[p].resize(seats);
         const auto old_index = problem.old_seat_index.find(passenger.old_seat);
         const Seat* old = old_index == problem.old_seat_index.end() ? nullptr : &problem.old_seats[old_index->second];
         const double old_value = !std::isnan(passenger.old_seat_value) ? passenger.old_seat_value
@@ -2183,6 +2216,7 @@ RichCandidateCache build_rich_candidate_cache(const Problem& problem, const Assi
         if (std::isfinite(alternative)) result.owner_regrets[p] = std::max(0.0, alternative - result.costs[p][own->second]);
     }
     for (int p = 0; p < count; ++p) {
+        if (target_group >= 0 && problem.passengers[p].group != target_group) continue;
         auto& order = result.rankings[p];
         for (int s = 0; s < seats; ++s) {
             const auto owner = owners.find(problem.seats[s].id);

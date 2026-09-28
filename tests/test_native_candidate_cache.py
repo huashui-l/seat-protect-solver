@@ -89,6 +89,23 @@ class NativeCandidateCacheTests(unittest.TestCase):
                         (work / name).write_text(json.dumps(data), encoding="utf-8")
                     run = subprocess.run([str(probe), str(work / "case.json"), str(work / "config.json"),
                                           str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    full = json.loads(run.stdout)["passengers"]
+                    for target_group, group in enumerate(groups):
+                        (work / "replay.json").write_text(json.dumps({
+                            "assignments": initial, "rank_only": True, "target_group": target_group}), encoding="utf-8")
+                        group_run = subprocess.run([str(probe), str(work / "case.json"), str(work / "config.json"),
+                                                    str(work / "replay.json")], capture_output=True, text=True)
+                        self.assertEqual(group_run.returncode, 0, group_run.stderr)
+                        partial = json.loads(group_run.stdout)["passengers"]
+                        self.assertEqual(len(partial), len(full))
+                        for index, row in enumerate(partial):
+                            self.assertEqual(row["regret"], full[index]["regret"])
+                            if passengers[index][0] == group.group_id:
+                                self.assertEqual(row, full[index])
+                            else:
+                                self.assertEqual(row["costs"], [])
+                                self.assertEqual(row["order"], [])
                 self.assertEqual(run.returncode, 0, run.stderr)
                 actual = json.loads(run.stdout)["passengers"]
                 self.assertEqual(len(actual), len(passengers))

@@ -69,7 +69,7 @@ RichRemainingDiagnostics assign_rich_remaining(
             return std::make_tuple(!l.need_both_empty, !l.need_single_empty, old_position(left))
                 < std::make_tuple(!r.need_both_empty, !r.need_single_empty, old_position(right));
         });
-        const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+        const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets, g);
         const int cap = problem.rich.candidate_cap;
         const int retry_cap = std::max(cap, problem.rich.candidate_cap_retry);
         const int full_cap = std::max(retry_cap, problem.rich.candidate_cap_full_retry);
@@ -165,9 +165,35 @@ RichRemainingDiagnostics assign_rich_remaining(
                 + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(problem.rich.small_group_dfs_time_limit)));
             long long nodes = 0;
             const long long limit = std::max(1LL, problem.rich.small_group_dfs_node_limit);
+            const bool bound_search = problem.rich_stage_budgets.business_time_limit <= 5.0
+                && problem.weight_c <= 0.0 && problem.group_centroid_x_factor >= 0.0
+                && problem.group_centroid_y_factor >= 0.0;
+            std::vector<double> suffix_min(remaining.size() + 1, 0.0);
+            if (bound_search) for (size_t depth = remaining.size(); depth-- > 0;) {
+                const int p = remaining[depth];
+                double minimum = std::numeric_limits<double>::infinity();
+                for (int seat : candidates[p]) minimum = std::min(minimum, costs.costs[p][seat]);
+                suffix_min[depth] = suffix_min[depth + 1] + minimum;
+            }
             const auto dfs = [&](auto&& self, size_t depth, double cost, int active_cap) -> void {
                 ++nodes;
                 if (nodes > limit || Clock::now() >= dfs_deadline) return;
+                if (bound_search && !best.empty()) {
+                    double x_low = std::numeric_limits<double>::infinity(), x_high = -x_low;
+                    double y_low = x_low, y_high = -x_low;
+                    const auto include = [&](int seat) {
+                        x_low = std::min(x_low, problem.seats[seat].x); x_high = std::max(x_high, problem.seats[seat].x);
+                        y_low = std::min(y_low, problem.seats[seat].y); y_high = std::max(y_high, problem.seats[seat].y);
+                    };
+                    for (int seat : anchors) include(seat);
+                    for (const auto& move : selected) include(move.seat);
+                    // Any final centroid has maximum distance at least half
+                    // the span of seats that have already been selected.
+                    const double span = x_low <= x_high ? 0.5 * (
+                        problem.group_centroid_x_factor * (x_high - x_low)
+                        + problem.group_centroid_y_factor * (y_high - y_low)) : 0.0;
+                    if (cost + suffix_min[depth] - problem.weight_c * span > best_cost + 1e-10) return;
+                }
                 if (depth == remaining.size()) {
                     if (!care_satisfied()) return;
                     const double total = cost - problem.weight_c * compactness(selected);
@@ -178,12 +204,14 @@ RichRemainingDiagnostics assign_rich_remaining(
                 const auto before = local.save();
                 for (size_t i = 0; i < slice_size(candidates[p].size(), active_cap); ++i) {
                     const int seat = candidates[p][i];
+                    if (bound_search && cost + costs.costs[p][seat] + suffix_min[depth + 1] > best_cost + 1e-10) continue;
                     for (int block : blocks(p, seat)) {
                         if (!local.assign(p, seat, block)) continue;
                         selected.push_back({p, seat, block});
                         self(self, depth + 1, cost + costs.costs[p][seat], active_cap);
                         selected.pop_back();
                         local.restore(before);
+                        if (bound_search && (nodes > limit || Clock::now() >= dfs_deadline)) return;
                     }
                 }
             };
@@ -314,7 +342,7 @@ int assign_rich_paired_ssrs(
         for (int p : problem.groups[g].passengers) {
             if (!needs_care(p)) continue;
             if (std::chrono::steady_clock::now() >= deadline) break;
-            auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+            auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets, g);
             if (state.passenger_to_seat[p] >= 0) {
                 const int seat = state.passenger_to_seat[p];
                 const auto& adjacent = neighbors(p, seat);
@@ -339,7 +367,7 @@ int assign_rich_paired_ssrs(
                 }
                 if (!problem.passengers[p].fixed_seat.empty()) continue;
                 state.remove(p);
-                costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+                costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets, g);
             }
             std::vector<int> assigned;
             for (int other : problem.groups[g].passengers)
@@ -527,7 +555,7 @@ RichPairedRescueDiagnostics rescue_rich_paired_ssrs(
         for (int p : fixed_unsatisfied) {
             diagnostics.attempted.push_back(p);
             const int seat = state.passenger_to_seat[p];
-            const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+            const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets, problem.passengers[p].group);
             struct Candidate { double cost; int caregiver, seat, old_seat, displaced, new_seat; };
             std::vector<Candidate> candidates;
             for (int cg : group.passengers) {
@@ -572,7 +600,7 @@ RichPairedRescueDiagnostics rescue_rich_paired_ssrs(
         const int option_cap = problem.rich.paired_rescue_option_cap;
         const auto options_for = [&](int p) {
             std::vector<Option> options;
-            const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets);
+            const auto costs = build_rich_candidate_cache(problem, state, &cache.owner_regrets, problem.passengers[p].group);
             for (int cg : group.passengers) {
                 if (!adult(cg)) continue;
                 if (expired()) break;

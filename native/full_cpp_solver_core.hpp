@@ -490,7 +490,7 @@ struct RichCandidateCache {
 };
 
 RichCandidateCache build_rich_candidate_cache(const Problem& problem, const AssignmentState& state,
-    const std::vector<double>* frozen_owner_regrets = nullptr);
+    const std::vector<double>* frozen_owner_regrets = nullptr, int target_group = -1);
 
 struct RichLnsAssignment {
     double score = -std::numeric_limits<double>::infinity();

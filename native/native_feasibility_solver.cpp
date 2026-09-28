@@ -261,7 +261,15 @@ FeasibilityResult solve_feasibility_mip(
                     const double refine_started = elapsed();
                     const double refine_remaining = search_seconds - refine_started;
                     if (refine_remaining > 0.3) {
-                        generate_rich_patterns_m3(problem, at(refine_started + refine_remaining * 0.55), group_result);
+                        auto refinement_problem = problem;
+                        if (problem.rich_stage_budgets.business_time_limit <= 5.0) {
+                            refinement_problem.rich.structured_pattern_dfs_per_group = std::max(
+                                refinement_problem.rich.structured_pattern_dfs_per_group, 0.2);
+                            refinement_problem.rich.structured_pattern_window_limit = std::max(
+                                refinement_problem.rich.structured_pattern_window_limit, 96);
+                        }
+                        generate_rich_patterns_m3(refinement_problem,
+                            at(refine_started + refine_remaining * 0.55), group_result);
                         result.rich_restricted = improve_rich_restricted_stage(problem, at(search_seconds - 0.08), group_result);
                         group_result.rich_stage_timing["pattern_refinement"] = {
                             0.0, refine_remaining - 0.08, refine_started, elapsed(),
@@ -999,8 +1007,9 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             Highs_getInfinity(highs), static_cast<HighsInt>(incumbent.size()), incumbent.data(), values.data()));
     }
     if (incumbent.size() == groups.size()) {
-        std::vector<double> values(incumbent.size(), 1.0);
-        d.mip_start_supplied = Highs_setSparseSolution(highs, static_cast<HighsInt>(incumbent.size()), incumbent.data(), values.data()) == kHighsStatusOk;
+        std::vector<double> values(columns.size(), 0.0);
+        for (HighsInt column : incumbent) values[column] = 1.0;
+        d.mip_start_supplied = Highs_setSolution(highs, values.data(), nullptr, nullptr, nullptr) == kHighsStatusOk;
     }
     const double initial_score = evaluate_rich_group_score(problem, state.passenger_to_seat, -1).total();
     double best_score = initial_score;
