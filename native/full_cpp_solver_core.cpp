@@ -263,6 +263,7 @@ Problem make_problem(const Value& case_json, const Value& config, const Value& s
         if (const Value* item = algorithm->find("structured_rigid_shift_rows")) problem.rich.structured_rigid_shift_rows = std::max(0, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("structured_research_min_group_size")) problem.rich.structured_research_min_group_size = std::max(1, static_cast<int>(item->number_or(2)));
         if (const Value* item = algorithm->find("structured_pattern_extra_rows")) problem.rich.structured_pattern_extra_rows = static_cast<int>(item->number_or(2));
+        if (const Value* item = algorithm->find("portfolio_workers")) problem.rich.portfolio_workers = std::clamp(static_cast<int>(item->number_or(1)), 1, 3);
         if (const Value* item = algorithm->find("structured_pattern_window_limit")) problem.rich.structured_pattern_window_limit = std::max(1, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);
@@ -458,6 +459,19 @@ IndividualScoreComponents evaluate_individual_score(
     return result;
 }
 
+IndividualScoreComponents evaluate_rich_individual_score(const Problem& problem, int p, int s) {
+    auto result = evaluate_individual_score(problem, p, s);
+    const auto& passenger = problem.passengers[p];
+    if (problem.old_seat_index.count(passenger.old_seat)) {
+        if (passenger.has_near_toilet_preference && problem.seats[s].near_toilet != passenger.prefer_near_toilet)
+            result.score_p -= problem.weight_t * passenger.near_toilet_preference_weight;
+        for (const auto& preference : passenger.rich_toilet_preferences)
+            if (problem.seats[s].near_toilet != preference.first)
+                result.score_p += problem.weight_t * preference.second;
+    }
+    return result;
+}
+
 static ScoreComponents score_components_impl(
     const Problem& problem, const std::vector<int>& assignment, int affected_group, bool rich_preferences,
     const std::set<int>* affected_groups = nullptr
@@ -471,20 +485,9 @@ static ScoreComponents score_components_impl(
          passenger_index < static_cast<int>(problem.passengers.size()); ++passenger_index) {
         const int new_index = assignment[passenger_index];
         if (new_index < 0 || !includes(problem.passengers[passenger_index].group)) continue;
-        IndividualScoreComponents individual = evaluate_individual_score(
-            problem, passenger_index, new_index
-        );
-        if (rich_preferences) {
-            const auto& passenger = problem.passengers[passenger_index];
-            if (problem.old_seat_index.count(passenger.old_seat)) {
-                if (passenger.has_near_toilet_preference
-                    && problem.seats[new_index].near_toilet != passenger.prefer_near_toilet)
-                    individual.score_p -= problem.weight_t * passenger.near_toilet_preference_weight;
-                for (const auto& preference : passenger.rich_toilet_preferences)
-                    if (problem.seats[new_index].near_toilet != preference.first)
-                        individual.score_p += problem.weight_t * preference.second;
-            }
-        }
+        const auto individual = rich_preferences
+            ? evaluate_rich_individual_score(problem, passenger_index, new_index)
+            : evaluate_individual_score(problem, passenger_index, new_index);
         result.score_s += individual.score_s;
         result.score_v += individual.score_v;
         result.score_p += individual.score_p;
@@ -652,24 +655,8 @@ RichStructuredOrder build_rich_structured_order(const Problem& problem, const st
 bool rich_conflict_diversity_active(const Problem& problem,
     const std::vector<RichGroupRepairMetric>& construction_metrics
 ) {
-    const int limit = problem.rich.elite_patterns_per_group;
-    const int demand = problem.rich_stage_budgets.seat_demand;
-    if (!problem.rich_conflict_diversity_time_active
-        || problem.seats.size() >= problem.old_seats.size()
-        || demand - static_cast<int>(problem.passengers.size()) < std::max(2, limit - 2)
-        || static_cast<int>(problem.seats.size()) - demand < limit) return false;
-    for (const auto& group : problem.groups) {
-        if (group.passengers.size() < static_cast<size_t>(problem.rich.structured_pattern_min_group_size)) continue;
-        if (!std::all_of(group.passengers.begin(), group.passengers.end(), [&](int p) {
-            const auto& passenger = problem.passengers[p];
-            return passenger.ssr.empty() && !passenger.need_cared && !passenger.has_new_seat
-                && !passenger.need_single_empty && !passenger.need_both_empty;
-        })) continue;
-        const auto metric = std::find_if(construction_metrics.begin(), construction_metrics.end(),
-            [&](const auto& m) { return m.group_id == group.id; });
-        if (metric != construction_metrics.end() && metric->value_mismatch_score < 0.0) return true;
-    }
-    return false;
+    (void)construction_metrics;
+    return problem.rich_conflict_diversity_time_active;
 }
 
 void write_rich_repair_queue(std::ostream& output,
@@ -811,7 +798,6 @@ std::vector<std::vector<RichPlacement>> build_rich_placement_options(
 ) {
     const auto& group = problem.groups[group_index];
     std::vector<std::vector<RichPlacement>> result;
-    std::vector<int> isolated(problem.passengers.size(), -1);
     const auto seat_less = [&](int a, int b) { return problem.seats[a].id < problem.seats[b].id; };
     for (int p : group.passengers) {
         const auto& passenger = problem.passengers[p];
@@ -836,8 +822,7 @@ std::vector<std::vector<RichPlacement>> build_rich_placement_options(
                     if (fixed.owner_by_seat[neighbor] < 0) modes.push_back({neighbor});
                 if (modes.empty()) continue;
             }
-            isolated[p] = s;
-            const double cost = -evaluate_rich_group_score(problem, isolated, group_index).total();
+            const double cost = -evaluate_rich_individual_score(problem, p, s).total();
             for (auto& blocked : modes) {
                 RichPlacement option;
                 option.passenger_index = static_cast<int>(result.size());
@@ -858,7 +843,6 @@ std::vector<std::vector<RichPlacement>> build_rich_placement_options(
                 options.push_back(std::move(option));
             }
         }
-        isolated[p] = -1;
         if (options.empty()) throw std::runtime_error("passenger has no legal Rich placement: "
             + std::to_string(group.id) + ":" + std::to_string(passenger.hostnum));
         result.push_back(std::move(options));
@@ -1642,6 +1626,10 @@ double rich_pattern_reduced_cost(const RichExactPattern& pattern, const RichPric
 ) {
     const auto get = [](const auto& values, const auto& key) { const auto found = values.find(key); return found == values.end() ? 0.0 : found->second; };
     double value = (phase_one ? 0.0 : pattern.master_cost) - get(duals.group, pattern.group_id);
+    // Structured discovery has only a group reward, so all other terms are zero.
+    if (duals.seat.empty() && duals.ssr_all.empty() && duals.ssr_flag.empty()
+        && duals.baby_lower.empty() && duals.baby_infant_upper.empty() && duals.baby_occupant_upper.empty())
+        return value;
     double seats = 0.0;
     for (int seat : pattern.seat_resources) seats += get(duals.seat, seat);
     value -= seats;

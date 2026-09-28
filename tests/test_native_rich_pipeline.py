@@ -12,7 +12,7 @@ from unittest.mock import patch
 from src import heuristic_seat_allocator as rich
 from src.allocation_evaluator import IncrementalSoftScorer
 from tests.general_validation_case_factory import materialize_cases
-from tests.test_native_rich_elite import python_capture_namespace, python_conflict_activation
+from tests.test_native_rich_elite import python_capture_namespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -98,7 +98,9 @@ class NativeRichPipelineTests(unittest.TestCase):
                 captures["capture_stage_patterns"]("vnd")
             expected_structured = None
             if structured and len(context.assigned_seats) == len(passengers):
-                captures["conflict_diversity_active"] = python_conflict_activation(case, config, metrics)
+                # Native candidates now preserve conflict diversity for both capacity directions.
+                algorithm = config["algorithm"]
+                captures["conflict_diversity_active"] = algorithm.get("business_time_limit_seconds", 5.0) >= algorithm.get("three_tier_min_business_time_seconds", 10.0)
                 expected_structured = rich.generate_structured_group_patterns(
                     case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"], case["groupsData"],
                     context, scorer, config["weights"], config, rich.time.perf_counter() + 60.0,

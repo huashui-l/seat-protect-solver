@@ -1004,11 +1004,11 @@ RichOrdinaryVndDiagnostics improve_rich_vnd_m2(
     const auto vnd = improve_rich_ordinary_vnd(state, diagnostics.rich_rankings, deadline, true, true);
     diagnostics.rich_state = state.save();
     diagnostics.rich_elite_store.capture(state, "vnd");
-    diagnostics.rich_vnd_one_opt_moves = vnd.one_opt;
-    diagnostics.rich_vnd_two_swap_moves = vnd.swaps;
-    diagnostics.rich_vnd_three_cycle_moves = vnd.cycles;
-    diagnostics.rich_vnd_group_rebuild_moves = vnd.group_rebuilds;
-    diagnostics.rich_vnd_caregiver_rebuild_moves = vnd.caregiver_rebuilds;
+    diagnostics.rich_vnd_one_opt_moves += vnd.one_opt;
+    diagnostics.rich_vnd_two_swap_moves += vnd.swaps;
+    diagnostics.rich_vnd_three_cycle_moves += vnd.cycles;
+    diagnostics.rich_vnd_group_rebuild_moves += vnd.group_rebuilds;
+    diagnostics.rich_vnd_caregiver_rebuild_moves += vnd.caregiver_rebuilds;
     diagnostics.rich_vnd_score = evaluate_soft_score(problem, state.passenger_to_seat);
     // Continue the actual Rich trajectory even when repair lost to a fallback.
     // Selection is separate from stage state and must remain complete/legal/better.
@@ -1020,7 +1020,7 @@ RichOrdinaryVndDiagnostics improve_rich_vnd_m2(
         diagnostics.score_delta = diagnostics.rich_vnd_score - diagnostics.q0_score;
         diagnostics.selected_incumbent = "rich-m2-vnd";
     }
-    diagnostics.rich_vnd_seconds = std::chrono::duration<double>(
+    diagnostics.rich_vnd_seconds += std::chrono::duration<double>(
         std::chrono::steady_clock::now() - started).count();
     return vnd;
 }

@@ -258,6 +258,15 @@ FeasibilityResult solve_feasibility_mip(
                     result.rich_master_last_radius = result.rich_restricted.radius_history.empty() ? -1 : result.rich_restricted.radius_history.back();
                     // Recombined group patterns can expose new improving exchanges.
                     // Charge polishing to the same global search deadline.
+                    const double refine_started = elapsed();
+                    const double refine_remaining = search_seconds - refine_started;
+                    if (refine_remaining > 0.3) {
+                        generate_rich_patterns_m3(problem, at(refine_started + refine_remaining * 0.55), group_result);
+                        result.rich_restricted = improve_rich_restricted_stage(problem, at(search_seconds - 0.08), group_result);
+                        group_result.rich_stage_timing["pattern_refinement"] = {
+                            0.0, refine_remaining - 0.08, refine_started, elapsed(),
+                            search_seconds - 0.08, 0.0, 0.0};
+                    }
                     const double polish_started = elapsed();
                     if (polish_started + 0.01 < search_seconds) {
                         improve_rich_vnd_m2(problem, search_deadline, group_result);
@@ -961,7 +970,16 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             check(Highs_addCol(highs, -pattern.local_score, 0.0, 1.0, static_cast<HighsInt>(indexes.size()), indexes.data(), values.data()));
             check(Highs_changeColIntegrality(highs, column, kHighsVarTypeInteger));
             columns.emplace_back(group.first, &pattern);
-            if (pattern.assignments == signature(group.second)) incumbent.push_back(column);
+            if (pattern.assignments == signature(group.second)) {
+                std::set<std::string> current_resources;
+                for (int p : problem.groups[group.second].passengers) {
+                    current_resources.insert(problem.seats[state.passenger_to_seat[p]].id);
+                    for (int seat : state.assigned_blocked[p]) current_resources.insert(problem.seats[seat].id);
+                }
+                const bool already_added = std::any_of(incumbent.begin(), incumbent.end(),
+                    [&](HighsInt index) { return columns[index].first == group.first; });
+                if (!already_added && resources == current_resources) incumbent.push_back(column);
+            }
         }
     }
     if (columns.empty()) { d.reason = "no_usable_patterns"; d.seconds = elapsed(); return d; }

@@ -701,21 +701,30 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
         }
     }
     if (movable.empty()) return diagnostics;
-    // Infant positions are frozen in this ordinary-only prefix, as in Python.
-    const auto initial = state.passenger_to_seat;
-    std::map<std::pair<int, int>, double> passenger_cache;
+    // Infant positions stay fixed during ordinary moves; cache their pair costs.
+    std::vector<int> infants;
+    for (int p = 0; p < n; ++p)
+        if (problem.passengers[p].ssr == "BSCT" && state.passenger_to_seat[p] >= 0) infants.push_back(p);
+    const size_t seat_count = problem.seats.size();
+    std::vector<double> passenger_cache(static_cast<size_t>(n) * seat_count,
+        std::numeric_limits<double>::quiet_NaN());
     const auto passenger_score = [&](int p, int s) {
-        const auto key = std::make_pair(p, s);
-        const auto found = passenger_cache.find(key);
-        if (found != passenger_cache.end()) return found->second;
-        std::vector<int> isolated(n, -1);
-        isolated[p] = s;
-        for (int infant = 0; infant < n; ++infant)
-            if (problem.passengers[infant].ssr == "BSCT"
-                && problem.passengers[infant].group != problem.passengers[p].group) isolated[infant] = initial[infant];
-        const double value = evaluate_rich_group_score(problem, isolated, problem.passengers[p].group).total();
-        passenger_cache[key] = value;
-        return value;
+        double& cached = passenger_cache[static_cast<size_t>(p) * seat_count + s];
+        if (!std::isnan(cached)) return cached;
+        const auto& target = problem.seats[s];
+        double baby = 0.0;
+        for (int infant : infants) {
+            if (problem.passengers[infant].group == problem.passengers[p].group) continue;
+            const int infant_seat = state.passenger_to_seat[infant];
+            const auto& seat = problem.seats[infant_seat];
+            if (s == infant_seat || seat.cabin != target.cabin) continue;
+            const double distance = 1.0 + std::abs(seat.x - target.x);
+            if (seat.row == target.row && seat.subrow == target.subrow) baby += problem.weight_b / distance;
+            else if (std::abs(seat.row - target.row) == 1)
+                baby += problem.weight_b * problem.baby_front_back_factor / distance;
+        }
+        cached = evaluate_rich_individual_score(problem, p, s).total() + baby;
+        return cached;
     };
     std::vector<std::vector<int>> group_seats(problem.groups.size());
     for (int p : state.assignment_order)

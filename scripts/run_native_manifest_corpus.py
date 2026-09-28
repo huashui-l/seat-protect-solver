@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--threads", type=int, default=1, help="Actual solver portfolio worker count for provenance")
     args = parser.parse_args()
     args.output = args.output.resolve()
     manifest = read_json(args.manifest)
@@ -92,7 +93,7 @@ def main():
         "binary_sha256": sha256(args.executable), "executable": str(args.executable.resolve()),
         "source_config_sha256": sha256(args.config), "runtime_config_sha256": sha256(config_path),
         "manifest_sha256": sha256(args.manifest), "platform": platform.platform(),
-        "cpu": platform.processor(), "seed": 0, "threads": 1, "time_limit_seconds": 5,
+        "cpu": platform.processor(), "seed": 0, "threads": args.threads, "time_limit_seconds": 5,
         "construction_objective": "rich-fast", "production_python_callback_count": 0,
         "reference_status": "unavailable; no reference scores used during native solve",
         "case_count": len(rows), "complete_count": sum(r["complete"] for r in rows),
