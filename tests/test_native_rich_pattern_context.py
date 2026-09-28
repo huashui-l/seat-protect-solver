@@ -196,10 +196,17 @@ class NativeRichPatternContextTests(unittest.TestCase):
         self.assertEqual(actual["state"]["assignments"], expected_assignment)
         self.assertEqual([sorted(row) for row in actual["state"]["blocked"]], expected_blocks)
         self.assertEqual(actual["state"]["assignment_order"], expected_order)
-        native_d = actual["diagnostics"]
+        native_d = dict(actual["diagnostics"])
         native_d.pop("seconds"); expected.pop("seconds")
         self.assertAlmostEqual(native_d.pop("score_improvement"), expected.pop("score_improvement"), places=8)
         if restricted:
+            # Protection-only switches now rebuild correctly; the frozen Python
+            # replay classified some nonimproving candidates as rebuild failures.
+            native_failures = native_d.pop("rebuild_failures")
+            expected_failures = expected.pop("rebuild_failures")
+            self.assertLessEqual(native_failures, expected_failures)
+            self.assertEqual(native_failures + native_d.pop("nonimproving_candidates"),
+                             expected_failures + expected.pop("nonimproving_candidates"))
             if "local_branching" in native_d:
                 # Every active fixture captures the exact incumbent, including blocked seats.
                 # Duplicate assignments with alternate protection must not disable its start.
@@ -242,6 +249,44 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 accepted += result["diagnostics"]["accepted"]
         self.assertGreater(attempts, 0)
         self.assertGreater(accepted, 0)
+
+    def test_restricted_master_can_change_only_a_protected_neighbor(self):
+        case = self.synthetic([
+            (20, {"oldSeat": {"seatNum": "2B", "seatValue": ""},
+                  "mandatoryRule": {"needSingleSideEmpty": "Y"}}),
+            (10, {"oldSeat": {"seatNum": "2A", "seatValue": ""}}),
+        ])
+        config = copy.deepcopy(self.config)
+        config["algorithm"].update(enable_pattern_local_branching=False, restricted_pattern_mip_attempts=1)
+        config["input_contract"] = {"seatmaps_by_direction": {
+            "public-test": {"old": "old.json", "new": "new.json"}}}
+        scorer = evaluator.IncrementalSoftScorer(case["newSeatmapData"]["seats"], case["oldSeatmapData"]["seats"],
+                                                case["groupsData"], config["weights"], config)
+        initial = {(20, 1): "2B", (10, 1): "3A"}
+        patterns = []
+        for gid, seat, blocked in ((20, "2B", ["2A"]), (20, "2B", ["2C"]),
+                                   (10, "3A", []), (10, "2A", [])):
+            proposal = {**initial, (gid, 1): seat}
+            patterns.append(dict(group_id=gid, assignments=[[1, seat]],
+                                 blocked_by_host=[[1, blocked]] if blocked else [],
+                                 local_score=scorer.components(proposal, {gid})["total_soft_score"], source="fixture"))
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for name, value in {
+                "case.json": {"caseId": "protection_switch", "direction": "public-test", "groups": case["groupsData"]},
+                "config.json": config, "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
+                "replay.json": {"pattern_context": dict(initial=[[0, "2B", "2A"], [1, "3A"]],
+                    patterns=patterns, pairs=[], restricted_mip=True, deadline_seconds=2.0)},
+            }.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                  str(work / "replay.json")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        actual = json.loads(run.stdout)
+        self.assertEqual(actual["state"]["assignments"], ["2B", "2A"])
+        self.assertEqual(actual["state"]["blocked"], [["2C"], []])
+        self.assertEqual(actual["diagnostics"]["rebuild_failures"], 0)
+        self.assertGreater(actual["diagnostics"]["score_improvement"], 0.0)
 
     def test_rich_restricted_production_wrapper_uses_rich_state(self):
         for case in self.cases[:11]:

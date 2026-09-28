@@ -261,6 +261,9 @@ FeasibilityResult solve_feasibility_mip(
                     const double refine_started = elapsed();
                     const double refine_remaining = search_seconds - refine_started;
                     if (refine_remaining > 0.3) {
+                        AssignmentState incumbent(problem);
+                        incumbent.restore(group_result.rich_state);
+                        group_result.rich_elite_store.capture(incumbent, "master_incumbent");
                         auto refinement_problem = problem;
                         if (problem.rich_stage_budgets.business_time_limit <= 5.0) {
                             refinement_problem.rich.structured_pattern_dfs_per_group = std::max(
@@ -955,6 +958,14 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             state.passenger_to_seat[p] < 0 ? std::string{} : problem.seats[state.passenger_to_seat[p]].id);
         std::sort(result.begin(), result.end()); return result;
     };
+    const auto resource_signature = [&](int g) {
+        std::set<std::string> resources;
+        for (int p : problem.groups[g].passengers) {
+            if (state.passenger_to_seat[p] >= 0) resources.insert(problem.seats[state.passenger_to_seat[p]].id);
+            for (int seat : state.assigned_blocked[p]) resources.insert(problem.seats[seat].id);
+        }
+        return resources;
+    };
     std::vector<std::pair<int, const RichElitePattern*>> columns;
     std::vector<HighsInt> incumbent;
     bool global_value_block = false;
@@ -963,6 +974,7 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
     for (const auto& group : groups) {
         const auto found = elite.groups().find(group.first);
         if (found == elite.groups().end()) continue;
+        const auto current_resources = resource_signature(group.second);
         for (const auto& pattern : found->second) {
             std::set<std::string> occupied, resources;
             bool valid = pattern.assignments.size() == problem.groups[group.second].passengers.size();
@@ -979,11 +991,6 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             check(Highs_changeColIntegrality(highs, column, kHighsVarTypeInteger));
             columns.emplace_back(group.first, &pattern);
             if (pattern.assignments == signature(group.second)) {
-                std::set<std::string> current_resources;
-                for (int p : problem.groups[group.second].passengers) {
-                    current_resources.insert(problem.seats[state.passenger_to_seat[p]].id);
-                    for (int seat : state.assigned_blocked[p]) current_resources.insert(problem.seats[seat].id);
-                }
                 const bool already_added = std::any_of(incumbent.begin(), incumbent.end(),
                     [&](HighsInt index) { return columns[index].first == group.first; });
                 if (!already_added && resources == current_resources) incumbent.push_back(column);
@@ -1044,7 +1051,12 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
         if (selected.empty()) break;
         ++d.attempts;
         if (choices.size() != groups.size()) break;
-        for (const auto& choice : choices) if (choice.second.assignments != signature(groups.at(choice.first))) changed.insert(choice);
+        for (const auto& choice : choices) {
+            const int g = groups.at(choice.first);
+            const auto& resources = choice.second.seat_resources;
+            if (choice.second.assignments != signature(g)
+                || std::set<std::string>(resources.begin(), resources.end()) != resource_signature(g)) changed.insert(choice);
+        }
         AssignmentSnapshot candidate;
         const bool rebuilt = rebuild_rich_pattern_component(state, changed, candidate);
         bool accepted = false;
