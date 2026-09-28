@@ -7,7 +7,8 @@ from pathlib import Path
 
 def rank(summary, references):
     rows = summary['cases']
-    valid = len(rows) == len(references) and {r['case_id'] for r in rows} == set(references)
+    valid = (len(rows) == len(references) and {r['case_id'] for r in rows} == set(references)
+             and summary.get('production_python_callback_count') == 0)
     gaps = []
     for row in rows:
         valid &= bool(row.get('complete') and row.get('unassigned') == 0
@@ -18,11 +19,16 @@ def rank(summary, references):
         if 'external_score' in row:
             ref = references[row['case_id']]
             gaps.append({'case_id': row['case_id'], 'gap': 100*(ref-row['external_score'])/max(1,abs(ref)),
-                         'score': row['external_score'], 'reference': ref})
+                         'score': row['external_score'], 'reference': ref, 'reference_type': 'gap_CG_integer',
+                         'wall_seconds': row['process_wall_seconds'], 'complete': row['complete'],
+                         'unassigned': row.get('unassigned'),
+                         'hard_violations': row.get('external_hard_violations'),
+                         'evaluator_consistent': row.get('evaluator_consistent')})
     values = [r['gap'] for r in gaps]
     return {'valid': valid, 'count': len(rows), 'worst': max(values),
             'mean': statistics.mean(values), 'median': statistics.median(values),
-            'le2': sum(x<=2 for x in values), 'max_wall': max(r['process_wall_seconds'] for r in rows),
+            'le1': sum(x<=1 for x in values), 'le2': sum(x<=2 for x in values),
+            'le5': sum(x<=5 for x in values), 'max_wall': max(r['process_wall_seconds'] for r in rows),
             'cases': sorted(gaps, key=lambda r: -r['gap'])}
 
 

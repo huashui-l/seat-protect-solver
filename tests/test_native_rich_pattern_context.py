@@ -200,6 +200,20 @@ class NativeRichPatternContextTests(unittest.TestCase):
         native_d.pop("seconds"); expected.pop("seconds")
         self.assertAlmostEqual(native_d.pop("score_improvement"), expected.pop("score_improvement"), places=8)
         if restricted:
+            if "local_branching" in native_d:
+                # Every active fixture captures the exact incumbent, including blocked seats.
+                # Duplicate assignments with alternate protection must not disable its start.
+                have_start = bool(config["algorithm"].get("enable_restricted_pattern_mip", True)
+                                  and duration > 0 and not empty_elite)
+                self.assertEqual(native_d["mip_start_supplied"], have_start)
+                expected["mip_start_supplied"] = have_start
+                branching = expected["local_branching"]
+                branching["enabled"] = (have_start and not any(
+                    p["source"] == "structured_global_value_block" for p in patterns)
+                    and config["algorithm"].get("enable_pattern_local_branching", True))
+                branching["radius_history"] = [min(len(groups), branching["maximum_radius"],
+                    branching["initial_radius"] + i * branching["radius_growth"])
+                    for i in range(native_d["attempts"])] if branching["enabled"] else []
             self.assertEqual(len(native_d["accepted_attempts"]), len(expected["accepted_attempts"]))
             for a, b in zip(native_d["accepted_attempts"], expected["accepted_attempts"]):
                 self.assertAlmostEqual(a.pop("score_improvement"), b.pop("score_improvement"), places=8)
