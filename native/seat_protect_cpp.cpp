@@ -390,6 +390,21 @@ int main(int argc, char** argv) {
             if (!file) return 2;
             output = &file;
         }
+        const auto solve_started = std::chrono::steady_clock::now();
+        std::ostringstream payload;
+        const auto publish = [&](int status) {
+            // Includes every search stage, final legality/score evaluation and serialization.
+            const double solve_seconds = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - solve_started).count();
+            auto result_json = payload.str();
+            const auto end = result_json.find_last_of('}');
+            if (end == std::string::npos) throw std::runtime_error("missing solver result");
+            std::ostringstream timing;
+            timing << std::setprecision(17) << ",\"solve_wall_seconds\":" << solve_seconds;
+            result_json.insert(end, timing.str());
+            *output << result_json;
+            return status;
+        };
         if (construction_objective == full_cpp::ConstructionObjective::GroupFirst
             || construction_objective == full_cpp::ConstructionObjective::GroupSoft
             || construction_objective == full_cpp::ConstructionObjective::RichFast) {
@@ -405,10 +420,10 @@ int main(int argc, char** argv) {
             const auto* algorithm = config.find("algorithm");
             const auto* enabled = algorithm ? algorithm->find("cabin_decomposition_enabled") : nullptr;
             if (cabins.size() > 1 && (!enabled || enabled->bool_or(true)))
-                return solve_cabins(output, problem, config, input_path, config_path, time_limit, seed, construction_objective, cabins);
+                return publish(solve_cabins(&payload, problem, config, input_path, config_path, time_limit, seed, construction_objective, cabins));
         }
         const auto result = solve_portfolio(problem, time_limit, seed, construction_objective);
-        return write_result(output, problem, result, construction_objective);
+        return publish(write_result(&payload, problem, result, construction_objective));
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 3;

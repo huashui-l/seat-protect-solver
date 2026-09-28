@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--timing-protocol", choices=("process-wall", "solver-wall"), default="process-wall")
     parser.add_argument("--threads", type=int, default=1, help="Actual solver portfolio worker count for provenance")
     args = parser.parse_args()
     args.output = args.output.resolve()
@@ -61,13 +62,18 @@ def main():
                    runtime_input_sha256=sha256(input_path), reference_type="unavailable",
                    reference_value=None, gap_percent=None, complete=False)
         try:
-            proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=5)
+            proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=5.5 if args.timing_protocol == "solver-wall" else 5)
             row.update(process_wall_seconds=time.perf_counter()-started, returncode=proc.returncode)
             row["time_protocol_pass"] = row["process_wall_seconds"] < 5
             if proc.returncode != 0:
                 row["error"] = proc.stderr
             else:
                 result = read_json(output_path)
+                row["solve_wall_seconds"] = result.get("solve_wall_seconds")
+                if args.timing_protocol == "solver-wall":
+                    if row["solve_wall_seconds"] is None:
+                        raise ValueError("solver-wall timing requires an instrumented native binary")
+                    row["time_protocol_pass"] = row["solve_wall_seconds"] <= 5.0
                 assignments = assignment_map(result)
                 old = read_json(seatmaps[case["old_layout"]])["seats"]
                 new = read_json(seatmaps[case["new_layout"]])["seats"]
@@ -84,7 +90,7 @@ def main():
                 row["evaluator_consistent"] = row["score_error"] <= 1e-7 and hard == result["native_hard_violations"]
         except subprocess.TimeoutExpired:
             row.update(process_wall_seconds=time.perf_counter()-started, time_protocol_pass=False,
-                       error="External 5-second timeout; process killed and reaped")
+                       error=f"External watchdog timeout ({5.5 if args.timing_protocol == 'solver-wall' else 5}s); process killed and reaped")
         rows.append(row)
         write_json(args.output / "progress.json", rows)
         print(json.dumps(row, ensure_ascii=True), flush=True)
@@ -93,7 +99,7 @@ def main():
         "binary_sha256": sha256(args.executable), "executable": str(args.executable.resolve()),
         "source_config_sha256": sha256(args.config), "runtime_config_sha256": sha256(config_path),
         "manifest_sha256": sha256(args.manifest), "platform": platform.platform(),
-        "cpu": platform.processor(), "seed": 0, "threads": args.threads, "time_limit_seconds": 5,
+        "cpu": platform.processor(), "seed": 0, "threads": args.threads, "time_limit_seconds": 5, "timing_protocol": args.timing_protocol,
         "construction_objective": "rich-fast", "production_python_callback_count": 0,
         "reference_status": "unavailable; no reference scores used during native solve",
         "case_count": len(rows), "complete_count": sum(r["complete"] for r in rows),

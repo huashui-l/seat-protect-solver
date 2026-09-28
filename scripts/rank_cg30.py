@@ -15,20 +15,23 @@ def rank(summary, references):
                       and row.get('external_hard_violations') == 0
                       and row.get('native_hard_violations') == 0
                       and row.get('evaluator_consistent')
-                      and row.get('process_wall_seconds', 10) < 5)
+                      and row.get('time_protocol_pass')
+                      and (row.get('solve_wall_seconds', 10) <= 5 if summary.get('timing_protocol') == 'solver-wall'
+                           else row.get('process_wall_seconds', 10) < 5))
         if 'external_score' in row:
             ref = references[row['case_id']]
             gaps.append({'case_id': row['case_id'], 'gap': 100*(ref-row['external_score'])/max(1,abs(ref)),
                          'score': row['external_score'], 'reference': ref, 'reference_type': 'gap_CG_integer',
-                         'wall_seconds': row['process_wall_seconds'], 'complete': row['complete'],
+                         'wall_seconds': row['process_wall_seconds'], 'solve_wall_seconds': row.get('solve_wall_seconds'), 'complete': row['complete'],
                          'unassigned': row.get('unassigned'),
                          'hard_violations': row.get('external_hard_violations'),
                          'evaluator_consistent': row.get('evaluator_consistent')})
     values = [r['gap'] for r in gaps]
-    return {'valid': valid, 'count': len(rows), 'worst': max(values),
+    return {'timing_protocol': summary.get('timing_protocol', 'process-wall'), 'valid': valid, 'count': len(rows), 'worst': max(values),
             'mean': statistics.mean(values), 'median': statistics.median(values),
             'le1': sum(x<=1 for x in values), 'le2': sum(x<=2 for x in values),
             'le5': sum(x<=5 for x in values), 'max_wall': max(r['process_wall_seconds'] for r in rows),
+            'max_solve_wall': max((r.get('solve_wall_seconds') or 0) for r in rows) or None,
             'cases': sorted(gaps, key=lambda r: -r['gap'])}
 
 
