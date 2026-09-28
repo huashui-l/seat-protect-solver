@@ -1940,9 +1940,12 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
         for (const auto& o : pattern.placements) signatures.emplace_back(o.passenger_index, o.seat, o.blocked);
         return Key{signatures, pattern.blocked_by};
     };
+    size_t remaining_groups = difficult.size();
     for (int g : order.ordered_groups) {
         if (Clock::now() >= deadline) { diagnostics.stopped_by_deadline = true; break; }
         if (!difficult.count(g)) continue;
+        const double share = std::chrono::duration<double>(deadline - Clock::now()).count()
+            / static_cast<double>(std::max(size_t{1}, remaining_groups--));
         const auto& group = problem.groups[g]; const auto& metric = metrics.at(group.id);
         const int target_span = std::max(0, metric.row_span - 2);
         if (metric.row_span >= 2) ++diagnostics.extreme_groups_attempted;
@@ -1952,7 +1955,10 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
         for (int p : group.passengers) targets.push_back(assignment[p]);
         diagnostics.three_tier_active = problem.rich_three_tier_active;
         auto patterns = generate_rich_rigid_relaxed_patterns(problem, g, targets, cache.all_options, active_types);
-        const auto group_deadline = std::min(deadline, after(Clock::now(), order.full_resource_global_blocks ? std::max(per_group_limit, 0.16) : per_group_limit));
+        const double group_budget = problem.rich_stage_budgets.business_time_limit <= 5.0
+            ? std::min(per_group_limit, std::max(0.008, share * 1.4))
+            : (order.full_resource_global_blocks ? std::max(per_group_limit, 0.16) : per_group_limit);
+        const auto group_deadline = std::min(deadline, after(Clock::now(), group_budget));
         const auto windows = build_rich_structured_windows(problem, g, cache.all_options, metric);
         generate_rich_value_block_patterns(problem, g, cache.all_options, metric, windows, active_types, group_deadline, patterns);
         std::map<Key, size_t> position;
