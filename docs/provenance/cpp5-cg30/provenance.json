@@ -429,5 +429,94 @@
     "active_work_seconds_at_stop": 36009,
     "new_trials_after_budget": false,
     "retained_method": "three construction alternatives, five structured workers, three restricted masters, capacity-adaptive DFS and explicit tail exchange"
+  },
+  "cleanup_verification": {
+    "source_commit": "48c81e45cc9179d590a1e6bf08174473bff70cac",
+    "archive_tag": "archive/pre-cg30-cleanup",
+    "archive_sha": "758b0dd15666bfee5144a79d54744b33176d4b28",
+    "build": "Release /O2 /EHsc /W4 /std:c++17; production-only clean directory and IncludeTools builds passed, no warnings",
+    "tests": "124 passed, 37234 subtests passed; final production-only binary audited in both full 30-case runs",
+    "algorithm_configuration_unchanged": true,
+    "runs": {
+      "cleanup_run": {
+        "summary": {
+          "git_commit": "48c81e45cc9179d590a1e6bf08174473bff70cac",
+          "binary_sha256": "882c4514010934e77b24c80ad4344275d5a595803a5f90eeea8fe8bdec63099b",
+          "executable": "E:\\seat_protect_worktrees\\cpp5-cg30\\build\\cleanup_release\\seat_protect_cpp.exe",
+          "source_config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9",
+          "runtime_config_sha256": "70dca61ceb5e6e493eb716badcd132947cc065e94294e4ac1247e4503028e499",
+          "manifest_sha256": "7dcdc4deb1ea5917e550684dddcd7f193e63d20ab223e9af61502174189c56d4",
+          "platform": "Windows-10-10.0.26200-SP0",
+          "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+          "seed": 0,
+          "threads": 5,
+          "time_limit_seconds": 5,
+          "timing_protocol": "solver-wall",
+          "construction_objective": "rich-fast",
+          "production_python_callback_count": 0,
+          "reference_status": "unavailable; no reference scores used during native solve",
+          "case_count": 30,
+          "complete_count": 30,
+          "valid_complete_count": 30,
+          "evaluator_consistent_count": 30,
+          "time_protocol_pass_count": 30,
+          "mean_process_wall_seconds": 4.889781963332886,
+          "max_process_wall_seconds": 5.230225999999675
+        },
+        "ranking": {
+          "timing_protocol": "solver-wall",
+          "valid": true,
+          "count": 30,
+          "worst": 4.564598425919069,
+          "mean": 0.5809612960320513,
+          "median": 0.18905062265975392,
+          "le1": 18,
+          "le2": 26,
+          "le5": 30,
+          "max_wall": 5.230225999999675,
+          "max_solve_wall": 4.9738313
+        }
+      },
+      "cleanup_repeat": {
+        "summary": {
+          "git_commit": "48c81e45cc9179d590a1e6bf08174473bff70cac",
+          "binary_sha256": "882c4514010934e77b24c80ad4344275d5a595803a5f90eeea8fe8bdec63099b",
+          "executable": "E:\\seat_protect_worktrees\\cpp5-cg30\\build\\cleanup_release\\seat_protect_cpp.exe",
+          "source_config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9",
+          "runtime_config_sha256": "70dca61ceb5e6e493eb716badcd132947cc065e94294e4ac1247e4503028e499",
+          "manifest_sha256": "7dcdc4deb1ea5917e550684dddcd7f193e63d20ab223e9af61502174189c56d4",
+          "platform": "Windows-10-10.0.26200-SP0",
+          "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+          "seed": 0,
+          "threads": 5,
+          "time_limit_seconds": 5,
+          "timing_protocol": "solver-wall",
+          "construction_objective": "rich-fast",
+          "production_python_callback_count": 0,
+          "reference_status": "unavailable; no reference scores used during native solve",
+          "case_count": 30,
+          "complete_count": 30,
+          "valid_complete_count": 30,
+          "evaluator_consistent_count": 30,
+          "time_protocol_pass_count": 30,
+          "mean_process_wall_seconds": 4.885398836667203,
+          "max_process_wall_seconds": 5.024478200008161
+        },
+        "ranking": {
+          "timing_protocol": "solver-wall",
+          "valid": true,
+          "count": 30,
+          "worst": 4.076401342825533,
+          "mean": 0.5863459809298962,
+          "median": 0.18905062265975392,
+          "le1": 18,
+          "le2": 26,
+          "le5": 30,
+          "max_wall": 5.024478200008161,
+          "max_solve_wall": 4.9749136
+        }
+      }
+    },
+    "comparison_sha256": "d747879a826dd29b0c31eacbf2d7e67096f8aa1300402cc8656232a20a54a5e6"
   }
 }

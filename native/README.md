@@ -251,3 +251,23 @@ The output contains the full 24-case external legality/score audit, paired
 comparison to frozen feasibility, and component means versus feasibility and
 the frozen Rich run. Private inputs, benchmark outputs, and binaries remain
 ignored and must not be committed.
+
+## Production cleanup verification
+
+The accepted CG30 method is preserved at tag `archive/pre-cg30-cleanup`
+(`758b0dd`). Cleanup removes the uncalled Rich pattern adapter and its production
+link dependencies, an unused location helper, and a redundant activation wrapper.
+The shared build recipe builds the solver by default; `-IncludeTools` adds the
+independent test probes and pool research executables. The retained 60-second
+modes and legal construction fallback remain available.
+
+Both Release builds passed without warnings; native differential tests passed
+124 tests and 37,234 subchecks. Two fresh 30-case audits of the production-only
+binary passed completeness, legality, score parity and the 5-second solver-wall
+gate on all cases, with zero Python callbacks. Each run has 26/30 gaps at most
+2%. Mean gaps are 0.581% / 0.586%, worst gaps 4.565% / 4.076%; maximum solver
+wall times are 4.974s / 4.975s and process wall times 5.230s / 5.024s.
+Time-limited parallel search remains variable; these are separate runs, not
+per-case best scores. Full case data and source/binary/config provenance are
+in `docs/provenance/cpp5-cg30/comparison.csv` (`cleanup_*` columns) and
+`provenance.json` (`cleanup_verification`). Earlier evidence is preserved.
