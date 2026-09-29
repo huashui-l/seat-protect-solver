@@ -1926,7 +1926,9 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
     const auto set_number = [&](const std::string& key, double number) {
         auto& value = pricing.object[key]; value.type = Value::Type::Number; value.number = number;
     };
-    const double per_group_limit = problem.rich.structured_pattern_dfs_per_group;
+    const bool spare_capacity = problem.rich_stage_budgets.business_time_limit <= 5.0
+        && problem.rich_stage_budgets.seat_demand < 0.6 * static_cast<double>(problem.seats.size());
+    const double per_group_limit = problem.rich.structured_pattern_dfs_per_group * (spare_capacity ? 2.0 : 1.0);
     set_number("dfs_discovery_time_limit", per_group_limit);
     set_number("quick_pricing_columns_per_group", problem.rich.structured_patterns_per_group);
     std::set<std::string> active;
