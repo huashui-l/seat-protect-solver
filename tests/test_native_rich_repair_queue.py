@@ -50,8 +50,13 @@ class NativeRichRepairQueueTests(unittest.TestCase):
                                               case["groupsData"], config["weights"], config)
                 metrics = rich._group_repair_metrics(case["groupsData"], assignments, scorer.new_topology,
                                                      config["weights"], config, scorer.old_topology)
-                expected = python_conflict_activation(case, config, metrics)
-                self.assertEqual(expected, variant in {"active", "empty_new_seat"})
+                legacy_expected = python_conflict_activation(case, config, metrics)
+                self.assertEqual(legacy_expected, variant in {"active", "empty_new_seat"})
+                # The native optimizer retains conflict diversity in either
+                # capacity direction and across protection/SSR group types.
+                # Only the configured time threshold disables it; a zero
+                # business budget is clamped to the native minimum of 0.1s.
+                native_expected = variant != "short"
                 config["input_contract"] = {"seatmaps_by_direction": {
                     "public-test": {"old": "old.json", "new": "new.json"}}}
                 with tempfile.TemporaryDirectory() as directory:
@@ -65,7 +70,7 @@ class NativeRichRepairQueueTests(unittest.TestCase):
                     run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
                                           str(work / "replay.json")], capture_output=True, text=True)
                 self.assertEqual(run.returncode, 0, run.stderr)
-                self.assertEqual(json.loads(run.stdout)["conflict_diversity_active"], expected)
+                self.assertEqual(json.loads(run.stdout)["conflict_diversity_active"], native_expected)
 
     def test_metrics_and_queue_match_actual_python(self):
         scenarios = [(case, partial, seconds, weight) for case in self.cases[:11]

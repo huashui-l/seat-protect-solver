@@ -144,6 +144,8 @@ master attempts reset the library's cumulative clocks before applying their
 remaining time limit. Each master reserves 50ms for extraction and validation.
 The main LNS stage stays disabled; `enable_tail_exchange` explicitly enables
 protected-group exchanges and LNS when the preceding stages finish early.
+Conflict-diverse elite patterns are retained in both capacity directions once
+the configured minimum business-time threshold is met.
 The best legal incumbent is retained throughout. Search deadlines can change
 which nodes are explored between repeated runs, so identical seeds do not imply
 identical assignments under a wall-time limit.
@@ -174,6 +176,37 @@ hashes. Reference scores are read only by the separate ranking command. They
 are pool integer references, not global optima or certified LP upper bounds.
 Signed `gap_CG_integer` is `100 * (reference - score) / max(1, abs(reference))`.
 Negative gaps mean the heuristic improved upon the frozen reference.
+
+The final cleaned build was audited twice on the same 30 inputs. No case was
+excluded. Both runs were complete, legal, evaluator-consistent, and below the
+5-second solver limit for all 30 cases, with zero production Python callbacks.
+
+| Metric | Initial C++ baseline | Final run | Repeat |
+| --- | ---: | ---: | ---: |
+| Mean signed gap (%) | 6.7296 | 0.6377 | 0.5900 |
+| Median gap (%) | 5.4383 | 0.1891 | 0.1891 |
+| Worst gap (%) | 26.2247 | 4.4033 | 4.4033 |
+| Cases at gap <= 1% | 6/30 | 19/30 | 17/30 |
+| Cases at gap <= 2% | 7/30 | 26/30 | 26/30 |
+| Cases at gap <= 5% | 14/30 | 30/30 | 30/30 |
+| Maximum complete solver wall (s) | Not instrumented | 4.9738 | 4.9736 |
+| Maximum process wall (s) | 4.8216 | 5.0221 | 5.0215 |
+
+The all-case 2% target was **not reached**. Both runs missed it on
+`reverse:full_edge`, `forward:100_edge`, `reverse:150_edge`, and
+`reverse:150_stress`. The last case varied from 4.1853% to 2.8224%; identical
+seeds do not remove wall-time search variation. Scores matched within 1e-7 on
+25/30 cases, while assignments matched on 18/30. Formal24 passed the 2% threshold
+on 20/24 cases and the six referenced D4 cases passed on 6/6 in both runs.
+
+See [the complete paired comparison](../docs/provenance/cpp5-cg30/comparison.csv)
+for all reference values, scores, gaps, both timing measures, legality, parity,
+and input/output hashes. [Provenance](../docs/provenance/cpp5-cg30/provenance.json)
+records the tested source, binary/config hashes, build environment, tests,
+reference limitations, and rejected full-corpus trials. The initial binary's
+partial native timer is not a substitute for the new complete solver clock.
+The mean uses signed gaps; in particular, `forward:full_edge` improves upon
+the frozen CG integer result and contributes a negative gap.
 
 ## Build
 

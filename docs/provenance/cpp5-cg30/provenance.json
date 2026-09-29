@@ -1,0 +1,433 @@
+{
+  "tested_source_commit": "9e140fd66ff2789f0016153fdf167bbd9e2c6087",
+  "branch": "feat/cpp5-cg30",
+  "archive": {
+    "branch": "archive/pre-cpp5-cg30-20260928",
+    "sha": "abdeb6020313ee4300acae8424f82ba51aab2b8d"
+  },
+  "checkpoint": {
+    "branch": "checkpoint/cpp5-cg30-20260928",
+    "sha": "5c0403959c31ea8246bcd1e19a07ab11e7b2338e"
+  },
+  "configuration": "configs/config_native_cpp5_gap2.json",
+  "binary_sha256": "3599c8efab810069e74957a2c9d1080a5cff122b905b05a4f35027e1d41762f9",
+  "config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9",
+  "manifest_sha256": "7dcdc4deb1ea5917e550684dddcd7f193e63d20ab223e9af61502174189c56d4",
+  "references_sha256": "1ac17b92da6e1ddc07a3140b50d517a36b321e55be2d5bc6f542a8c5675c47bb",
+  "comparison_sha256": "1d2a45287ff874fee6e15e61ee4dbd9d2ac6ea223c54440ef98e445745687968",
+  "environment": {
+    "cpu": "AMD Ryzen 7 5800H",
+    "physical_cores": 8,
+    "logical_processors": 16,
+    "os": "Windows-10-10.0.26200-SP0",
+    "compiler": "MSVC 19.40.33813.0",
+    "toolset": "14.40.33807",
+    "build_flags": "/O2 /EHsc /W4 /std:c++17",
+    "highs": "1.15.1",
+    "cli_seed": 0,
+    "peak_search_workers": 5,
+    "restricted_master_seeds": [
+      0,
+      1,
+      2
+    ],
+    "highs_threads_per_master": 1
+  },
+  "timing": {
+    "protocol": "solver-wall",
+    "limit_seconds": 5,
+    "external_watchdog_seconds": 5.5,
+    "includes": [
+      "construction",
+      "repair",
+      "VND",
+      "pattern generation",
+      "master/LNS",
+      "native validation and scoring",
+      "result serialization"
+    ],
+    "outside_solver_clock": [
+      "process launch",
+      "initial input parsing",
+      "final file output",
+      "external Python evaluator"
+    ],
+    "note": "Process wall is reported separately and may exceed 5s; external evaluator starts after subprocess return."
+  },
+  "production_python_callback_count": 0,
+  "excluded_cases": [],
+  "candidate_selection_order": [
+    "correctness and timing gates",
+    "more cases at gap <= 2%",
+    "lower signed mean gap",
+    "lower worst gap",
+    "lower median gap",
+    "more stable wall time"
+  ],
+  "sprint_budget_seconds": 36000,
+  "optimization_trials_frozen_by_active_seconds": 34601,
+  "successful_gap_target": false,
+  "initial_and_final_runtime_input_hashes_identical": "30/30",
+  "reference_policy": "Frozen repaired CG integer scores: use the saved 600s result when present, otherwise 150s; all six D4 use 150s. No best-of selection and no LP reference substitution.",
+  "gap_formula": "100 * (reference - score) / max(1, abs(reference)); signed, not clipped",
+  "reference_sources": [
+    {
+      "path": "reports/audit-2026-09-23/benchmark/formal24_forward_timing.json",
+      "sha256": "87adc16c5ce9c71e70bdcf1e152ce378ac7aab83da35fdc7dba045907af93e2a",
+      "git_commit": "86b54fb4c4cd7a4f550cd359c39d999ead2dfbb5"
+    },
+    {
+      "path": "reports/audit-2026-09-23/benchmark/formal24_forward_600s_new.json",
+      "sha256": "bb1596273a846ba230efef6b37057f02f510db029e948cdf1a1e4bf15b89f82f",
+      "git_commit": "3c5133709e15445fd3d9ff65b872f05f755ac223"
+    },
+    {
+      "path": "reports/audit-2026-09-23/benchmark/formal24_reverse_timing.json",
+      "sha256": "ed7269407fdeab9f33ceeb3aed1630eebf49c06b07421fc8954f2ed9aaafbe7e",
+      "git_commit": "86b54fb4c4cd7a4f550cd359c39d999ead2dfbb5"
+    },
+    {
+      "path": "reports/audit-2026-09-23/benchmark/formal24_reverse_600s_new.json",
+      "sha256": "2dc2f61202896104e9061ef1f33e962de3b9f98f1ed215d21f8cb8ec2ade8694",
+      "git_commit": "3c5133709e15445fd3d9ff65b872f05f755ac223"
+    },
+    {
+      "path": "outputs/d4_cg150/comparison.json",
+      "sha256": "9af00667c1547f22a698039ee416d68884044efd693de3957c20f11b4182b586",
+      "git_commit": null
+    },
+    {
+      "path": "outputs/d4_cg150/provenance.json",
+      "sha256": "b3f5db1707db5c0be192e3c19aadc73e5d35ffa748078073b25c8aac8096cee7",
+      "git_commit": null
+    }
+  ],
+  "reference_limitations": "Historical Formal24 CG aggregate files lack complete per-run input/config hashes and assignments. Input semantic equivalence and all 30 reported integer scores were checked. These are frozen pool integer references, not certified LP bounds or global optima. Ten other D4 cases have no usable CG integer reference due to license restrictions.",
+  "baseline": {
+    "mean": 6.7295852483401095,
+    "median": 5.438308703541716,
+    "worst": 26.224689320956024,
+    "le1": 6,
+    "le2": 7,
+    "le5": 14,
+    "max_process_wall_seconds": 4.821586899997783,
+    "solve_wall_seconds": null,
+    "note": "Historical initial binary has no complete solve_wall_seconds instrument; do not substitute its partial native timer."
+  },
+  "baseline_sources": [
+    {
+      "path": "E:\\seat_protect_collab_candidate\\outputs\\benchmarks\\formal24_cpp5_vs_cg_2026-09-28\\current_main_run\\summary.json",
+      "summary_sha256": "982e8649882ffb628e63bab716aff17ab66eaa274978eade74aa26fcccd924db",
+      "git_commit": "abdeb6020313ee4300acae8424f82ba51aab2b8d",
+      "binary_sha256": "91e498b10677f304f3e828f3e0addcbc276661169c9caf59f70e43064b5a125e",
+      "source_config_sha256": "e552a090b9fbd9ea10b44952a7f0a0197e4dc65c7d47d0351c40e4ede5e8066c",
+      "production_python_callback_count": 0
+    },
+    {
+      "path": "E:\\seat_protect_collab_candidate\\outputs\\benchmarks\\d4_cpp5_main_2026-09-26\\summary.json",
+      "summary_sha256": "18e046fcb3bd7f86c952e44c97c471ffb647c6ac9ddefec5a45dd221d8684024",
+      "git_commit": "abdeb6020313ee4300acae8424f82ba51aab2b8d",
+      "binary_sha256": "91e498b10677f304f3e828f3e0addcbc276661169c9caf59f70e43064b5a125e",
+      "source_config_sha256": "e552a090b9fbd9ea10b44952a7f0a0197e4dc65c7d47d0351c40e4ede5e8066c",
+      "production_python_callback_count": 0
+    }
+  ],
+  "final_runs": {
+    "final_clean_run": {
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.403342765078733,
+        "mean": 0.6376797720468292,
+        "median": 0.18905062265975392,
+        "le1": 19,
+        "le2": 26,
+        "le5": 30,
+        "max_wall": 5.022138599990285,
+        "max_solve_wall": 4.9738385
+      },
+      "audit": {
+        "git_commit": "9e140fd66ff2789f0016153fdf167bbd9e2c6087",
+        "binary_sha256": "3599c8efab810069e74957a2c9d1080a5cff122b905b05a4f35027e1d41762f9",
+        "executable": "E:\\seat_protect_worktrees\\cpp5-cg30\\build\\native\\seat_protect_cpp.exe",
+        "source_config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9",
+        "runtime_config_sha256": "70dca61ceb5e6e493eb716badcd132947cc065e94294e4ac1247e4503028e499",
+        "manifest_sha256": "7dcdc4deb1ea5917e550684dddcd7f193e63d20ab223e9af61502174189c56d4",
+        "platform": "Windows-10-10.0.26200-SP0",
+        "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+        "seed": 0,
+        "threads": 5,
+        "time_limit_seconds": 5,
+        "timing_protocol": "solver-wall",
+        "construction_objective": "rich-fast",
+        "production_python_callback_count": 0,
+        "reference_status": "unavailable; no reference scores used during native solve",
+        "case_count": 30,
+        "complete_count": 30,
+        "valid_complete_count": 30,
+        "evaluator_consistent_count": 30,
+        "time_protocol_pass_count": 30,
+        "mean_process_wall_seconds": 4.887772403332444,
+        "max_process_wall_seconds": 5.022138599990285
+      },
+      "summary_sha256": "83428bdbfdcd05195cf5e393b76cccae4e7e35a4c82e060f0256e9e8fef437a2"
+    },
+    "final_clean_repeat": {
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.403342765078733,
+        "mean": 0.5900057112946535,
+        "median": 0.18905062265975392,
+        "le1": 17,
+        "le2": 26,
+        "le5": 30,
+        "max_wall": 5.0215383999893675,
+        "max_solve_wall": 4.9735715
+      },
+      "audit": {
+        "git_commit": "9e140fd66ff2789f0016153fdf167bbd9e2c6087",
+        "binary_sha256": "3599c8efab810069e74957a2c9d1080a5cff122b905b05a4f35027e1d41762f9",
+        "executable": "E:\\seat_protect_worktrees\\cpp5-cg30\\build\\native\\seat_protect_cpp.exe",
+        "source_config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9",
+        "runtime_config_sha256": "70dca61ceb5e6e493eb716badcd132947cc065e94294e4ac1247e4503028e499",
+        "manifest_sha256": "7dcdc4deb1ea5917e550684dddcd7f193e63d20ab223e9af61502174189c56d4",
+        "platform": "Windows-10-10.0.26200-SP0",
+        "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+        "seed": 0,
+        "threads": 5,
+        "time_limit_seconds": 5,
+        "timing_protocol": "solver-wall",
+        "construction_objective": "rich-fast",
+        "production_python_callback_count": 0,
+        "reference_status": "unavailable; no reference scores used during native solve",
+        "case_count": 30,
+        "complete_count": 30,
+        "valid_complete_count": 30,
+        "evaluator_consistent_count": 30,
+        "time_protocol_pass_count": 30,
+        "mean_process_wall_seconds": 4.885961836665714,
+        "max_process_wall_seconds": 5.0215383999893675
+      },
+      "summary_sha256": "13c3878fff672c428ea6e225182aa2bc0cd7be69b0ce7fd609e63f3301ec7852"
+    }
+  },
+  "repeatability": {
+    "identical_assignments": 18,
+    "identical_scores_within_1e_7": 25,
+    "max_absolute_score_difference": 8.71894736842114,
+    "note": "Time-limited parallel search is not assignment deterministic. Both independent complete runs are reported; scores are never merged per case."
+  },
+  "validation_logs": {
+    "final_clean_build.log": {
+      "path": "outputs/cg30_sprint/final_clean_build.log",
+      "sha256": "7523471b33f8e0924b4f78c550ed90f99fc5e8a94ad1ba2215b7a6383ce77895"
+    },
+    "final_clean_tests.log": {
+      "path": "outputs/cg30_sprint/final_clean_tests.log",
+      "sha256": "87e7a50e52b2b7b785fa221dac4e403caed05810e105b5800d594c0b73d111cd"
+    },
+    "final_clean_tests_repair_queue.log": {
+      "path": "outputs/cg30_sprint/final_clean_tests_repair_queue.log",
+      "sha256": "bed3dc6b5ecbe982afcf5b17877049f25a239c330de9a279d54596a57014b9d7"
+    }
+  },
+  "tests": {
+    "native_test_modules": 21,
+    "main_tests": 124,
+    "passing_subchecks_after_targeted_fix": 37234,
+    "initial_full_suite": "124 passed, 37224 subtests passed; 10 subtest failures in one outdated conflict-diversity activation assertion",
+    "fix": "Retain frozen Python assertions and independently assert the intentionally broadened native activation policy. No production source or legality/score checks changed.",
+    "targeted_rerun": "2 passed, 58 subtests passed in 3.27s; exit code 0",
+    "all_failures_resolved": true,
+    "command": "SEAT_PROTECT_NATIVE_EXE=build/native/seat_protect_cpp.exe; SEAT_PROTECT_STATE_REPLAY=build/native/native_state_replay.exe; python -m pytest -q tests/test_native_*.py excluding legacy artifact-only test_native_feasibility_solver.py and test_native_formal24_metrics.py",
+    "build": "Full Release /O2 build succeeded; two pre-existing C4244 warnings and no new warnings",
+    "portable_direct_cli_smoke": {
+      "source": "Git archive of committed config, maps and forward:50_normal in an isolated directory; no benchmark path substitution",
+      "complete": true,
+      "unassigned": 0,
+      "native_hard_violations": 0,
+      "solve_wall_seconds": 3.0400332,
+      "process_wall_seconds": 3.1016244999918854,
+      "config_sha256": "d42cccfadd4d690cbcb33b07c75e0137525e35324b2f3229c6ace5ee430a28f9"
+    }
+  },
+  "rejected_full_corpus_trials": [
+    {
+      "run": "construction5_full",
+      "reason": "Five construction alternatives reduced the number of <=2% cases from 26 to 24, despite a better signed mean and worst in this individual trial.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.076401342825533,
+        "mean": 0.4824344411905914,
+        "median": 0.18905062265975392,
+        "le1": 16,
+        "le2": 24,
+        "le5": 30,
+        "max_wall": 5.027894400001969,
+        "max_solve_wall": 4.973791
+      }
+    },
+    {
+      "run": "master5_full",
+      "reason": "Five restricted-master seeds retained 26 <=2% cases but had a worse signed mean than the incumbent selection run.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.403342765078733,
+        "mean": 0.6264368807623134,
+        "median": 0.18905062265975392,
+        "le1": 17,
+        "le2": 26,
+        "le5": 30,
+        "max_wall": 5.025032100005774,
+        "max_solve_wall": 4.9742838
+      }
+    },
+    {
+      "run": "windows16_full",
+      "reason": "Narrower structured window set retained 26 <=2% cases but worsened the signed mean and worst gap.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 5.703194967751896,
+        "mean": 0.6287832104910105,
+        "median": 0.12374177504399407,
+        "le1": 19,
+        "le2": 26,
+        "le5": 29,
+        "max_wall": 5.023020799999358,
+        "max_solve_wall": 4.9743774
+      }
+    },
+    {
+      "run": "parallel_dual_full",
+      "reason": "Native parallel LP-guided pricing did not repay its time cost; only 23 <=2% cases.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.729509166566643,
+        "mean": 0.8274033540609009,
+        "median": 0.5344156553099917,
+        "le1": 18,
+        "le2": 23,
+        "le5": 30,
+        "max_wall": 5.022250599999097,
+        "max_solve_wall": 4.9745629
+      }
+    },
+    {
+      "run": "semantic_symmetry_full",
+      "reason": "Broader pricing symmetry passed its local differential checks but regressed full-corpus quality; discarded.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 8.09173615834498,
+        "mean": 0.9213559672661233,
+        "median": 0.33459812553066737,
+        "le1": 16,
+        "le2": 23,
+        "le5": 29,
+        "max_wall": 5.021900199993979,
+        "max_solve_wall": 4.9740091
+      }
+    },
+    {
+      "run": "tail_drop2_full",
+      "reason": "Allowing temporary LNS score loss did not improve the best legal configuration.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.239872053952077,
+        "mean": 0.7615328324761965,
+        "median": 0.37240278519567016,
+        "le1": 16,
+        "le2": 24,
+        "le5": 30,
+        "max_wall": 5.023722799989628,
+        "max_solve_wall": 4.9740208
+      }
+    },
+    {
+      "run": "alternative_shifts_full",
+      "reason": "Extra translated construction alternatives did not improve full-corpus threshold coverage.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 4.239872053952077,
+        "mean": 0.7616383921409446,
+        "median": 0.37240278519567016,
+        "le1": 17,
+        "le2": 23,
+        "le5": 30,
+        "max_wall": 5.0285340000118595,
+        "max_solve_wall": 4.9749074
+      }
+    },
+    {
+      "run": "postmaster040_full",
+      "reason": "Reserving more time for post-master protected exchanges reduced overall quality.",
+      "metrics": {
+        "timing_protocol": "solver-wall",
+        "valid": true,
+        "count": 30,
+        "worst": 5.592386928065341,
+        "mean": 0.901928199817647,
+        "median": 0.8117264994699095,
+        "le1": 15,
+        "le2": 23,
+        "le5": 28,
+        "max_wall": 5.02335440000752,
+        "max_solve_wall": 4.9748779
+      }
+    }
+  ],
+  "objective_and_constraint_config_unchanged_from_baseline": true,
+  "d4_reference_run_provenance": {
+    "cg_commit": "8b193c42df8f99d376797ec95162e6f3257d49f7",
+    "cpp_commit": "abdeb6020313ee4300acae8424f82ba51aab2b8d",
+    "gurobi_version": "13.0.3",
+    "license": "size-limited bundled license",
+    "config_sha256": "2d3e905c4eefb9a5b432b7d18acfdb5e5e2518d367538278b01e5d2fab3466d1",
+    "manifest_sha256": "983e99b879a3f74ba9e26967d1e9aa49105f82939c518a3f813f2c4d9afef0fa",
+    "cpp_summary_sha256": "18e046fcb3bd7f86c952e44c97c471ffb647c6ac9ddefec5a45dd221d8684024",
+    "cg_budget_seconds": 150,
+    "pricing_budget_seconds": 50,
+    "integer_budget_seconds": 30,
+    "watchdog_seconds": 210,
+    "pricing_workers": 6,
+    "master_threads": 1,
+    "pricing_threads": 1,
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.2",
+    "timing_limitation": "Regression tests overlapped some early cases. Wall times are observational, not isolated speed benchmarks.",
+    "evaluator_source_diff_vs_main": "empty",
+    "objective": "Same main config weights and constraints as archived C++ run; no C++ assignments passed as warm start."
+  },
+  "solver_source_diff_after_final_validation": "empty; only evidence, README and the corrected boundary test differ from tested_source_commit",
+  "runtime_libraries_sha256": {
+    "highs.dll": "722dfd5eb66e1de2fe306d8e6e9c68085ca1b454c04e1860dd22f636557e6de5"
+  },
+  "all_final_case_score_errors": 0.0,
+  "matched_ranking_audit": {
+    "valid_full_corpus_runs_inspected": 70,
+    "best_by_frozen_selection_order": "final_clean_repeat",
+    "no_unchecked_higher_ranked_candidate_found": true
+  },
+  "stop": {
+    "reason": "10-hour accumulated active-work budget reached; all-case 2% target not achieved",
+    "active_work_seconds_at_stop": 36009,
+    "new_trials_after_budget": false,
+    "retained_method": "three construction alternatives, five structured workers, three restricted masters, capacity-adaptive DFS and explicit tail exchange"
+  }
+}
