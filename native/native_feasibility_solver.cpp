@@ -90,11 +90,6 @@ Location location_of(const Seat& seat, bool by_row) {
     return {seat.cabin, seat.row, by_row ? -1 : seat.subrow};
 }
 
-bool same_location(const Seat& left, const Seat& right, bool by_row) {
-    return left.cabin == right.cabin && left.row == right.row
-        && (by_row || left.subrow == right.subrow);
-}
-
 }  // namespace
 
 ConstructionObjective parse_construction_objective(const std::string& value) {

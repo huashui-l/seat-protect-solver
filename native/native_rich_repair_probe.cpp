@@ -963,8 +963,7 @@ int main(int argc, char** argv) {
             std::cout << std::setprecision(17) << "{\"repair_queue\":";
             full_cpp::write_rich_repair_queue(std::cout,
                 full_cpp::build_rich_repair_queue(problem, state.passenger_to_seat), problem.groups.size());
-            std::cout << ",\"conflict_diversity_active\":" << (full_cpp::rich_conflict_diversity_active(problem,
-                full_cpp::build_rich_repair_queue(problem, state.passenger_to_seat)) ? "true" : "false") << "}\n";
+            std::cout << ",\"conflict_diversity_active\":" << (problem.rich_conflict_diversity_time_active ? "true" : "false") << "}\n";
             return 0;
         }
         std::vector<std::vector<int>> rankings;
@@ -1033,8 +1032,7 @@ int main(int argc, char** argv) {
                 vnd = full_cpp::improve_rich_vnd_m2(problem,
                     std::chrono::steady_clock::now() + std::chrono::seconds(60), diagnostics);
                 if (const auto* structured = replay.find("pipeline_structured"); structured && structured->bool_or()) {
-                    diagnostics.rich_conflict_diversity_active = full_cpp::rich_conflict_diversity_active(problem,
-                        full_cpp::build_rich_repair_queue(problem, construction_state.passenger_to_seat));
+                    diagnostics.rich_conflict_diversity_active = problem.rich_conflict_diversity_time_active;
                     if (const auto* alternate = replay.find("structured_alternate_selected"); alternate && alternate->bool_or())
                         diagnostics.passenger_to_seat.assign(problem.passengers.size(), -1);
                     full_cpp::generate_rich_patterns_m3(problem,

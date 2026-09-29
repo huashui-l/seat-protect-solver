@@ -198,8 +198,6 @@ std::vector<RichGroupRepairMetric> build_rich_repair_queue(
     const Problem& problem, const std::vector<int>& assignment);
 void write_rich_repair_queue(std::ostream& output,
     const std::vector<RichGroupRepairMetric>& queue, size_t limit);
-bool rich_conflict_diversity_active(const Problem& problem,
-    const std::vector<RichGroupRepairMetric>& construction_metrics);
 
 struct RichStructuredOrder {
     int min_group_size = 0;

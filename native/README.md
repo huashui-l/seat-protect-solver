@@ -4,6 +4,11 @@ This directory contains the active C++ source closure and its PowerShell build
 entry points. Historical frontier C++/GNN research status is preserved under
 [`docs/research-status/`](../docs/research-status/frontier-cpp-gnn-roadmap.md).
 
+The production build links only the raw JSON solver sources listed below.
+`build_native_solver_pipeline.ps1 -HighsRoot <path>` builds this solver; add
+`-IncludeTools` to build differential probes and historical pool benchmarks.
+Those tools are separate executables and are not linked into the solver.
+
 The raw JSON feasibility CLI consists of:
 
 - `seat_protect_cpp.cpp`
@@ -12,7 +17,6 @@ The raw JSON feasibility CLI consists of:
 - `native_group_constructor.cpp/.hpp`
 - `native_json.hpp`
 - `native_rich_construction.cpp`
-- `native_rich_pattern_adapter.cpp/.hpp`
 
 `native_state_replay.cpp` is a build-time public-fixture differential probe for
 high-volume `AssignmentState` legality and save/restore replay tests.
