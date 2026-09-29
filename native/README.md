@@ -120,7 +120,7 @@ unused construction/repair/VND/pattern carry before restricted MIP, which keeps
 so exhausted neighborhoods may still finish early. No artificial wait is added.
 The preserved 60s `group-first` profile and archived results are unchanged.
 
-This is the recommended short profile. Frozen `17727e4` Formal24 passes all
+This is a preserved historical short profile. Frozen `17727e4` Formal24 passes all
 24 completeness/legality/evaluator checks; process mean/median/max is
 4.292/4.493/4.550s, all below 5s. Against the first short profile: 20 improve,
 4 tie, 0 regress, mean score gain 7.969. Average normalized score loss versus
@@ -132,6 +132,48 @@ C++ 60s is 2.87%. Exact results and the intermediate timing diagnosis are in
   --config configs/config_native_rich_4p5s_search.json --output RESULT.json `
   --construction-objective rich-fast --time-limit 5 --seed 0
 ```
+
+## Five-second CG30 profile
+
+Use `configs/config_native_cpp5_gap2.json` with `rich-fast --time-limit 5 --seed 0`.
+The native search uses three construction alternatives, five structured-pattern
+workers, and three single-threaded restricted masters with fixed seeds 0, 1, 2.
+When seat demand is below 60% of capacity, structured DFS receives twice its
+per-group budget, still bounded by the shared stage deadline. Repeated HiGHS
+master attempts reset the library's cumulative clocks before applying their
+remaining time limit. Each master reserves 50ms for extraction and validation.
+The main LNS stage stays disabled; `enable_tail_exchange` explicitly enables
+protected-group exchanges and LNS when the preceding stages finish early.
+The best legal incumbent is retained throughout. Search deadlines can change
+which nodes are explored between repeated runs, so identical seeds do not imply
+identical assignments under a wall-time limit.
+
+The `solver-wall` protocol requires `solve_wall_seconds <= 5`. It includes
+construction, repair, VND, pattern generation, master searches, tail exchanges,
+final native validation/scoring, and result serialization. Process launch,
+initial JSON loading, final file output, and the external Python evaluator are
+outside this interval. The harness also records process wall time separately;
+that value can exceed 5 seconds. Its 5.5-second watchdog kills and reaps a stalled
+process; it does not relax the 5-second solver acceptance gate.
+
+From the repository root, after building:
+
+```powershell
+python scripts/run_native_manifest_corpus.py `
+  --manifest docs/provenance/cpp5-cg30/manifest.json `
+  --config configs/config_native_cpp5_gap2.json `
+  --executable build/native/seat_protect_cpp.exe `
+  --output outputs/cg30 --timing-protocol solver-wall --threads 5
+python scripts/rank_cg30.py outputs/cg30
+```
+
+`--threads` records the peak native worker count for provenance; it does not
+configure the solver. The manifest selects Formal24 plus the six D4 cases with
+available frozen repaired-CG integer results, and verifies input and seatmap
+hashes. Reference scores are read only by the separate ranking command. They
+are pool integer references, not global optima or certified LP upper bounds.
+Signed `gap_CG_integer` is `100 * (reference - score) / max(1, abs(reference))`.
+Negative gaps mean the heuristic improved upon the frozen reference.
 
 ## Build
 

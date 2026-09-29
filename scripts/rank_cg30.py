@@ -38,7 +38,7 @@ def rank(summary, references):
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('run',type=Path)
-    parser.add_argument('--references',type=Path,default=Path('outputs/cg30_sprint/references.json'))
+    parser.add_argument('--references',type=Path,default=Path('docs/provenance/cpp5-cg30/references.json'))
     args=parser.parse_args()
     refs={r['case_id']:r['score'] for r in json.loads(args.references.read_text())}
     result=rank(json.loads((args.run/'summary.json').read_text()),refs)

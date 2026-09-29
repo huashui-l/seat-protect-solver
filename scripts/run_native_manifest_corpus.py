@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timing-protocol", choices=("process-wall", "solver-wall"), default="process-wall")
-    parser.add_argument("--threads", type=int, default=1, help="Actual solver portfolio worker count for provenance")
+    parser.add_argument("--threads", type=int, default=1, help="Recorded peak native search workers; this does not change solver settings")
     args = parser.parse_args()
     args.output = args.output.resolve()
     manifest = read_json(args.manifest)
