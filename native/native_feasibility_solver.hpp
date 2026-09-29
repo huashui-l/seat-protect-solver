@@ -27,7 +27,7 @@ struct RichRestrictedDiagnostics {
     std::vector<RichRestrictedAccepted> accepted_attempts;
 };
 RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, AssignmentState& state,
-    const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline);
+    const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline, int seed = 0);
 void write_rich_restricted_diagnostics(std::ostream& output, const RichRestrictedDiagnostics& diagnostics);
 RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
     std::chrono::steady_clock::time_point deadline, GroupConstructionResult& result);

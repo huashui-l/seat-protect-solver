@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <future>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -286,6 +287,21 @@ FeasibilityResult solve_feasibility_mip(
                             search_seconds, 0.0, 0.0};
                     }
                 }
+            }
+            // Spend unused short-solve time on exchanges beyond the pattern pool.
+            if (group_result.rich_candidate_complete && budgets.business_time_limit <= 5.0
+                && elapsed() + 0.5 < search_seconds) {
+                auto tail_problem = problem;
+                tail_problem.rich.conflict_component_lns_enabled = true;
+                const double tail_started = elapsed();
+                tail_problem.rich.protected_multigroup_enabled = true;
+                tail_problem.rich.priority_multigroup_enabled = true;
+                result.rich_protected = improve_rich_protected_stage(tail_problem,
+                    at(tail_started + (search_seconds - 0.05 - tail_started) * 0.6), group_result);
+                result.rich_lns = improve_rich_lns_stage(tail_problem, at(search_seconds - 0.05), group_result);
+                group_result.rich_stage_timing["tail_lns"] = {
+                    0.0, search_seconds - 0.05 - tail_started, tail_started, elapsed(),
+                    search_seconds - 0.05, 0.0, 0.0};
             }
             // Q1/Q2A are independent fallback improvements, not frozen Rich
             // stages. Run them only after Rich, using the same remaining global
@@ -825,7 +841,8 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
             std::sort(ordered.begin(), ordered.end(), [&](int a, int b) { return std::make_pair(priority_loss.at(a), a) < std::make_pair(priority_loss.at(b), b); });
             if (ordered.size() > static_cast<size_t>(max_groups - 1)) ordered.resize(max_groups - 1);
             ordered.push_back(root); std::sort(ordered.begin(), ordered.end());
-            if (ordered.size() >= 2) components.push_back(std::move(ordered));
+            if (ordered.size() >= 2 || problem.rich_stage_budgets.business_time_limit <= 5.0)
+                components.push_back(std::move(ordered));
         }
         for (const auto& component : components) {
             if (tested.count(component) || d.components_tested >= problem.rich.protected_multigroup_component_limit || Clock::now() >= deadline) continue;
@@ -838,7 +855,7 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
             std::set<int> outside_indexes;
             for (const auto& group : problem.groups) if (!std::binary_search(component.begin(), component.end(), group.id))
                 for (const auto& seat : resources_for(group.id)) { outside.insert(seat); outside_indexes.insert(problem.seat_index.at(seat)); }
-            for (int gid : component) if (gid != root) {
+            for (int gid : component) if (gid != root || problem.rich_stage_budgets.business_time_limit <= 5.0) {
                 const auto dynamic = add_rich_dynamic_relocation_patterns(problem, state, group_indexes.at(gid), outside_indexes, deadline, fixed, baby, caches, elite);
                 d.dynamic_relocation_calls += dynamic.calls; d.dynamic_relocation_patterns += dynamic.patterns;
             }
@@ -912,7 +929,28 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
 ) {
     if (!result.rich_candidate_complete) return {};
     AssignmentState state(problem); state.restore(result.rich_state);
-    const auto diagnostics = improve_rich_restricted_mip(problem, state, result.rich_elite_store, deadline);
+    using MasterResult = std::pair<AssignmentSnapshot, RichRestrictedDiagnostics>;
+    std::vector<std::future<MasterResult>> alternatives;
+    if (problem.rich_stage_budgets.business_time_limit <= 5.0
+        && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.5) {
+        for (int seed : {1, 2}) alternatives.push_back(std::async(std::launch::async, [&, seed]() {
+            AssignmentState candidate(problem); candidate.restore(result.rich_state);
+            auto diagnostics = improve_rich_restricted_mip(problem, candidate, result.rich_elite_store, deadline, seed);
+            return MasterResult{candidate.save(), std::move(diagnostics)};
+        }));
+    }
+    auto diagnostics = improve_rich_restricted_mip(problem, state, result.rich_elite_store, deadline);
+    double best_score = evaluate_soft_score(problem, state.passenger_to_seat);
+    for (auto& alternative : alternatives) {
+        auto candidate = alternative.get();
+        const double candidate_score = evaluate_soft_score(problem, candidate.first.passenger_to_seat);
+        if (candidate_score > best_score + 1e-9
+            && validate_complete_assignment(problem, candidate.first.passenger_to_seat) == 0) {
+            state.restore(std::move(candidate.first));
+            diagnostics = std::move(candidate.second);
+            best_score = candidate_score;
+        }
+    }
     result.rich_state = state.save();
     const double score = evaluate_soft_score(problem, state.passenger_to_seat);
     if (validate_complete_assignment(problem, state.passenger_to_seat) == 0 && score > result.group_construction_score + 1e-9) {
@@ -926,7 +964,7 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
 }
 
 RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, AssignmentState& state,
-    const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline
+    const RichEliteStore& elite, std::chrono::steady_clock::time_point deadline, int seed
 ) {
     using Clock = std::chrono::steady_clock;
     const auto started = Clock::now();
@@ -942,7 +980,7 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
     const auto check = [](HighsInt status) { if (status == kHighsStatusError) throw std::runtime_error("Rich restricted MIP API error"); };
     check(Highs_setBoolOptionValue(highs, "output_flag", 0));
     check(Highs_setIntOptionValue(highs, "threads", 1));
-    check(Highs_setIntOptionValue(highs, "random_seed", 0));
+    check(Highs_setIntOptionValue(highs, "random_seed", seed));
     check(Highs_setDoubleOptionValue(highs, "mip_rel_gap", 0.0));
     std::map<int, int> groups;
     for (size_t g = 0; g < problem.groups.size(); ++g) groups[problem.groups[g].id] = static_cast<int>(g);
@@ -1035,7 +1073,11 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             check(Highs_changeRowBounds(highs, branching_row, static_cast<double>(groups.size()) - radius, Highs_getInfinity(highs)));
             d.radius_history.push_back(radius);
         }
-        check(Highs_setDoubleOptionValue(highs, "time_limit", remaining));
+        // HiGHS returns after postsolve; leave time for extraction and legality checks.
+        const double solve_remaining = remaining
+            - (problem.rich_stage_budgets.business_time_limit <= 5.0 ? 0.05 : 0.0);
+        if (solve_remaining <= 0.01) break;
+        check(Highs_setDoubleOptionValue(highs, "time_limit", solve_remaining));
         check(Highs_run(highs));
         const char* names[] = {"Not Set", "Load error", "Model error", "Presolve error", "Solve error", "Postsolve error", "Empty", "Optimal",
             "Infeasible", "Primal infeasible or unbounded", "Unbounded", "Bound on objective reached", "Target for objective reached", "Time limit reached",
