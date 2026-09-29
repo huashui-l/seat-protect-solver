@@ -20,6 +20,7 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
     def test_complete_solve_clock_covers_single_and_split_cabin_stages(self):
         profile = json.loads((Path(__file__).resolve().parents[1]
                              / "configs/config_native_cpp5_gap2.json").read_text(encoding="utf-8"))
+        tail_seen = False
         for case_id in ("shrink_small_blockers", "two_cabin_valid_groups"):
             with self.subTest(case=case_id):
                 result = self.run_case(case_id, "rich-fast", algorithm=profile["algorithm"])
@@ -31,6 +32,15 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 else:
                     self.assertGreaterEqual(result["solve_wall_seconds"], max(
                         t["finished"] for t in result["rich_stage_timing"].values()))
+                for native in ([c["result"] for c in cabins.values()] if cabins else [result]):
+                    timing = native["rich_stage_timing"].get("tail_exchange")
+                    if timing:
+                        tail_seen = True
+                        self.assertGreaterEqual(timing["finished"], timing["started"])
+                        self.assertLessEqual(timing["deadline"], native["rich_search_deadline"])
+                        self.assertGreaterEqual(native["native_score"], native["rich_vnd_score"] - 1e-8)
+                        self.assertTrue(native["rich_multigroup_lns"]["enabled"])
+        self.assertTrue(tail_seen)
 
     def test_rich_fast_profile_uses_rich_first_and_q0_only_on_failure(self):
         profile = json.loads((Path(__file__).resolve().parents[1]

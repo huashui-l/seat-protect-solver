@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
-#include <future>
 #include <sstream>
 #include <fstream>
 #include <iomanip>
@@ -187,46 +186,6 @@ int write_result(std::ostream* output, const full_cpp::Problem& problem,
         return result.native_hard_violations == 0 && unassigned == 0 ? 0 : 4;
 }
 
-full_cpp::FeasibilityResult solve_portfolio(const full_cpp::Problem& problem, double budget,
-    int seed, full_cpp::ConstructionObjective objective) {
-    if (objective != full_cpp::ConstructionObjective::RichFast || problem.rich.portfolio_workers == 1)
-        return full_cpp::solve_feasibility_mip(problem, budget, seed, objective);
-    const auto started = std::chrono::steady_clock::now();
-    std::vector<std::future<full_cpp::FeasibilityResult>> runs;
-    for (int variant = 0; variant < problem.rich.portfolio_workers; ++variant) {
-        runs.push_back(std::async(std::launch::async, [&, variant]() {
-            auto local = problem;
-            if (variant == 1) {
-                local.rich.structured_patterns_per_group = 4;
-                local.rich.elite_patterns_per_group = 128;
-                local.rich.structured_pattern_dfs_per_group = 0.04;
-            } else if (variant == 2) {
-                local.rich.structured_patterns_per_group = 8;
-                local.rich.elite_patterns_per_group = 128;
-                local.rich.structured_pattern_dfs_per_group = 0.08;
-                local.rich.structured_pattern_window_limit = 96;
-                local.rich.conflict_component_lns_enabled = false;
-            }
-            const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-            return full_cpp::solve_feasibility_mip(local, std::max(0.01, budget - elapsed), seed, objective);
-        }));
-    }
-    full_cpp::FeasibilityResult best;
-    bool have_best = false;
-    double best_score = -std::numeric_limits<double>::infinity();
-    for (auto& run : runs) {
-        auto candidate = run.get();
-        if (full_cpp::validate_complete_assignment(problem, candidate.passenger_to_seat) != 0) continue;
-        const double score = full_cpp::evaluate_soft_score(problem, candidate.passenger_to_seat);
-        if (!have_best || score > best_score) {
-            best = std::move(candidate); best_score = score; have_best = true;
-        }
-    }
-    if (!have_best) throw std::runtime_error("portfolio produced no complete legal incumbent");
-    best.wall_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-    return best;
-}
-
 // The outer frozen Python allocator solves homogeneous cabins in increasing
 // target-seat count order; each call constructs its own topology and budgets.
 int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
@@ -296,7 +255,7 @@ int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
         auto& limit = cabin_config.object.at("algorithm").object["business_time_limit_seconds"];
         limit.type = native_json::Value::Type::Number; limit.number = budget;
         const auto subproblem = full_cpp::make_problem(cabin_raw, cabin_config, cabin_new, cabin_old);
-        const auto result = solve_portfolio(subproblem, budget, seed, objective);
+        const auto result = full_cpp::solve_feasibility_mip(subproblem, budget, seed, objective);
         for (size_t p = 0; p < subproblem.passengers.size(); ++p) {
             const int seat = result.passenger_to_seat[p];
             if (seat < 0) continue;
@@ -422,7 +381,7 @@ int main(int argc, char** argv) {
             if (cabins.size() > 1 && (!enabled || enabled->bool_or(true)))
                 return publish(solve_cabins(&payload, problem, config, input_path, config_path, time_limit, seed, construction_objective, cabins));
         }
-        const auto result = solve_portfolio(problem, time_limit, seed, construction_objective);
+        const auto result = full_cpp::solve_feasibility_mip(problem, time_limit, seed, construction_objective);
         return publish(write_result(&payload, problem, result, construction_objective));
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

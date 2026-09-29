@@ -289,7 +289,7 @@ FeasibilityResult solve_feasibility_mip(
                 }
             }
             // Spend unused short-solve time on exchanges beyond the pattern pool.
-            if (group_result.rich_candidate_complete && budgets.business_time_limit <= 5.0
+            if (problem.rich.tail_exchange_enabled && group_result.rich_candidate_complete && budgets.business_time_limit <= 5.0
                 && elapsed() + 0.5 < search_seconds) {
                 auto tail_problem = problem;
                 tail_problem.rich.conflict_component_lns_enabled = true;
@@ -299,7 +299,7 @@ FeasibilityResult solve_feasibility_mip(
                 result.rich_protected = improve_rich_protected_stage(tail_problem,
                     at(tail_started + (search_seconds - 0.05 - tail_started) * 0.6), group_result);
                 result.rich_lns = improve_rich_lns_stage(tail_problem, at(search_seconds - 0.05), group_result);
-                group_result.rich_stage_timing["tail_lns"] = {
+                group_result.rich_stage_timing["tail_exchange"] = {
                     0.0, search_seconds - 0.05 - tail_started, tail_started, elapsed(),
                     search_seconds - 0.05, 0.0, 0.0};
             }
@@ -841,7 +841,7 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
             std::sort(ordered.begin(), ordered.end(), [&](int a, int b) { return std::make_pair(priority_loss.at(a), a) < std::make_pair(priority_loss.at(b), b); });
             if (ordered.size() > static_cast<size_t>(max_groups - 1)) ordered.resize(max_groups - 1);
             ordered.push_back(root); std::sort(ordered.begin(), ordered.end());
-            if (ordered.size() >= 2 || problem.rich_stage_budgets.business_time_limit <= 5.0)
+            if (ordered.size() >= 2 || problem.rich.tail_exchange_enabled)
                 components.push_back(std::move(ordered));
         }
         for (const auto& component : components) {
@@ -855,7 +855,7 @@ RichProtectedMipDiagnostics improve_rich_protected_mip(const Problem& problem,
             std::set<int> outside_indexes;
             for (const auto& group : problem.groups) if (!std::binary_search(component.begin(), component.end(), group.id))
                 for (const auto& seat : resources_for(group.id)) { outside.insert(seat); outside_indexes.insert(problem.seat_index.at(seat)); }
-            for (int gid : component) if (gid != root || problem.rich_stage_budgets.business_time_limit <= 5.0) {
+            for (int gid : component) if (gid != root || problem.rich.tail_exchange_enabled) {
                 const auto dynamic = add_rich_dynamic_relocation_patterns(problem, state, group_indexes.at(gid), outside_indexes, deadline, fixed, baby, caches, elite);
                 d.dynamic_relocation_calls += dynamic.calls; d.dynamic_relocation_patterns += dynamic.patterns;
             }
@@ -931,7 +931,7 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
     AssignmentState state(problem); state.restore(result.rich_state);
     using MasterResult = std::pair<AssignmentSnapshot, RichRestrictedDiagnostics>;
     std::vector<std::future<MasterResult>> alternatives;
-    if (problem.rich_stage_budgets.business_time_limit <= 5.0
+    if (problem.rich.enable_restricted_pattern_mip && problem.rich_stage_budgets.business_time_limit <= 5.0
         && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.5) {
         for (int seed : {1, 2}) alternatives.push_back(std::async(std::launch::async, [&, seed]() {
             AssignmentState candidate(problem); candidate.restore(result.rich_state);
@@ -1077,6 +1077,8 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
         const double solve_remaining = remaining
             - (problem.rich_stage_budgets.business_time_limit <= 5.0 ? 0.05 : 0.0);
         if (solve_remaining <= 0.01) break;
+        // HiGHS otherwise compares the new limit against cumulative run time.
+        check(Highs_zeroAllClocks(highs));
         check(Highs_setDoubleOptionValue(highs, "time_limit", solve_remaining));
         check(Highs_run(highs));
         const char* names[] = {"Not Set", "Load error", "Model error", "Presolve error", "Solve error", "Postsolve error", "Empty", "Optimal",

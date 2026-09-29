@@ -264,7 +264,7 @@ Problem make_problem(const Value& case_json, const Value& config, const Value& s
         if (const Value* item = algorithm->find("structured_rigid_shift_rows")) problem.rich.structured_rigid_shift_rows = std::max(0, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("structured_research_min_group_size")) problem.rich.structured_research_min_group_size = std::max(1, static_cast<int>(item->number_or(2)));
         if (const Value* item = algorithm->find("structured_pattern_extra_rows")) problem.rich.structured_pattern_extra_rows = static_cast<int>(item->number_or(2));
-        if (const Value* item = algorithm->find("portfolio_workers")) problem.rich.portfolio_workers = std::clamp(static_cast<int>(item->number_or(1)), 1, 3);
+        if (const Value* item = algorithm->find("enable_tail_exchange")) problem.rich.tail_exchange_enabled = item->bool_or(false);
         if (const Value* item = algorithm->find("structured_pattern_window_limit")) problem.rich.structured_pattern_window_limit = std::max(1, static_cast<int>(item->number_or(12)));
         if (const Value* item = algorithm->find("prioritize_front")) problem.prioritize_front = item->bool_or(problem.prioritize_front);
         if (const Value* item = algorithm->find("front_penalty_reduction")) problem.front_penalty_reduction = item->number_or(problem.front_penalty_reduction);

@@ -74,7 +74,7 @@ struct SsrRule {
 };
 
 struct RichConstructionConfig {
-    int portfolio_workers = 1;
+    bool tail_exchange_enabled = false;
     bool protected_multigroup_enabled = false, priority_multigroup_enabled = false;
     int protected_multigroup_root_limit = 8, protected_multigroup_max_groups = 4;
     int protected_multigroup_component_limit = 30, protected_multigroup_options_per_group = 20;
