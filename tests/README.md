@@ -16,6 +16,12 @@
   imports a research audit helper outside this initial allowlist. No
   artifact-independent deadline-fallback test was available to migrate.
 
+The shared 24-case Formal24 plus 16-case D4 benchmark is driven by
+`scripts/benchmark_three_routes.py`. Its default schedule is the C++ native
+heuristic at 5 seconds, each Gurobi route at 150 seconds, and a 600-second
+supplement only for exact runs without an optimality or infeasibility
+certificate.
+
 Formal24, training, long column generation, and research benchmarks are not
 ordinary pull-request tests.
 
