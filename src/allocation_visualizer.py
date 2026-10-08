@@ -5,7 +5,7 @@
 
 功能：
 1. 读取 config.json；
-2. 调用 heuristic_seat_allocator.py 的 run_allocation；
+2. 默认调用 model_driven_seat_allocator.py 的独立数学启发式；
 3. 同时绘制旧机型原座位图和新机型分配结果图；
 4. 通过连线汇总图展示旅客从旧座位到新座位的移动；
 5. 正确处理 3-3、3-4-3、商务舱跳列和多过道布局；
@@ -697,7 +697,7 @@ def run_visualization(
     module_path = (
         algorithm_path.resolve()
         if algorithm_path
-        else (base_dir / "src" / "heuristic_seat_allocator.py")
+        else (Path(__file__).resolve().parent / "model_driven_seat_allocator.py")
     )
     output_dir = output_dir.resolve() if output_dir else (base_dir / "outputs")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -804,7 +804,7 @@ def main() -> None:
     parser.add_argument(
         "--algorithm",
         default=None,
-        help="算法文件路径，默认 src/heuristic_seat_allocator.py",
+        help="算法文件路径，默认 src/model_driven_seat_allocator.py（新算法）",
     )
     parser.add_argument("--output-dir", default=None, help="输出目录，默认 outputs/")
     parser.add_argument("--groups", default=None, help="覆盖旅客组数据文件")

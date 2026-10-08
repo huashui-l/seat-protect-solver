@@ -1,5 +1,15 @@
 # 飞机座位保护与重分配
 
+本分支新增独立的数学启发式入口 **`python -m src.smart_seat_allocator`**：完整组模式构造、Hungarian 匹配、HiGHS／CP-SAT 全机组合和自适应大邻域搜索，接口默认预算 20 秒；本轮完整 V2 基础实验选择 **60 秒**为优先改进档位，运行时显式指定 `--time-limit 60`。新搜索不调用旧启发式。安装、命令、模型对应和证书说明见 [新启发式说明](docs/smart-heuristic.md)。三档实验及逐例指标见 [HTML 实验报告](reports/smart-heuristic-experiments.html)。下文原算法说明保留作为历史基线。
+
+## 本分支结果（`codex/model-driven-anytime-heuristic`）
+
+本分支重新构建了一个仍严格遵循原数学模型的组合数学启发式，并完成了 V2 数据集的 5 / 20 / 60 秒基础实验、60 秒缓存版改进实验、旧 Python 与历史 C++ 原始源码的本机复测、独立审计和离线 HTML 报告。推荐版本是 **60 秒缓存版 A**；它在同一求解中缓存几何邻居排序，把省下的候选生成时间交给后续联合重组和大邻域搜索。
+
+最终 V2 结果：72 个输入中 69 个经模型判定可行并全部得到完整合法解，3 个通过独立的婴儿—陪护座位对匹配证书证明不可行，0 个超时。缓存版相对新算法初版 60 秒为 **22 胜 / 33 平 / 14 负**，合计提高 **322.01 分**；相对历史 C++ 原始源码本机 5 秒复测为 **54 胜 / 5 平 / 10 负**，逐例平均扣分降低 **3.61%**。这项 C++ 对比使用了不同时间预算，不能解读为同等 5 秒下全面超越；缓存版 V2 当前仍没有全局最优性证明。
+
+完整逐例分数、耗时、收敛轨迹、目标分项、不可行证书、版本消融和复现信息见 [HTML 实验报告](reports/smart-heuristic-experiments.html)，原始审计结果见 [`docs/provenance/smart-heuristic/`](docs/provenance/smart-heuristic/)。
+
 > **私有协作仓库边界。** 本仓库是从内部研究快照通过显式允许清单建立的核心代码候选仓库，
 > 不正式业务数据、完整 benchmark 输出、模型权重、预编译二进制或第三方工具链。
 > 文档中的历史结果用于说明研究状态，并不使缺失 artifact 成为默认运行依赖。
@@ -180,6 +190,8 @@ MP2固定一个同行组，在该组各旅客所属舱位的完整座位—保�
 旧的 HiGHS 列生成已归档到 `archive/legacy_column_generation/`（其定价证书层的缺陷见 `reports/audit-2026-09-23/列生成正确性审计.md`）。新的精确路线是 `src/cg_gurobi/`：按同行组直接定价的 Dantzig–Wolfe 列生成 + 分支定价，只依赖本文档第 6 节模型和独立评估器语义，用法与证书口径见 `src/cg_gurobi/README.md`。
 
 Formal24 上与启发式、旧实现、Rich 60 s 参考的完整对比报告：`reports/audit-2026-09-23/列生成重做报告.html`（由 `scripts/build_cg_report_html.py` 生成）；基准脚本 `scripts/benchmark_cg_gurobi.py`。
+
+测试用例的分层、字段定义、生成流程、难度参数、PNR/SSR规则、Formal24/D4/CG30关系和维护流程，统一见[测试用例构建与维护说明](docs/test-case-construction.md)。
 
 ## 7. 项目结构
 

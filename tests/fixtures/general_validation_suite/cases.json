@@ -8,13 +8,31 @@
           "name": "Economy",
           "startRow": 1,
           "endRow": 4,
-          "seatLabels": ["A", "B", "C", "D", "E", "F"],
-          "aisleAfter": ["C"],
+          "seatLabels": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+          ],
+          "aisleAfter": [
+            "C"
+          ],
           "seatClass": "Economy",
-          "bassinetRows": [1],
-          "exitRows": [4],
-          "extraLegroomRows": [1, 4],
-          "toiletRows": [4]
+          "bassinetRows": [
+            1
+          ],
+          "exitRows": [
+            4
+          ],
+          "extraLegroomRows": [
+            1,
+            4
+          ],
+          "toiletRows": [
+            4
+          ]
         }
       ]
     },
@@ -25,13 +43,36 @@
           "name": "Economy",
           "startRow": 1,
           "endRow": 3,
-          "seatLabels": ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"],
-          "aisleAfter": ["C", "G"],
+          "seatLabels": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "J",
+            "K"
+          ],
+          "aisleAfter": [
+            "C",
+            "G"
+          ],
           "seatClass": "Economy",
-          "bassinetRows": [1],
-          "exitRows": [3],
-          "extraLegroomRows": [1, 3],
-          "toiletRows": [3]
+          "bassinetRows": [
+            1
+          ],
+          "exitRows": [
+            3
+          ],
+          "extraLegroomRows": [
+            1,
+            3
+          ],
+          "toiletRows": [
+            3
+          ]
         }
       ]
     },
@@ -42,25 +83,56 @@
           "name": "Business",
           "startRow": 1,
           "endRow": 1,
-          "seatLabels": ["A", "C", "D", "F"],
-          "aisleAfter": ["C"],
+          "seatLabels": [
+            "A",
+            "C",
+            "D",
+            "F"
+          ],
+          "aisleAfter": [
+            "C"
+          ],
           "seatClass": "Business",
-          "bassinetRows": [1],
+          "bassinetRows": [
+            1
+          ],
           "exitRows": [],
-          "extraLegroomRows": [1],
-          "toiletRows": [1]
+          "extraLegroomRows": [
+            1
+          ],
+          "toiletRows": [
+            1
+          ]
         },
         {
           "name": "Economy",
           "startRow": 2,
           "endRow": 4,
-          "seatLabels": ["A", "B", "C", "D", "E", "F"],
-          "aisleAfter": ["C"],
+          "seatLabels": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+          ],
+          "aisleAfter": [
+            "C"
+          ],
           "seatClass": "Economy",
-          "bassinetRows": [2],
-          "exitRows": [4],
-          "extraLegroomRows": [2, 4],
-          "toiletRows": [4]
+          "bassinetRows": [
+            2
+          ],
+          "exitRows": [
+            4
+          ],
+          "extraLegroomRows": [
+            2,
+            4
+          ],
+          "toiletRows": [
+            4
+          ]
         }
       ]
     }
@@ -72,13 +144,69 @@
       "oldSeatmap": "economy_3-3_4rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["identity", "negative-control", "ordinary"],
+      "tags": [
+        "identity",
+        "negative-control",
+        "ordinary"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1B", "1C"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C"]},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A"
+          ],
+          "referenceSeats": [
+            "1A"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1B",
+            "1C"
+          ],
+          "referenceSeats": [
+            "1B",
+            "1C"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "2C"
+          ]
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ],
+          "referenceSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -10.8
     },
     {
       "id": "shrink_small_blockers",
@@ -86,14 +214,89 @@
       "oldSeatmap": "economy_3-4-3_3rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["shrink", "ordinary", "small-blockers"],
+      "tags": [
+        "shrink",
+        "ordinary",
+        "small-blockers"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1C", "1D"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["1E", "1F", "1G"]},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
-        {"groupId": 5, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H", "2J"]}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B"
+          ],
+          "referenceSeats": [
+            "4A",
+            "4B"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1C",
+            "1D"
+          ],
+          "referenceSeats": [
+            "1A",
+            "1C"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "1E",
+            "1F",
+            "1G"
+          ],
+          "referenceSeats": [
+            "1B",
+            "1E",
+            "1D"
+          ]
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "3A",
+            "3B"
+          ]
+        },
+        {
+          "groupId": 5,
+          "cabin": "Y",
+          "oldSeats": [
+            "2E",
+            "2F",
+            "2G",
+            "2H",
+            "2J"
+          ],
+          "referenceSeats": [
+            "2E",
+            "3D",
+            "2D",
+            "2F",
+            "3F"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -61.15
     },
     {
       "id": "expansion_spare_capacity",
@@ -101,13 +304,77 @@
       "oldSeatmap": "economy_3-3_4rows",
       "newSeatmap": "economy_3-4-3_3rows",
       "expectedValid": true,
-      "tags": ["expansion", "negative-control", "ordinary"],
+      "tags": [
+        "expansion",
+        "negative-control",
+        "ordinary"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1C", "1D", "1E"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B"
+          ],
+          "referenceSeats": [
+            "1C",
+            "1B"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1C",
+            "1D",
+            "1E"
+          ],
+          "referenceSeats": [
+            "1D",
+            "1G",
+            "1F"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "2D",
+            "2C"
+          ]
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D",
+            "3E"
+          ],
+          "referenceSeats": [
+            "2F",
+            "2E",
+            "2H",
+            "2G",
+            "2J"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -54.14
     },
     {
       "id": "full_resource_shrink",
@@ -115,25 +382,123 @@
       "oldSeatmap": "economy_3-4-3_3rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["shrink", "full-resource", "single-empty"],
+      "tags": [
+        "shrink",
+        "full-resource",
+        "single-empty"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1F", "1G", "1H", "1J", "1K"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H"]},
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B",
+            "1C",
+            "1D",
+            "1E"
+          ],
+          "referenceSeats": [
+            "1A",
+            "1B",
+            "1D",
+            "1C",
+            "1E"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1F",
+            "1G",
+            "1H",
+            "1J",
+            "1K"
+          ],
+          "referenceSeats": [
+            "2E",
+            "4E",
+            "1F",
+            "2F",
+            "4F"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "3A",
+            "3B"
+          ]
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "2E",
+            "2F",
+            "2G",
+            "2H"
+          ],
+          "referenceSeats": [
+            "3C",
+            "2C",
+            "3D",
+            "2D"
+          ]
+        },
         {
           "groupId": 5,
           "cabin": "Y",
-          "oldSeats": ["2J", "3D"],
-          "passengerOverrides": {"1": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+          "oldSeats": [
+            "2J",
+            "3D"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needSingleSideEmpty": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "3E",
+            "4D"
+          ]
         },
         {
           "groupId": 6,
           "cabin": "Y",
-          "oldSeats": ["3A", "3B"],
-          "passengerOverrides": {"2": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+          "oldSeats": [
+            "3A",
+            "3B"
+          ],
+          "passengerOverrides": {
+            "2": {
+              "mandatoryRule": {
+                "needSingleSideEmpty": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "4A",
+            "4B"
+          ]
         }
-      ]
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -116.79
     },
     {
       "id": "dense_full_resource_special_chain",
@@ -141,20 +506,119 @@
       "oldSeatmap": "economy_3-4-3_3rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["shrink", "full-resource", "dense-traveler", "single-empty"],
+      "tags": [
+        "shrink",
+        "full-resource",
+        "dense-traveler",
+        "single-empty"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1F", "1G", "1H", "1J", "1K"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["2E", "2F", "2G", "2H"]},
-        {"groupId": 5, "cabin": "Y", "oldSeats": ["2J", "2K", "3A"]},
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B",
+            "1C",
+            "1D",
+            "1E"
+          ],
+          "referenceSeats": [
+            "4A",
+            "1B",
+            "1A",
+            "1C",
+            "4C"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1F",
+            "1G",
+            "1H",
+            "1J",
+            "1K"
+          ],
+          "referenceSeats": [
+            "4D",
+            "1D",
+            "4E",
+            "1E",
+            "1F"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "3A",
+            "2C"
+          ]
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "2E",
+            "2F",
+            "2G",
+            "2H"
+          ],
+          "referenceSeats": [
+            "2E",
+            "3D",
+            "2D",
+            "3E"
+          ]
+        },
+        {
+          "groupId": 5,
+          "cabin": "Y",
+          "oldSeats": [
+            "2J",
+            "2K",
+            "3A"
+          ],
+          "referenceSeats": [
+            "3F",
+            "2F",
+            "4F"
+          ]
+        },
         {
           "groupId": 6,
           "cabin": "Y",
-          "oldSeats": ["3B", "3D"],
-          "passengerOverrides": {"1": {"mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+          "oldSeats": [
+            "3B",
+            "3D"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needSingleSideEmpty": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "3B",
+            "4B"
+          ]
         }
-      ]
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -122.025
     },
     {
       "id": "fixed_and_protected",
@@ -162,22 +626,75 @@
       "oldSeatmap": "economy_3-3_4rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["fixed", "single-empty", "both-empty"],
+      "tags": [
+        "fixed",
+        "single-empty",
+        "both-empty"
+      ],
       "groups": [
         {
           "groupId": 1,
           "cabin": "Y",
-          "oldSeats": ["1B", "2A", "2B"],
-          "passengerOverrides": {"1": {"newSeat": "1B", "mandatoryRule": {"needBothSideEmpty": "Y"}}}
+          "oldSeats": [
+            "1B",
+            "2A",
+            "2B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "newSeat": "1B",
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "1B",
+            "2A",
+            "2B"
+          ]
         },
         {
           "groupId": 2,
           "cabin": "Y",
-          "oldSeats": ["1E", "2C"],
-          "passengerOverrides": {"1": {"newSeat": "1E", "mandatoryRule": {"needSingleSideEmpty": "Y"}}}
+          "oldSeats": [
+            "1E",
+            "2C"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "newSeat": "1E",
+              "mandatoryRule": {
+                "needSingleSideEmpty": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "1E",
+            "2D"
+          ]
         },
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
-      ]
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ],
+          "referenceSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -16.85
     },
     {
       "id": "full_resource_protection_heavy",
@@ -186,17 +703,154 @@
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
       "expectedCurrentHeuristicComplete": false,
-      "tags": ["shrink", "full-resource", "protection-heavy", "negative-control"],
+      "tags": [
+        "shrink",
+        "full-resource",
+        "protection-heavy",
+        "negative-control"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1B"], "referenceSeats": ["1B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["1E"], "referenceSeats": ["1E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["1J"], "referenceSeats": ["2B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["2B"], "referenceSeats": ["2E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 5, "cabin": "Y", "oldSeats": ["2E"], "referenceSeats": ["3B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 6, "cabin": "Y", "oldSeats": ["2J"], "referenceSeats": ["3E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 7, "cabin": "Y", "oldSeats": ["3B"], "referenceSeats": ["4B"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}},
-        {"groupId": 8, "cabin": "Y", "oldSeats": ["3E"], "referenceSeats": ["4E"], "passengerOverrides": {"1": {"mandatoryRule": {"needBothSideEmpty": "Y"}}}}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1B"
+          ],
+          "referenceSeats": [
+            "1B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "1E"
+          ],
+          "referenceSeats": [
+            "3E"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "1J"
+          ],
+          "referenceSeats": [
+            "1E"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "2B"
+          ],
+          "referenceSeats": [
+            "2B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 5,
+          "cabin": "Y",
+          "oldSeats": [
+            "2E"
+          ],
+          "referenceSeats": [
+            "3B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 6,
+          "cabin": "Y",
+          "oldSeats": [
+            "2J"
+          ],
+          "referenceSeats": [
+            "2E"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 7,
+          "cabin": "Y",
+          "oldSeats": [
+            "3B"
+          ],
+          "referenceSeats": [
+            "4B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        },
+        {
+          "groupId": 8,
+          "cabin": "Y",
+          "oldSeats": [
+            "3E"
+          ],
+          "referenceSeats": [
+            "4E"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "mandatoryRule": {
+                "needBothSideEmpty": "Y"
+              }
+            }
+          }
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -30.8
     },
     {
       "id": "caregiver_and_ssr",
@@ -204,28 +858,86 @@
       "oldSeatmap": "economy_3-3_4rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["caregiver", "WCHR", "BSCT", "CHD"],
+      "tags": [
+        "caregiver",
+        "WCHR",
+        "BSCT",
+        "CHD"
+      ],
       "groups": [
         {
           "groupId": 1,
           "cabin": "Y",
-          "oldSeats": ["2C", "2B"],
-          "passengerOverrides": {"1": {"ssr": "WCHR", "needCared": "Y"}}
+          "oldSeats": [
+            "2C",
+            "2B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "ssr": "WCHR",
+              "needCared": "Y"
+            }
+          },
+          "referenceSeats": [
+            "2C",
+            "2B"
+          ]
         },
         {
           "groupId": 2,
           "cabin": "Y",
-          "oldSeats": ["1C", "1B"],
-          "passengerOverrides": {"1": {"ssr": "BSCT", "needCared": "Y"}}
+          "oldSeats": [
+            "1C",
+            "1B"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "ssr": "BSCT",
+              "needCared": "Y"
+            }
+          },
+          "referenceSeats": [
+            "1C",
+            "1B"
+          ]
         },
         {
           "groupId": 3,
           "cabin": "Y",
-          "oldSeats": ["3B", "3A"],
-          "passengerOverrides": {"1": {"ssr": "CHD", "needCared": "Y"}}
+          "oldSeats": [
+            "3B",
+            "3A"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "ssr": "CHD",
+              "needCared": "Y"
+            }
+          },
+          "referenceSeats": [
+            "3B",
+            "3A"
+          ]
         },
-        {"groupId": 4, "cabin": "Y", "oldSeats": ["2D", "2E", "2F"]}
-      ]
+        {
+          "groupId": 4,
+          "cabin": "Y",
+          "oldSeats": [
+            "2D",
+            "2E",
+            "2F"
+          ],
+          "referenceSeats": [
+            "2D",
+            "2E",
+            "2F"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -8.198590225563912
     },
     {
       "id": "conditional_ssr_isolation",
@@ -233,22 +945,69 @@
       "oldSeatmap": "economy_3-3_4rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["SSR", "same-row", "same-subrow"],
+      "tags": [
+        "SSR",
+        "same-row",
+        "same-subrow"
+      ],
       "groups": [
         {
           "groupId": 1,
           "cabin": "Y",
-          "oldSeats": ["1A"],
-          "passengerOverrides": {"1": {"ssr": "UM", "mandatoryRule": {"sameRowNoOtherSSR": "Y"}}}
+          "oldSeats": [
+            "1A"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "ssr": "UM",
+              "mandatoryRule": {
+                "sameRowNoOtherSSR": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "1A"
+          ]
         },
         {
           "groupId": 2,
           "cabin": "Y",
-          "oldSeats": ["2A"],
-          "passengerOverrides": {"1": {"ssr": "UM", "mandatoryRule": {"sameSubRowNoOtherSSR": "Y"}}}
+          "oldSeats": [
+            "2A"
+          ],
+          "passengerOverrides": {
+            "1": {
+              "ssr": "UM",
+              "mandatoryRule": {
+                "sameSubRowNoOtherSSR": "Y"
+              }
+            }
+          },
+          "referenceSeats": [
+            "2A"
+          ]
         },
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D"]}
-      ]
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ],
+          "referenceSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -6.3
     },
     {
       "id": "large_groups_9_10",
@@ -256,11 +1015,72 @@
       "oldSeatmap": "economy_3-4-3_3rows",
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": true,
-      "tags": ["large-group", "size-9", "size-10", "shrink"],
+      "tags": [
+        "large-group",
+        "size-9",
+        "size-10",
+        "shrink"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J", "2K"]}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B",
+            "1C",
+            "1D",
+            "1E",
+            "1F",
+            "1G",
+            "1H",
+            "1J"
+          ],
+          "referenceSeats": [
+            "1A",
+            "1B",
+            "4B",
+            "1C",
+            "4C",
+            "4E",
+            "1D",
+            "1F",
+            "4F"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D",
+            "2E",
+            "2F",
+            "2G",
+            "2H",
+            "2J",
+            "2K"
+          ],
+          "referenceSeats": [
+            "3A",
+            "2A",
+            "3B",
+            "3C",
+            "2C",
+            "2D",
+            "3D",
+            "2E",
+            "2F",
+            "3F"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -75.78333333333333
     },
     {
       "id": "two_cabin_valid_groups",
@@ -268,12 +1088,65 @@
       "oldSeatmap": "two_cabin_22seats",
       "newSeatmap": "two_cabin_22seats",
       "expectedValid": true,
-      "tags": ["two-cabin", "decomposition", "negative-control"],
+      "tags": [
+        "two-cabin",
+        "decomposition",
+        "negative-control"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "C", "oldSeats": ["1A", "1C", "1D"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
-      ]
+        {
+          "groupId": 1,
+          "cabin": "C",
+          "oldSeats": [
+            "1A",
+            "1C",
+            "1D"
+          ],
+          "referenceSeats": [
+            "1A",
+            "1C",
+            "1D"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ],
+          "referenceSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D",
+            "3E"
+          ],
+          "referenceSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D",
+            "3E"
+          ]
+        }
+      ],
+      "referenceType": "proven_integer_witness",
+      "referenceSource": "cg_gurobi direct pricing backend; independently checked by allocation_evaluator",
+      "referenceStatus": "proven_optimal",
+      "referenceScore": -18.34
     },
     {
       "id": "mixed_cabin_group_invalid",
@@ -282,13 +1155,23 @@
       "newSeatmap": "two_cabin_22seats",
       "expectedValid": false,
       "expectedErrorContains": "含多个舱位",
-      "tags": ["invalid", "mixed-cabin"],
+      "tags": [
+        "invalid",
+        "mixed-cabin"
+      ],
       "groups": [
         {
           "groupId": 1,
           "cabin": "C",
-          "oldSeats": ["1A", "2A"],
-          "passengerOverrides": {"2": {"cabin": "Y"}}
+          "oldSeats": [
+            "1A",
+            "2A"
+          ],
+          "passengerOverrides": {
+            "2": {
+              "cabin": "Y"
+            }
+          }
         }
       ]
     },
@@ -299,11 +1182,54 @@
       "newSeatmap": "economy_3-3_4rows",
       "expectedValid": false,
       "expectedErrorContains": "超过目标机型容量",
-      "tags": ["invalid", "capacity"],
+      "tags": [
+        "invalid",
+        "capacity"
+      ],
       "groups": [
-        {"groupId": 1, "cabin": "Y", "oldSeats": ["1A", "1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J", "1K"]},
-        {"groupId": 2, "cabin": "Y", "oldSeats": ["2A", "2B", "2C", "2D", "2E", "2F", "2G", "2H", "2J", "2K"]},
-        {"groupId": 3, "cabin": "Y", "oldSeats": ["3A", "3B", "3C", "3D", "3E"]}
+        {
+          "groupId": 1,
+          "cabin": "Y",
+          "oldSeats": [
+            "1A",
+            "1B",
+            "1C",
+            "1D",
+            "1E",
+            "1F",
+            "1G",
+            "1H",
+            "1J",
+            "1K"
+          ]
+        },
+        {
+          "groupId": 2,
+          "cabin": "Y",
+          "oldSeats": [
+            "2A",
+            "2B",
+            "2C",
+            "2D",
+            "2E",
+            "2F",
+            "2G",
+            "2H",
+            "2J",
+            "2K"
+          ]
+        },
+        {
+          "groupId": 3,
+          "cabin": "Y",
+          "oldSeats": [
+            "3A",
+            "3B",
+            "3C",
+            "3D",
+            "3E"
+          ]
+        }
       ]
     }
   ]

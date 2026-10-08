@@ -97,18 +97,35 @@ class GeneralValidationCaseTests(unittest.TestCase):
                 continue
             with self.subTest(case=case["id"]):
                 config = copy.deepcopy(base_config)
-                if case["referenceAssignments"]:
-                    reference_violations, reference_unassigned, _ = (
-                        evaluator.count_hard_constraint_violations(
-                            case["newSeatmapData"]["seats"],
-                            case["groupsData"],
-                            case["referenceAssignments"],
-                            config,
-                        )
+                expected_passengers = data_generator.passenger_count(
+                    case["groupsData"]
+                )
+                self.assertEqual(
+                    len(case["referenceAssignments"]), expected_passengers,
+                    "每个合法小例都必须保存完整参考分配",
+                )
+                reference_violations, reference_unassigned, _ = (
+                    evaluator.count_hard_constraint_violations(
+                        case["newSeatmapData"]["seats"],
+                        case["groupsData"],
+                        case["referenceAssignments"],
+                        config,
                     )
-                    self.assertEqual(
-                        (reference_violations, reference_unassigned), (0, 0)
-                    )
+                )
+                self.assertEqual(
+                    (reference_violations, reference_unassigned), (0, 0)
+                )
+                reference_score, _ = evaluator.calculate_soft_score(
+                    case["newSeatmapData"]["seats"],
+                    case["oldSeatmapData"]["seats"],
+                    case["groupsData"],
+                    case["referenceAssignments"],
+                    config["weights"],
+                    config,
+                )
+                self.assertAlmostEqual(
+                    reference_score, case["referenceScore"], places=7
+                )
                 if not case.get("expectedCurrentHeuristicComplete", True):
                     continue
                 result, _ = allocator.run_allocation(
@@ -168,6 +185,14 @@ class GeneralValidationCaseTests(unittest.TestCase):
                 )
                 if case["expectedValid"]:
                     self.assertEqual(errors, [])
+                    self.assertEqual(
+                        len(case["referenceAssignments"]),
+                        data_generator.passenger_count(case["groupsData"]),
+                    )
+                    self.assertEqual(case["referenceStatus"], "proven_optimal")
+                    self.assertEqual(
+                        case["referenceType"], "proven_integer_witness"
+                    )
                     self.assertLessEqual(
                         data_generator.target_seat_demand(case["groupsData"]),
                         len(new_topology.seats),

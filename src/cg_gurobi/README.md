@@ -28,6 +28,10 @@
 
 ## 运行
 
+本地环境、Gurobi 教育版许可证检查和最小可运行案例见 [`docs/cg-gurobi-local-setup.md`](../../docs/cg-gurobi-local-setup.md)。
+
+HiGHS 后端迁移已记录为待办，范围与验收要求见[开发待办](../../docs/TODO.md)。
+
 ```bash
 .venv/bin/python -m src.cg_gurobi --groups case.json --old-seatmap old.json --new-seatmap new.json \
     --time-limit 180 --pricing-time-limit 60 --output result.json
