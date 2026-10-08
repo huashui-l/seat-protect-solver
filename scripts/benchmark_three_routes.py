@@ -267,7 +267,9 @@ def _run_method(
         result.update(_metrics(new, old, groups, assigned, config.get("weights", {}), config))
         result.update({
             "status": raw.get("status"),
-            "solver_status": raw.get("solver_status", raw.get("integer_status")),
+            "solver_status": raw.get(
+                "solver_status", raw.get("integer_status", raw.get("status"))
+            ),
             "proven_optimal": bool(raw.get("proven_optimal", False)),
             "bound": raw.get("lp_bound", raw.get("model_bound")),
             "bound_certified": bool(raw.get("lp_bound_certified", False)),
@@ -430,6 +432,7 @@ def main() -> None:
     parser.add_argument("--initial-seconds", type=float, default=150.0)
     parser.add_argument("--supplement-seconds", type=float, default=600.0)
     parser.add_argument("--skip-supplement", action="store_true")
+    parser.add_argument("--only", default="", help="comma-separated case IDs for a smoke run")
     parser.add_argument("--json-output", type=Path, required=True)
     parser.add_argument("--markdown-output", type=Path)
     args = parser.parse_args()
@@ -442,6 +445,12 @@ def main() -> None:
     if "cpp_heuristic" in methods and args.native_executable is None:
         parser.error("--native-executable is required for cpp_heuristic")
     cases = load_cases([item.strip() for item in args.corpora.split(",") if item.strip()])
+    only = {item for item in args.only.split(",") if item}
+    if only:
+        cases = [case for case in cases if case["case_id"] in only]
+        missing = only - {case["case_id"] for case in cases}
+        if missing:
+            parser.error(f"unknown case IDs: {sorted(missing)}")
     report = run_benchmark(
         cases,
         args.config.resolve(),
