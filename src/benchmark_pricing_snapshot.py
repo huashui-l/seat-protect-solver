@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 import allocation_evaluator as evaluator
-from exact_column_generation import (
+from archive.legacy_column_generation.exact_column_generation import (
     _baby_pairs,
     _build_group_pricing_cache,
     _deserialize_master_duals,

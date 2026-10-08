@@ -38,14 +38,14 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 try:
-    from . import allocation_evaluator as evaluator
-    from . import heuristic_seat_allocator as heuristic_allocator
+    from src import allocation_evaluator as evaluator
+    from src import heuristic_seat_allocator as heuristic_allocator
 except ImportError:
     import allocation_evaluator as evaluator
     import heuristic_seat_allocator as heuristic_allocator
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PassengerKey = Tuple[int, int]
 SsrResource = Tuple[str, Any, str]  # ("row"/"subrow", location, ssr)
 BabyPair = Tuple[str, str]

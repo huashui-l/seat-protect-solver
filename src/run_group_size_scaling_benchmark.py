@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 try:
-    from . import exact_column_generation
+    from archive.legacy_column_generation import exact_column_generation
 except ImportError:
-    import exact_column_generation
+    from archive.legacy_column_generation import exact_column_generation
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

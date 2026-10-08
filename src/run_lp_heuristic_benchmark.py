@@ -15,11 +15,11 @@ from typing import Any, Dict, List
 
 try:
     from . import batch_benchmark
-    from . import exact_column_generation
+    from archive.legacy_column_generation import exact_column_generation
     from . import passenger_data_generator
 except ImportError:
     import batch_benchmark
-    import exact_column_generation
+    from archive.legacy_column_generation import exact_column_generation
     import passenger_data_generator
 
 
