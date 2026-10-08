@@ -12,13 +12,20 @@ Those tools are separate executables and are not linked into the solver.
 The raw JSON feasibility CLI consists of:
 
 - `seat_protect_cpp.cpp`
-- `full_cpp_solver_core.cpp/.hpp` (translation-unit aggregator and shared input helpers)
+- `full_cpp_solver_core.cpp/.hpp` (shared input/topology helpers and public types)
+- `full_cpp_solver_core_internal.hpp` / `full_cpp_solver_core_sections.hpp` (shared section declarations and compile includes)
 - `full_cpp_solver_core_input.inc` (case/config normalization)
+- `full_cpp_solver_core_input.cpp` (input translation unit)
 - `full_cpp_solver_core_scoring.inc` (individual, group, and full scoring)
+- `full_cpp_solver_core_scoring.cpp` (scoring translation unit)
 - `full_cpp_solver_core_rich_repair.inc` (repair metrics and fixed-seat preprocessing)
+- `full_cpp_solver_core_rich_repair.cpp` (repair translation unit)
 - `full_cpp_solver_core_rich_patterns.inc` (placement, structured patterns, and pricing)
+- `full_cpp_solver_core_rich_patterns.cpp` (patterns/pricing translation unit)
 - `full_cpp_solver_core_state.inc` (stage schedule, assignment state, and LNS)
+- `full_cpp_solver_core_state.cpp` (state/LNS translation unit)
 - `full_cpp_solver_core_elite.inc` (elite pattern storage and relocation diagnostics)
+- `full_cpp_solver_core_elite.cpp` (elite translation unit)
 - `native_feasibility_solver.cpp/.hpp`
 - `native_group_constructor.cpp/.hpp`
 - `native_json.hpp`

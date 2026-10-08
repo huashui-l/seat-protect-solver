@@ -44,8 +44,18 @@ function Add-Link([string]$Name, [string[]]$Objects) {
     $Commands.Add(('link /nologo {0} /LIBPATH:"{1}" highs.lib /OUT:"{2}\{3}.exe"' -f
         $Inputs, $Library, $OutputDir, $Name))
 }
-$SolverObjects = @('full_cpp_solver_core', 'native_feasibility_solver',
-    'native_group_constructor', 'native_rich_construction')
+$SolverObjects = @(
+    'full_cpp_solver_core',
+    'full_cpp_solver_core_input',
+    'full_cpp_solver_core_scoring',
+    'full_cpp_solver_core_rich_repair',
+    'full_cpp_solver_core_rich_patterns',
+    'full_cpp_solver_core_state',
+    'full_cpp_solver_core_elite',
+    'native_feasibility_solver',
+    'native_group_constructor',
+    'native_rich_construction'
+)
 foreach ($Object in $SolverObjects) { Add-Compile $Object }
 Add-Compile 'seat_protect_cpp'
 Add-Link 'seat_protect_cpp' ($SolverObjects + 'seat_protect_cpp')
@@ -54,7 +64,7 @@ Add-Link 'seat_protect_cpp' ($SolverObjects + 'seat_protect_cpp')
 if ($IncludeTools) {
     foreach ($Probe in @('native_full_core_probe', 'native_state_replay')) {
         Add-Compile $Probe
-        Add-Link $Probe @('full_cpp_solver_core', $Probe)
+        Add-Link $Probe ($SolverObjects + $Probe)
     }
     Add-Compile 'native_rich_repair_probe'
     Add-Link 'native_rich_repair_probe' ($SolverObjects + 'native_rich_repair_probe')

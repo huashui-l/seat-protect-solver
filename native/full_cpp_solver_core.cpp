@@ -17,7 +17,6 @@
 #include <numeric>
 
 namespace full_cpp {
-namespace {
 
 using native_json::Value;
 
@@ -187,15 +186,5 @@ bool is_adult_caregiver(const Passenger& passenger) {
     return passenger.ssr.empty() && !passenger.need_cared
         && !passenger.need_both_empty && !passenger.need_single_empty;
 }
-
-}  // namespace
-
-// Functional implementation sections are included in one translation unit.
-#include "full_cpp_solver_core_input.inc"
-#include "full_cpp_solver_core_scoring.inc"
-#include "full_cpp_solver_core_rich_repair.inc"
-#include "full_cpp_solver_core_rich_patterns.inc"
-#include "full_cpp_solver_core_state.inc"
-#include "full_cpp_solver_core_elite.inc"
 
 }  // namespace full_cpp
