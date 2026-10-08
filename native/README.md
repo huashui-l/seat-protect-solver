@@ -12,7 +12,13 @@ Those tools are separate executables and are not linked into the solver.
 The raw JSON feasibility CLI consists of:
 
 - `seat_protect_cpp.cpp`
-- `full_cpp_solver_core.cpp/.hpp`
+- `full_cpp_solver_core.cpp/.hpp` (translation-unit aggregator and shared input helpers)
+- `full_cpp_solver_core_input.inc` (case/config normalization)
+- `full_cpp_solver_core_scoring.inc` (individual, group, and full scoring)
+- `full_cpp_solver_core_rich_repair.inc` (repair metrics and fixed-seat preprocessing)
+- `full_cpp_solver_core_rich_patterns.inc` (placement, structured patterns, and pricing)
+- `full_cpp_solver_core_state.inc` (stage schedule, assignment state, and LNS)
+- `full_cpp_solver_core_elite.inc` (elite pattern storage and relocation diagnostics)
 - `native_feasibility_solver.cpp/.hpp`
 - `native_group_constructor.cpp/.hpp`
 - `native_json.hpp`
