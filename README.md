@@ -118,7 +118,7 @@ P6.5-v3当前Gate为`GENERATION LIMITED / component construction limited`：patt
 
 ## 5. 算法二：列生成与LP上界
 
-入口实现为`src/exact_column_generation.py`。一列表示一个同行组的完整整数放置，包括组内全部旅客座位、保护空座、SSR资源和软成本。
+入口实现为`src/cg_gurobi/`。一列表示一个同行组的完整整数放置，包括组内全部旅客座位、保护空座、SSR资源和软成本；旧的 HiGHS 列生成入口仅保留在归档中。
 
 ### 5.1 MP1限制主问题
 
@@ -205,7 +205,7 @@ python -m pip install -r requirements.txt
 python -m pip install -r requirements-column-generation.txt
 ```
 
-`requirements.txt`包含核心数值与可视化依赖；列生成和完整求解路径额外依赖`highspy`。本阶段未迁移GNN训练代码，因此核心依赖不含PyTorch或scikit-learn。
+`requirements.txt`包含核心数值与可视化依赖；当前列生成和直接求解路线额外依赖`gurobipy>=13.0`及可容纳模型的 Gurobi 许可。C++ 启发式的 native 构建链仍使用外部 HiGHS SDK；这不属于活动的 Gurobi 列生成或直接求解路线。本阶段未迁移GNN训练代码，因此核心依赖不含PyTorch或scikit-learn。
 
 ## 9. 可运行范围
 
@@ -228,10 +228,10 @@ python src/allocation_visualizer.py --config config.json --output-dir outputs/ma
 ### 9.3 运行单组列生成
 
 ```powershell
-python src/exact_column_generation.py --config config.json --output outputs/manual_column_result.json
+python -m src.cg_gurobi --groups CASE.json --old-seatmap OLD_SEATMAP.json --new-seatmap NEW_SEATMAP.json --config config.json --time-limit 150 --output outputs/manual_cg_gurobi_result.json
 ```
 
-该命令同样需要外部数据和`highspy`，不属于普通PR验证。
+该命令需要外部数据、`gurobipy`和可用的 Gurobi 许可，不属于普通PR验证。
 
 ### 9.4 运行双向24组统一实验
 

@@ -35,6 +35,10 @@
 .venv/bin/python scripts/benchmark_cg_gurobi.py --instances DIR --old-seatmap old.json --new-seatmap new.json --time-limit 150 --output report.md
 ```
 
+The active column-generation route requires `gurobipy>=13.0` and a Gurobi
+license that can hold the generated master and pricing models. The archived
+HiGHS column-generation implementation is not an active dependency.
+
 配置在 `config.json` 的 `cg_gurobi` 节（缺省见 `solver._cfg`）：`total_time_limit`、`pricing_time_limit`、`integer_time_limit`、`pricing_workers`、`warm_start`（heuristic/greedy/none）、`dive`、`branch_and_price`、`bp_node_limit`、`dual_smoothing_alpha`、`pricing_early_stop`。
 
 ## 验证
