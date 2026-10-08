@@ -1,0 +1,3716 @@
+{
+  "generatorVersion": "generator-v3.2",
+  "corpus": "benchmark_v2_2026-10-07",
+  "caseId": "v2:nb33_to_wb242:load85:small_groups:mixed:r0",
+  "specId": "v2:nb33_to_wb242:load85:small_groups",
+  "specialProfile": "mixed",
+  "replicate": 0,
+  "difficulty": {
+    "resourceLoadTarget": 0.85,
+    "pnrProfile": "small_groups",
+    "specialProfile": "mixed"
+  },
+  "seed": 20263107,
+  "algorithmSeed": 912100,
+  "requestedResourceDemand": 156,
+  "targetSeatDemand": 156,
+  "travelerCount": 150,
+  "protectedSeatCount": 6,
+  "passengerCapacity": 184,
+  "resourceLoad": 0.8478260869565217,
+  "fixedSeatCount": 15,
+  "pnrSizeHistogram": {
+    "1": 47,
+    "2": 25,
+    "3": 11,
+    "4": 5,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0
+  },
+  "ssrCounts": {
+    "BLND": 3,
+    "BSCT": 2,
+    "CBBG": 1,
+    "CHD": 7,
+    "EXST": 1,
+    "UM": 4,
+    "WCHR": 4
+  },
+  "oldLayout": "3-3",
+  "newLayout": "2-4-2",
+  "generatorDiagnostics": {
+    "generatorVersion": "generator-v3.2",
+    "profileLabel": "synthetic old-assignment profile",
+    "configuredProfile": {
+      "compact": 0.25,
+      "same_row": 0.25,
+      "nearby": 0.25,
+      "scattered": 0.25
+    },
+    "travelerCount": 150,
+    "protectedSeatCount": 6,
+    "resourceDemand": 156,
+    "oldRealOccupied": 150,
+    "oldProtectedEmpty": 6,
+    "oldOrdinaryEmpty": 28,
+    "cabinLoadFactors": {
+      "Business": {
+        "capacity": 16,
+        "occupied": 13,
+        "protectedEmpty": 0,
+        "resourceLoadFactor": 0.8125
+      },
+      "Economy": {
+        "capacity": 168,
+        "occupied": 137,
+        "protectedEmpty": 6,
+        "resourceLoadFactor": 0.8511904761904762
+      }
+    },
+    "groupPlacementModeCounts": {
+      "compact": 66,
+      "same_row": 9,
+      "nearby": 3,
+      "scattered": 10
+    },
+    "contiguousGroupRatio": 0.75,
+    "sameRowRatio": 0.8522727272727273,
+    "rowSpanMedian": 0.0,
+    "rowSpanP90": 6
+  },
+  "jointSpecialResourceDiagnostics": {
+    "source_special_group_count": 23,
+    "target_special_group_count": 23,
+    "source_per_group_legal_pattern_counts": {
+      "4": 4,
+      "28": 45,
+      "30": 64,
+      "31": 64,
+      "32": 64,
+      "37": 64,
+      "42": 45,
+      "46": 64,
+      "47": 4,
+      "48": 64,
+      "55": 64,
+      "56": 16,
+      "57": 47,
+      "59": 64,
+      "61": 64,
+      "64": 64,
+      "71": 64,
+      "81": 59,
+      "82": 64,
+      "83": 64,
+      "84": 64,
+      "86": 45,
+      "88": 64
+    },
+    "target_per_group_legal_pattern_counts": {
+      "4": 12,
+      "28": 64,
+      "30": 64,
+      "31": 64,
+      "32": 64,
+      "37": 64,
+      "42": 64,
+      "46": 64,
+      "47": 12,
+      "48": 64,
+      "55": 64,
+      "56": 24,
+      "57": 64,
+      "59": 64,
+      "61": 64,
+      "64": 64,
+      "71": 64,
+      "81": 64,
+      "82": 64,
+      "83": 64,
+      "84": 64,
+      "86": 57,
+      "88": 64
+    },
+    "source_witness_search_nodes": 30,
+    "target_witness_search_nodes": 26,
+    "source_witness_search_budget_exhausted": 0,
+    "target_witness_search_budget_exhausted": 0,
+    "special_role_resample_attempts": 20,
+    "no_source_joint_special_witness": 0,
+    "no_target_joint_special_witness": 0,
+    "special_resample_exhausted": false,
+    "ordinary_old_assignment_completion_failed": 0,
+    "role_metadata_assignment_failed": 19,
+    "traveler_count": 150,
+    "requested_resource_demand": 156,
+    "preassignment_attempts": 1
+  },
+  "groups": [
+    {
+      "groupId": 1,
+      "groupType": "communityType",
+      "PNR": "BBTL84",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "21A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 2,
+      "groupType": "communityType",
+      "PNR": "QDV8ZC",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "9E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 3,
+      "groupType": "coupleType",
+      "PNR": "C35TZG",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "22D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "22E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 4,
+      "groupType": "careType",
+      "PNR": "DFL4KF",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "5E",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "7E"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "BSCT",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "5F",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "7D"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 5,
+      "groupType": "communityType",
+      "PNR": "52K8FK",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.4"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "9C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 6,
+      "groupType": "communityType",
+      "PNR": "WK8C22",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.3"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "25B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 7,
+      "groupType": "communityType",
+      "PNR": "AZHLBR",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "14C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 8,
+      "groupType": "coupleType",
+      "PNR": "TJO5VC",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "28D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.9"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "31F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 9,
+      "groupType": "communityType",
+      "PNR": "0SMQK8",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 10,
+      "groupType": "communityType",
+      "PNR": "QX6ORH",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "31B",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "31F"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 11,
+      "groupType": "communityType",
+      "PNR": "ZVZK51",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "22B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 12,
+      "groupType": "communityType",
+      "PNR": "16M6T7",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.7"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "9B",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "9D"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 13,
+      "groupType": "communityType",
+      "PNR": "6XMQ4U",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.7"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "17C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 14,
+      "groupType": "coupleType",
+      "PNR": "VE6NLX",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "8A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.7"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "32D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 15,
+      "groupType": "communityType",
+      "PNR": "7JQ8X4",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.5"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "29A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 16,
+      "groupType": "coupleType",
+      "PNR": "1JX7FM",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "9D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.3"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "29B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 17,
+      "groupType": "communityType",
+      "PNR": "IZ1H2R",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.2"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "16E",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "16A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 18,
+      "groupType": "communityType",
+      "PNR": "FE3387",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "24E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 19,
+      "groupType": "coupleType",
+      "PNR": "QJ2G47",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "11D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "11E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 20,
+      "groupType": "communityType",
+      "PNR": "6FI2BK",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "7F",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "7F"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 21,
+      "groupType": "communityType",
+      "PNR": "C8TZQ7",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "4C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 22,
+      "groupType": "communityType",
+      "PNR": "Y0J7Q6",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.3"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "28F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 23,
+      "groupType": "communityType",
+      "PNR": "S0M2N2",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "28B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 24,
+      "groupType": "communityType",
+      "PNR": "52WJUK",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "8C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 25,
+      "groupType": "communityType",
+      "PNR": "0WWSEU",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 26,
+      "groupType": "communityType",
+      "PNR": "9G9496",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.6"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "32A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 27,
+      "groupType": "communityType",
+      "PNR": "SAUD7A",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "26F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 28,
+      "groupType": "careType",
+      "PNR": "MUK13X",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.4"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "21B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "WCHR",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "21C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 29,
+      "groupType": "communityType",
+      "PNR": "BYNYSM",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "30F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 30,
+      "groupType": "coupleType",
+      "PNR": "RV56ZT",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "18B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "UM",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.6"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "18A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 31,
+      "groupType": "careType",
+      "PNR": "GHBXJY",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "1.0"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "17F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "17E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 32,
+      "groupType": "communityType",
+      "PNR": "67HSLS",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "Y",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "19D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 33,
+      "groupType": "coupleType",
+      "PNR": "MC7NC0",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "21E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "21F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 34,
+      "groupType": "communityType",
+      "PNR": "BAH8UP",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "5D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 35,
+      "groupType": "communityType",
+      "PNR": "0E2OJ9",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "14A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 36,
+      "groupType": "communityType",
+      "PNR": "9DD8HZ",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "10A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 37,
+      "groupType": "careType",
+      "PNR": "0ZT51F",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "6F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "6E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 38,
+      "groupType": "coupleType",
+      "PNR": "GG7JD5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "9A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "30A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 39,
+      "groupType": "communityType",
+      "PNR": "JMX4KN",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.6"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "25C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 40,
+      "groupType": "communityType",
+      "PNR": "8X5WXD",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "3C",
+            "seatValue": "A"
+          },
+          "newSeat": {
+            "seatNum": "3H"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 41,
+      "groupType": "communityType",
+      "PNR": "7UX6LP",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "19F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "20C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.8"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "21D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 42,
+      "groupType": "careType",
+      "PNR": "3344B3",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "1.0"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "31E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "WCHR",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "31D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "29D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 43,
+      "groupType": "communityType",
+      "PNR": "OKDDS5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "13B",
+            "seatValue": "E"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 44,
+      "groupType": "communityType",
+      "PNR": "YDQEFT",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "3F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 45,
+      "groupType": "communityType",
+      "PNR": "1DEXE5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "25A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 46,
+      "groupType": "careType",
+      "PNR": "67E666",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "24B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "UM",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "15C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "24C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 4,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "30E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 47,
+      "groupType": "careType",
+      "PNR": "H2XP9F",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "5B",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "7C"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "BSCT",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.9"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "5A",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "7A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 48,
+      "groupType": "careType",
+      "PNR": "Y8NPTM",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "26E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "26D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.8"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "32C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 49,
+      "groupType": "communityType",
+      "PNR": "ZTJX5C",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "26B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 50,
+      "groupType": "communityType",
+      "PNR": "A3D7PX",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 51,
+      "groupType": "communityType",
+      "PNR": "Q8KMR4",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "15A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 52,
+      "groupType": "communityType",
+      "PNR": "RE41AV",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "23A",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "23A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 53,
+      "groupType": "communityType",
+      "PNR": "HSWJL5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "16D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "16C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "16F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 54,
+      "groupType": "communityType",
+      "PNR": "TRIJBH",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "12F",
+            "seatValue": "E"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 55,
+      "groupType": "careType",
+      "PNR": "R90FCZ",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "8E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "8D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 56,
+      "groupType": "careType",
+      "PNR": "W78072",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "1A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "C",
+          "needCared": "Y",
+          "ssr": "BLND",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "1C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 57,
+      "groupType": "careType",
+      "PNR": "2I0Y2B",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "7B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "7D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "WCHR",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "7C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 58,
+      "groupType": "coupleType",
+      "PNR": "4HX7DM",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "1F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "1D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 59,
+      "groupType": "careType",
+      "PNR": "HC2BZS",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.2"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "6A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "6B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "BLND",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "6C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 60,
+      "groupType": "communityType",
+      "PNR": "4AY6BN",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "29C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 61,
+      "groupType": "careType",
+      "PNR": "NJBF18",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "17B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "17A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 62,
+      "groupType": "coupleType",
+      "PNR": "5P58MX",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "13E",
+            "seatValue": "E"
+          },
+          "newSeat": {
+            "seatNum": "13C"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.3"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "13C",
+            "seatValue": "E"
+          },
+          "newSeat": {
+            "seatNum": "13D"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 63,
+      "groupType": "communityType",
+      "PNR": "KUXRE5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "28A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 64,
+      "groupType": "coupleType",
+      "PNR": "H0Z1KA",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "20B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "EXST",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "Y",
+            "sameSubRowNoOtherSSR": "Y",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "20E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 65,
+      "groupType": "communityType",
+      "PNR": "ITMZR5",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "22C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 66,
+      "groupType": "communityType",
+      "PNR": "PLB7Y0",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "32E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 67,
+      "groupType": "communityType",
+      "PNR": "D6D0ZZ",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "13F",
+            "seatValue": "E"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "32B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "27C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 68,
+      "groupType": "communityType",
+      "PNR": "Z2YUYP",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "11F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 69,
+      "groupType": "communityType",
+      "PNR": "OF1Z59",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "16B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 70,
+      "groupType": "communityType",
+      "PNR": "GY410P",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "27A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "27F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.3"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "27E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 4,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "27D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 71,
+      "groupType": "coupleType",
+      "PNR": "0QZEO0",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "UM",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "24F",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "24D"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "24A",
+            "seatValue": "W"
+          },
+          "newSeat": {
+            "seatNum": "24G"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 72,
+      "groupType": "communityType",
+      "PNR": "025M1Z",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "14B",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 73,
+      "groupType": "communityType",
+      "PNR": "VR3CCE",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "4F",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "4D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "4A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 74,
+      "groupType": "communityType",
+      "PNR": "V0V14J",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "30D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 75,
+      "groupType": "communityType",
+      "PNR": "JZJPFX",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "18C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 76,
+      "groupType": "coupleType",
+      "PNR": "9YVKUK",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "8B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.6"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "26A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 77,
+      "groupType": "coupleType",
+      "PNR": "JLZF96",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "29E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "29F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 78,
+      "groupType": "coupleType",
+      "PNR": "426OXI",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "31C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "6D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 79,
+      "groupType": "communityType",
+      "PNR": "880NMD",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "2D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "2A",
+            "seatValue": "W"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "C",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "2F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 80,
+      "groupType": "communityType",
+      "PNR": "KK88NQ",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "28C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 81,
+      "groupType": "coupleType",
+      "PNR": "RAB46G",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "15B",
+            "seatValue": ""
+          },
+          "newSeat": {
+            "seatNum": "15G"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "Y",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "15E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 82,
+      "groupType": "communityType",
+      "PNR": "8D7J95",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "UM",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "18E",
+            "seatValue": ""
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 83,
+      "groupType": "communityType",
+      "PNR": "XHBZ60",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.7"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "13A",
+            "seatValue": "E"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "12A",
+            "seatValue": "E"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "CBBG",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "Y",
+            "sameSubRowNoOtherSSR": "Y",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "12D",
+            "seatValue": "E"
+          }
+        },
+        {
+          "hostnum": 4,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "Y",
+              "weight": "0.7"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.9"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "11C",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 84,
+      "groupType": "careType",
+      "PNR": "SMFBVC",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "11B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "CHD",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "11A",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 85,
+      "groupType": "communityType",
+      "PNR": "7KFNR1",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "10F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 86,
+      "groupType": "careType",
+      "PNR": "HEV4LM",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.6"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "10E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "10C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "10B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 4,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "WCHR",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "10D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 87,
+      "groupType": "communityType",
+      "PNR": "WK51AS",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "25D",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.4"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "25E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "25F",
+            "seatValue": "W"
+          }
+        }
+      ]
+    },
+    {
+      "groupId": 88,
+      "groupType": "careType",
+      "PNR": "LA0L6F",
+      "psrs": [
+        {
+          "hostnum": 1,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "优先属性一致": "Y",
+              "weight": "0.7"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "14E",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 2,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [],
+          "oldSeat": {
+            "seatNum": "30B",
+            "seatValue": ""
+          }
+        },
+        {
+          "hostnum": 3,
+          "cabin": "Y",
+          "needCared": "Y",
+          "ssr": "BLND",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.3"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.5"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "30C",
+            "seatValue": "A"
+          }
+        },
+        {
+          "hostnum": 4,
+          "cabin": "Y",
+          "needCared": "N",
+          "ssr": "",
+          "mandatoryRule": {
+            "needBothSideEmpty": "N",
+            "needSingleSideEmpty": "N",
+            "sameSubRowNoOtherSSR": "N",
+            "sameRowNoOtherSSR": "N"
+          },
+          "optionRule": [
+            {
+              "nearToilet": "N",
+              "weight": "0.9"
+            },
+            {
+              "优先属性一致": "Y",
+              "weight": "0.8"
+            }
+          ],
+          "oldSeat": {
+            "seatNum": "20D",
+            "seatValue": "A"
+          }
+        }
+      ]
+    }
+  ]
+}

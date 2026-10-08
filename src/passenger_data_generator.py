@@ -1468,7 +1468,14 @@ def _assign_ssr_metadata(
             return True
         return False
 
-    required = ("BSCT", "WCHR", "CHD", "BLND", "EXST", "CBBG", "UM")
+    # Existing scenario profiles keep the historical all-SSR coverage.  New
+    # benchmark profiles may explicitly choose a smaller required set so that
+    # “no SSR” and sparse-SSR cases are representable without changing the
+    # legacy corpora.
+    required = tuple(cfg.get(
+        "required_ssrs",
+        ("BSCT", "WCHR", "CHD", "BLND", "EXST", "CBBG", "UM"),
+    ))
     for ssr in required:
         if not try_assign(ssr):
             raise RuntimeError(f"无法在旧座位生成前构造必需 SSR/caregiver: {ssr}")
@@ -2136,7 +2143,11 @@ def _generate_groups_exact_count(
         )
 
     present_ssrs = {p.get("ssr") for g in groups for p in g["psrs"] if p.get("ssr")}
-    missing_ssrs = set(SSR_PROFILES) - present_ssrs
+    required_ssrs = set(cfg.get(
+        "required_ssrs",
+        ("BSCT", "WCHR", "CHD", "BLND", "EXST", "CBBG", "UM"),
+    ))
+    missing_ssrs = required_ssrs - present_ssrs
     if missing_ssrs:
         raise RuntimeError(f"生成结果缺少 SSR 类型: {sorted(missing_ssrs)}")
 

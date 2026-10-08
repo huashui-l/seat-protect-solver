@@ -1,0 +1,973 @@
+{
+  "schema_version": 1,
+  "dataset_id": "benchmark_v2_spec_2026-10-07",
+  "status": "specification_only",
+  "description": "Independent seat-protection benchmark design. This file defines inputs to generate; it is not a result corpus.",
+  "upper_pnr_size": 10,
+  "source_corpora_to_preserve": [
+    "Formal24",
+    "D4",
+    "CG30"
+  ],
+  "seed_policy": {
+    "generation_seed_base": 20261007,
+    "algorithm_seed_base": 910000,
+    "formal_repetitions": 5,
+    "development_repetitions": 1
+  },
+  "layouts": {
+    "2-2": {
+      "total_seats": 98,
+      "by_cabin": {
+        "Business": 6,
+        "Economy": 92
+      }
+    },
+    "2-3": {
+      "total_seats": 137,
+      "by_cabin": {
+        "Business": 12,
+        "Economy": 125
+      }
+    },
+    "3-3": {
+      "total_seats": 184,
+      "by_cabin": {
+        "Business": 16,
+        "Economy": 168
+      }
+    },
+    "2-4-2": {
+      "total_seats": 284,
+      "by_cabin": {
+        "Business": 36,
+        "Economy": 248
+      }
+    },
+    "3-3-3": {
+      "total_seats": 339,
+      "by_cabin": {
+        "Business": 42,
+        "Economy": 297
+      }
+    },
+    "3-4-3": {
+      "total_seats": 336,
+      "by_cabin": {
+        "Business": 36,
+        "Economy": 300
+      }
+    }
+  },
+  "transitions": [
+    {
+      "id": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98
+    },
+    {
+      "id": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98
+    },
+    {
+      "id": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184
+    },
+    {
+      "id": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184
+    },
+    {
+      "id": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333
+    },
+    {
+      "id": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333
+    },
+    {
+      "id": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284
+    },
+    {
+      "id": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284
+    }
+  ],
+  "resource_loads": [
+    {
+      "id": "load60",
+      "target": 0.6
+    },
+    {
+      "id": "load85",
+      "target": 0.85
+    },
+    {
+      "id": "load97",
+      "target": 0.97
+    }
+  ],
+  "pnr_profiles": {
+    "small_groups": {
+      "description": "1–2人PNR为主",
+      "group_size_weights": {
+        "1": 0.55,
+        "2": 0.3,
+        "3": 0.1,
+        "4": 0.04,
+        "5": 0.01,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "10": 0
+      }
+    },
+    "family_groups": {
+      "description": "3–6人家庭/同行组为主",
+      "group_size_weights": {
+        "1": 0.05,
+        "2": 0.2,
+        "3": 0.3,
+        "4": 0.25,
+        "5": 0.12,
+        "6": 0.06,
+        "7": 0.02,
+        "8": 0,
+        "9": 0,
+        "10": 0
+      }
+    },
+    "large_groups": {
+      "description": "7–10人大组比例较高",
+      "group_size_weights": {
+        "1": 0.02,
+        "2": 0.03,
+        "3": 0.05,
+        "4": 0.1,
+        "5": 0.15,
+        "6": 0.2,
+        "7": 0.2,
+        "8": 0.15,
+        "9": 0.07,
+        "10": 0.03
+      }
+    }
+  },
+  "special_profiles": {
+    "none": {
+      "description": "无SSR与保护空座",
+      "ssr_ratio": 0.0,
+      "required_ssrs": [],
+      "preassign_ratio": 0.0,
+      "same_subrow_rule_ratio": 0.0,
+      "same_row_rule_ratio": 0.0,
+      "both_side_empty_ratio": 0.0,
+      "minimum_both_side_empty": 0
+    },
+    "sparse": {
+      "description": "稀疏特殊需求，至少一个WCHR",
+      "ssr_ratio": 0.05,
+      "required_ssrs": [
+        "WCHR"
+      ],
+      "preassign_ratio": 0.1,
+      "same_subrow_rule_ratio": 0.05,
+      "same_row_rule_ratio": 0.02,
+      "both_side_empty_ratio": 0.005,
+      "minimum_both_side_empty": 0
+    },
+    "mixed": {
+      "description": "多类SSR、陪护与保护空座组合",
+      "ssr_ratio": 0.15,
+      "required_ssrs": [
+        "CHD",
+        "WCHR",
+        "BSCT",
+        "EXST"
+      ],
+      "preassign_ratio": 0.1,
+      "same_subrow_rule_ratio": 0.15,
+      "same_row_rule_ratio": 0.1,
+      "both_side_empty_ratio": 0.01,
+      "minimum_both_side_empty": 1
+    }
+  },
+  "spec_count": 72,
+  "planned_formal_case_count": 360,
+  "specs": [
+    {
+      "spec_id": "v2:rj22_to_nb23:load60:small_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load60:family_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load60:large_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load85:small_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load85:family_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load85:large_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load97:small_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load97:family_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:rj22_to_nb23:load97:large_groups",
+      "direction": "rj22_to_nb23",
+      "old_layout": "2-2",
+      "new_layout": "2-3",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load60:small_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load60:family_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load60:large_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 59,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load85:small_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load85:family_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load85:large_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 83,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load97:small_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load97:family_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb23_to_rj22:load97:large_groups",
+      "direction": "nb23_to_rj22",
+      "old_layout": "2-3",
+      "new_layout": "2-2",
+      "common_transferable_capacity": 98,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 95,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load60:small_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load60:family_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load60:large_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load85:small_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load85:family_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load85:large_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load97:small_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load97:family_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:nb33_to_wb242:load97:large_groups",
+      "direction": "nb33_to_wb242",
+      "old_layout": "3-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load60:small_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load60:family_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load60:large_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 110,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load85:small_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load85:family_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load85:large_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 156,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load97:small_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load97:family_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_nb33:load97:large_groups",
+      "direction": "wb242_to_nb33",
+      "old_layout": "2-4-2",
+      "new_layout": "3-3",
+      "common_transferable_capacity": 184,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 178,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load60:small_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load60:family_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load60:large_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load85:small_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load85:family_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load85:large_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load97:small_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load97:family_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb333:load97:large_groups",
+      "direction": "wb343_to_wb333",
+      "old_layout": "3-4-3",
+      "new_layout": "3-3-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load60:small_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load60:family_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load60:large_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 200,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load85:small_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load85:family_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load85:large_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 283,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load97:small_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load97:family_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb333_to_wb343:load97:large_groups",
+      "direction": "wb333_to_wb343",
+      "old_layout": "3-3-3",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 333,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 323,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load60:small_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load60:family_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load60:large_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load85:small_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load85:family_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load85:large_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load97:small_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load97:family_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb343_to_wb242:load97:large_groups",
+      "direction": "wb343_to_wb242",
+      "old_layout": "3-4-3",
+      "new_layout": "2-4-2",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load60:small_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load60:family_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load60:large_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.6,
+      "requested_resource_demand": 170,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load85:small_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load85:family_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load85:large_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.85,
+      "requested_resource_demand": 241,
+      "pnr_profile": "large_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load97:small_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "small_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load97:family_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "family_groups"
+    },
+    {
+      "spec_id": "v2:wb242_to_wb343:load97:large_groups",
+      "direction": "wb242_to_wb343",
+      "old_layout": "2-4-2",
+      "new_layout": "3-4-3",
+      "common_transferable_capacity": 284,
+      "resource_load_target": 0.97,
+      "requested_resource_demand": 275,
+      "pnr_profile": "large_groups"
+    }
+  ],
+  "required_metadata": [
+    "travelerCount",
+    "targetSeatDemand",
+    "protectedSeatCount",
+    "fixedSeatCount",
+    "pnrSizeHistogram",
+    "ssrCounts",
+    "sourceLayout",
+    "targetLayout",
+    "resourceLoad",
+    "seed",
+    "generatorVersion",
+    "fullFeasibleWitness"
+  ],
+  "evaluation_contract": {
+    "time_budgets_seconds": [
+      5,
+      30,
+      60
+    ],
+    "repetitions": 5,
+    "primary_statuses": [
+      "complete_legal",
+      "known_feasible_not_found",
+      "proven_infeasible",
+      "unknown",
+      "timeout",
+      "error"
+    ],
+    "reference_policy": "Use exact or independently certified references only on small cases; large cases report known-feasible and certified-bound fields separately."
+  },
+  "formal_special_profile": "mixed",
+  "diagnostic_special_profiles": [
+    "none",
+    "sparse"
+  ],
+  "planned_diagnostic_case_count": 144
+}
