@@ -47,8 +47,12 @@ function Add-Compile([string]$Name, [string]$Source = "", [string]$Define = "") 
 }
 function Add-Link([string]$Name, [string[]]$Objects) {
     $Inputs = ($Objects | ForEach-Object { '"{0}\{1}.obj"' -f $OutputDir, $_ }) -join ' '
-    $Commands.Add(('link /nologo {0} /LIBPATH:"{1}" highs.lib "{4}" /OUT:"{2}\{3}.exe"' -f
-        $Inputs, $Library, $OutputDir, $Name, $GurobiLibrary))
+    # Load solver DLLs on first use, after the CLI's complete-solve clock starts.
+    $DelayImports = if ($Name -eq 'seat_protect_cpp') {
+        '/DELAYLOAD:highs.dll /DELAYLOAD:gurobi130.dll delayimp.lib'
+    } else { '' }
+    $Commands.Add(('link /nologo {0} /LIBPATH:"{1}" highs.lib "{4}" {5} /OUT:"{2}\{3}.exe"' -f
+        $Inputs, $Library, $OutputDir, $Name, $GurobiLibrary, $DelayImports))
 }
 $SolverObjects = @(
     'full_cpp_solver_core',
