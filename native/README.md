@@ -30,6 +30,7 @@ The raw JSON production CLI consists of one current implementation per module:
 - `native_rich_paired.cpp` (SSR/caregiver paired construction and rescue)
 - `native_rich_vnd.cpp` (VND neighborhoods)
 - `native_rich_pipeline.cpp` (Rich construction/repair/VND stage orchestration)
+- `native_rich_geometry.cpp/.hpp` (geometry resource shapes, special-passenger enumeration, and ordinary identity matching)
 - `native_rich_protected_mip.cpp` (protected/priority component MIP)
 - `native_rich_restricted_mip.cpp` (Gurobi elite-pool restricted MIP and local branching)
 - `native_rich_master_ssr.cpp/.hpp` (conditional row/subrow SSR constraints for the pattern master)
@@ -118,11 +119,21 @@ complete group patterns are kept separately; unassigned groups are not captured.
 The last open master task tries an expanded pool containing these alternatives,
 while the other tasks retain the original Q0/VND pool.
 Successful construction retains its existing pattern-capture behavior.
+The short portfolio also generates geometry patterns on one additional worker,
+using a separate elite store while the original structured DFS continues.
+An additional single-threaded Gurobi task merges that store with the original
+pool under the existing elite cap; the original master tasks retain their pools.
+Generation stops when the original stage ends, and all workers are joined before
+return. Geometry pool size and a selected geometry master are identified by
+`geometry_pool_patterns` and `portfolio_pool=geometry` respectively.
 All subsequent replacements still require a strict score improvement.
 The restricted master models conditional row/subrow SSR activation explicitly,
 including conflicts involving three different groups. Gurobi environment startup,
 model construction, solution extraction and cleanup all consume the same deadline.
 Diagnostics identify the backend as `gurobi`.
+The production CLI delay-loads HiGHS and Gurobi on their first API calls, after
+its complete-solve clock starts. Both DLLs must still accompany the executable.
+Full process wall time, including process startup, remains the acceptance clock.
 If Gurobi fails while solving the optional restricted MIP, the stage keeps the
 best validated assignment and reports `reason=solver_error`; model construction
 errors still fail explicitly.
