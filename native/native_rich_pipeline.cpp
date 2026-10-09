@@ -56,6 +56,9 @@ bool seed_rich_fallback(const Problem& problem, GroupConstructionResult& result)
     }
     result.rich_state = state.save();
     result.rich_candidate_complete = true;
+    // Keep failed-construction patterns for a separate search task. The main
+    // pool keeps its original Q0/VND trajectory under the short deadline.
+    result.rich_fallback_patterns = std::move(result.rich_elite_store);
     result.rich_elite_store = RichEliteStore(problem.rich.elite_patterns_per_group);
     result.rich_elite_store.capture(state, "q0_fallback");
     return true;
@@ -139,6 +142,11 @@ GroupConstructionResult construct_rich_m1(
             selected_score = candidate_score;
             complete = true;
         }
+    }
+    if (!complete) for (const auto& snapshot : alternative_states) {
+        AssignmentState candidate(problem);
+        candidate.restore(snapshot);
+        result.rich_elite_store.capture(candidate, "construction_alternative");
     }
     const double repair_finished = elapsed();
     schedule.finish("repair", repair_window, repair_finished);

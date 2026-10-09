@@ -88,6 +88,7 @@ Problem make_problem(const Value& case_json, const Value& config, const Value& s
         if (const Value* item = algorithm->find("stage3_time_budget")) problem.rich.stage3_time_budget = item->number_or(problem.rich.stage3_time_budget);
         if (const Value* item = algorithm->find("enable_restricted_pattern_mip")) problem.rich.enable_restricted_pattern_mip = item->bool_or(problem.rich.enable_restricted_pattern_mip);
         if (const Value* item = algorithm->find("enable_restricted_mip_portfolio")) problem.rich.enable_restricted_mip_portfolio = item->bool_or(false);
+        if (const Value* item = algorithm->find("restricted_pattern_mip_workers")) problem.rich.restricted_pattern_mip_workers = std::max(1, static_cast<int>(item->number_or(3)));
         if (const Value* item = algorithm->find("restricted_pattern_mip_time_budget")) problem.rich.restricted_pattern_mip_time_budget = item->number_or(problem.rich.restricted_pattern_mip_time_budget);
         if (const Value* item = algorithm->find("restricted_pattern_mip_tail_budget")) problem.rich.restricted_pattern_mip_tail_budget = item->number_or(problem.rich.restricted_pattern_mip_tail_budget);
         if (const Value* item = algorithm->find("restricted_pattern_mip_attempts")) problem.rich.restricted_pattern_mip_attempts = static_cast<int>(item->number_or(problem.rich.restricted_pattern_mip_attempts));

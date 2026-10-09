@@ -23,16 +23,29 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
     AssignmentState state(problem); state.restore(result.rich_state);
     using MasterResult = std::pair<AssignmentSnapshot, RichRestrictedDiagnostics>;
     std::vector<std::future<MasterResult>> alternatives;
+    const double parallel_minimum = problem.rich.enable_restricted_mip_portfolio
+        && !result.rich_fallback_patterns.groups().empty() ? 0.2 : 0.5;
     if (problem.rich.enable_restricted_pattern_mip && problem.rich_stage_budgets.business_time_limit <= 5.0
-        && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.5) {
-        for (int seed : {1, 2}) alternatives.push_back(std::async(std::launch::async, [&, seed]() {
+        && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > parallel_minimum) {
+        for (int seed = 1; seed < problem.rich.restricted_pattern_mip_workers; ++seed)
+            alternatives.push_back(std::async(std::launch::async, [&, seed]() {
             auto candidate_problem = problem;
             // Keep one small-change neighborhood alongside the open master.
             // This varies search structure as well as the solver's random seed.
             if (problem.rich.enable_restricted_mip_portfolio)
                 candidate_problem.rich.enable_pattern_local_branching = seed == 1;
             AssignmentState candidate(problem); candidate.restore(result.rich_state);
-            auto diagnostics = improve_rich_restricted_mip(candidate_problem, candidate, result.rich_elite_store, deadline, seed);
+            RichEliteStore expanded;
+            const auto* pool = &result.rich_elite_store;
+            if (problem.rich.enable_restricted_mip_portfolio && seed == problem.rich.restricted_pattern_mip_workers - 1
+                && !result.rich_fallback_patterns.groups().empty()) {
+                expanded = result.rich_elite_store;
+                for (const auto& group : result.rich_fallback_patterns.groups())
+                    for (const auto& pattern : group.second)
+                        expanded.record_candidate(group.first, pattern, candidate, result.rich_conflict_diversity_active);
+                pool = &expanded;
+            }
+            auto diagnostics = improve_rich_restricted_mip(candidate_problem, candidate, *pool, deadline, seed);
             if (problem.rich.enable_restricted_mip_portfolio && seed == 1 && !result.rich_rankings.empty()
                 && std::chrono::steady_clock::now() < deadline) {
                 const auto started = std::chrono::steady_clock::now();

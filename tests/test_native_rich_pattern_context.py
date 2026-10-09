@@ -306,6 +306,7 @@ class NativeRichPatternContextTests(unittest.TestCase):
         ])
         config = copy.deepcopy(self.config)
         config["algorithm"].update(business_time_limit_seconds=5.0,
+            restricted_pattern_mip_workers=4,
             enable_pattern_local_branching=True, pattern_local_branching_initial_radius=1,
             pattern_local_branching_max_radius=1, restricted_pattern_mip_attempts=1)
         config["input_contract"] = {"seatmaps_by_direction": {
@@ -317,27 +318,35 @@ class NativeRichPatternContextTests(unittest.TestCase):
                          local_score=scorer.components({**initial, (gid, 1): seat}, {gid})["total_soft_score"],
                          source="fixture")
                     for gid, seat in [(20, "2A"), (20, "1A"), (10, "1A"), (10, "2A")]]
-        results = []
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             for name, value in {
                 "case.json": {"caseId": "two-group-exchange", "direction": "public-test", "groups": case["groupsData"]},
                 "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
-                "replay.json": {"pattern_context": dict(initial=[[0, "2A"], [1, "1A"]],
-                    patterns=patterns, pairs=[], restricted_mip=True, protected_stage=True, deadline_seconds=2.0)},
             }.items():
                 (work / name).write_text(json.dumps(value), encoding="utf-8")
-            for enabled in (False, True):
-                config["algorithm"]["enable_restricted_mip_portfolio"] = enabled
-                (work / "config.json").write_text(json.dumps(config), encoding="utf-8")
-                run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
-                                      str(work / "replay.json")], capture_output=True, text=True)
-                self.assertEqual(run.returncode, 0, run.stderr)
-                results.append(json.loads(run.stdout))
-        self.assertEqual(results[0]["state"]["assignments"], ["2A", "1A"])
-        self.assertEqual(results[1]["state"]["assignments"], ["1A", "2A"])
-        self.assertGreater(results[1]["selected_score"], results[0]["selected_score"])
-        self.assertFalse(results[1]["diagnostics"]["local_branching"]["enabled"])
+            for separate_fallback_pool in (False, True):
+                with self.subTest(separate_fallback_pool=separate_fallback_pool):
+                    replay = {"pattern_context": dict(initial=[[0, "2A"], [1, "1A"]],
+                        patterns=patterns, pairs=[], restricted_mip=True, protected_stage=True, deadline_seconds=2.0)}
+                    if separate_fallback_pool:
+                        replay["pattern_context"]["fallback_pattern_indexes"] = [1, 3]
+                    (work / "replay.json").write_text(json.dumps(replay), encoding="utf-8")
+                    results = []
+                    for enabled in (False, True):
+                        config["algorithm"]["enable_restricted_mip_portfolio"] = enabled
+                        (work / "config.json").write_text(json.dumps(config), encoding="utf-8")
+                        run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                              str(work / "replay.json")], capture_output=True, text=True)
+                        self.assertEqual(run.returncode, 0, run.stderr)
+                        results.append(json.loads(run.stdout))
+                    self.assertEqual(results[0]["state"]["assignments"], ["2A", "1A"])
+                    self.assertEqual(results[1]["state"]["assignments"], ["1A", "2A"])
+                    self.assertGreater(results[1]["selected_score"], results[0]["selected_score"])
+                    self.assertFalse(results[1]["diagnostics"]["local_branching"]["enabled"])
+                    if separate_fallback_pool:
+                        for result in results:
+                            self.assertEqual(sum(len(v) for v in result["elite"].values()), 2)
 
     def test_rich_restricted_branching_and_early_returns(self):
         case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),

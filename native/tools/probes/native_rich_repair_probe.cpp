@@ -14,6 +14,16 @@ int main(int argc, char** argv) {
         const auto replay = native_json::parse_file(argv[3]);
         if (const auto* assignment = replay.find("fallback_assignment")) {
             full_cpp::GroupConstructionResult result;
+            if (const auto* initial = replay.find("construction")) {
+                full_cpp::AssignmentState state(problem);
+                for (const auto& entry : initial->array) {
+                    const int chosen = entry.array.size() > 2 ? problem.seat_index.at(entry.array[2].string) : -1;
+                    if (!state.assign_rich_pattern(static_cast<int>(entry.array[0].number),
+                        problem.seat_index.at(entry.array[1].string), {}, chosen))
+                        throw std::runtime_error("fallback construction assignment failed");
+                }
+                result.rich_elite_store.capture(state, "construction");
+            }
             for (const auto& seat : assignment->array)
                 result.passenger_to_seat.push_back(seat.is_null() ? -1 : problem.seat_index.at(seat.string));
             const bool seeded = full_cpp::seed_rich_fallback(problem, result);
@@ -30,6 +40,8 @@ int main(int argc, char** argv) {
             }
             std::cout << "],\"elite\":";
             full_cpp::write_rich_elite_store(std::cout, result.rich_elite_store);
+            std::cout << ",\"alternatives\":";
+            full_cpp::write_rich_elite_store(std::cout, result.rich_fallback_patterns);
             std::cout << "}\n";
             return 0;
         }
@@ -259,8 +271,13 @@ int main(int argc, char** argv) {
             };
             if (const auto* mode = input->find("restricted_mip"); mode && mode->bool_or()) {
                 full_cpp::RichEliteStore elite;
-                for (const auto& entry : patterns)
+                std::set<int> fallback_indexes;
+                if (const auto* indexes = input->find("fallback_pattern_indexes"))
+                    for (const auto& index : indexes->array) fallback_indexes.insert(static_cast<int>(index.number));
+                for (size_t i = 0; i < patterns.size(); ++i) if (!fallback_indexes.count(static_cast<int>(i))) {
+                    const auto& entry = patterns[i];
                     elite.insert_relocation(entry.first, entry.second, [&]() { return entry.second.local_score; });
+                }
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(input->at("deadline_seconds").number));
                 full_cpp::RichRestrictedDiagnostics stats;
@@ -269,6 +286,11 @@ int main(int argc, char** argv) {
                 if (stage) {
                     result.rich_candidate_complete = true;
                     result.rich_state = state.save(); result.rich_elite_store = elite;
+                    for (int i : fallback_indexes) {
+                        const auto& entry = patterns.at(i);
+                        result.rich_fallback_patterns.insert_relocation(entry.first, entry.second,
+                            [&]() { return entry.second.local_score; });
+                    }
                     result.group_construction_score = full_cpp::evaluate_soft_score(problem, state.passenger_to_seat);
                     stats = full_cpp::improve_rich_restricted_stage(problem, deadline, result);
                     state.restore(result.rich_state);

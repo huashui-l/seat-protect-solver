@@ -11,6 +11,7 @@ namespace full_cpp {
 struct GroupConstructionResult {
     RichStructuredDiagnostics rich_structured;
     RichEliteStore rich_elite_store;
+    RichEliteStore rich_fallback_patterns;
     bool rich_conflict_diversity_active = false;
     AssignmentSnapshot rich_state;
     std::vector<std::vector<int>> rich_rankings;

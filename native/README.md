@@ -112,12 +112,18 @@ remains. Its legal assignment is converted into Rich state, including a global
 matching of single-empty protection resources, so VND and pattern search can
 continue from that fallback. Q1/Q2A do not run. A complete legal candidate is
 accepted even when its score is negative and there is no previous incumbent.
+When all construction trajectories are incomplete and Q0 is needed, their
+complete group patterns are kept separately; unassigned groups are not captured.
+The last open master task tries an expanded pool containing these alternatives,
+while the other tasks retain the original Q0/VND pool.
+Successful construction retains its existing pattern-capture behavior.
 All subsequent replacements still require a strict score improvement.
 If HiGHS fails while solving the optional restricted MIP, the stage keeps the
 best validated assignment and reports `reason=solver_error`; model construction
 errors still fail explicitly.
 
-The 5s profile enables `enable_restricted_mip_portfolio`: the existing three
+The 5s profile enables `enable_restricted_mip_portfolio` and four
+`restricted_pattern_mip_workers` (other profiles default to three). These
 single-threaded master tasks combine an open search and a local-branching search,
 then select the best independently validated full score. All tasks finish before
 returning. The local-branching task uses its remaining time to polish its own

@@ -104,6 +104,7 @@ struct RichConstructionConfig {
     double stage3_time_budget = 20.0;
     bool enable_restricted_pattern_mip = true;
     bool enable_restricted_mip_portfolio = false;
+    int restricted_pattern_mip_workers = 3;
     double restricted_pattern_mip_time_budget = 0.0;
     double restricted_pattern_mip_tail_budget = 0.10;
     int restricted_pattern_mip_attempts = 3;
