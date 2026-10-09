@@ -141,7 +141,7 @@ is explicitly enabled.
 
 Stage weights are construction 2.4, repair 0.3, VND 0.7, patterns 1.8, LNS 0.2,
 and restricted MIP 2.2, proportionally scaled to the available search time with
-a 0.4s scoring/overhead reserve. Carry and incomplete-repair borrowing apply;
+a 0.2s scoring/overhead reserve. Carry and incomplete-repair borrowing apply;
 cabin budgets scale these windows. Structured search includes small groups and
 three-tier patterns, with 0.12s per-group DFS, 32 windows, 24 generated patterns
 per group and an elite capacity of 64. The native clock includes input loading,
