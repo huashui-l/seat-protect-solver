@@ -224,7 +224,20 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
                 diagnostics.rich_conflict_diversity_active);
     };
     std::atomic<bool> stop_geometry{false};
-    using RelocationRequest = std::tuple<int, RichTieredPattern, double>;
+    using RelocationSeed = std::pair<RichTieredPattern, double>;
+    using RelocationRequest = std::pair<int, std::vector<RelocationSeed>>;
+    std::vector<int> resource_owner(problem.seats.size(), -1);
+    for (int p : state.assignment_order) {
+        resource_owner[state.passenger_to_seat[p]] = problem.passengers[p].group;
+        for (int seat : state.assigned_blocked[p]) resource_owner[seat] = problem.passengers[p].group;
+    }
+    const auto owners_of = [&](int g, const RichTieredPattern& candidate) {
+        std::set<int> owners;
+        const auto add = [&](int seat) { if (resource_owner[seat] >= 0 && resource_owner[seat] != g) owners.insert(resource_owner[seat]); };
+        for (const auto& entry : candidate.pattern.assignments) add(entry.second);
+        for (const auto& entry : candidate.pattern.blocked_by) add(entry.first);
+        return owners;
+    };
     std::promise<RelocationRequest> relocation_request;
     auto pending_request = relocation_request.get_future();
     bool request_selected = false;
@@ -253,67 +266,73 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
             }
             // Reuse a completed structured search instead of solving another
             // group MIP. This is the existing sixth generation worker.
-            RelocationRequest request{-1, {}, 0.0};
+            RelocationRequest request{-1, {}};
             if (pending_request.wait_until(deadline) == std::future_status::ready) request = pending_request.get();
-            const int g = std::get<0>(request);
-            const auto& candidate = std::get<1>(request);
-            const double score = std::get<2>(request);
-            if (g >= 0 && std::chrono::steady_clock::now() < deadline) {
-                record(pool, g, candidate, score, false);
-                std::set<int> requested;
-                for (const auto& entry : candidate.pattern.assignments) requested.insert(entry.second);
-                for (const auto& entry : candidate.pattern.blocked_by) requested.insert(entry.first);
-                std::set<int> owners;
-                for (int p : state.assignment_order) {
-                    bool conflict = requested.count(state.passenger_to_seat[p]) != 0;
-                    for (int seat : state.assigned_blocked[p]) conflict |= requested.count(seat) != 0;
-                    if (conflict && problem.passengers[p].group != g) owners.insert(problem.passengers[p].group);
-                }
+            const int g = request.first;
+            if (g >= 0) {
                 const auto baby = build_rich_baby_costs(problem);
                 std::map<int, RichPricingCache> caches;
-                for (int owner : owners) {
+                for (const auto& seed : request.second) {
                     if (std::chrono::steady_clock::now() >= deadline) break;
-                    auto outside = requested;
-                    for (int p : state.assignment_order)
-                        if (problem.passengers[p].group != g && problem.passengers[p].group != owner) {
-                            outside.insert(state.passenger_to_seat[p]);
-                            outside.insert(state.assigned_blocked[p].begin(), state.assigned_blocked[p].end());
-                        }
-                    add_rich_dynamic_relocation_patterns(problem, state, owner, outside,
-                        deadline, fixed, baby, caches, pool);
+                    const auto& candidate = seed.first;
+                    record(pool, g, candidate, seed.second, false);
+                    std::set<int> requested;
+                    for (const auto& entry : candidate.pattern.assignments) requested.insert(entry.second);
+                    for (const auto& entry : candidate.pattern.blocked_by) requested.insert(entry.first);
+                    for (int owner : owners_of(g, candidate)) {
+                        if (std::chrono::steady_clock::now() >= deadline) break;
+                        auto outside = requested;
+                        for (int p : state.assignment_order)
+                            if (problem.passengers[p].group != g && problem.passengers[p].group != owner) {
+                                outside.insert(state.passenger_to_seat[p]);
+                                outside.insert(state.assigned_blocked[p].begin(), state.assigned_blocked[p].end());
+                            }
+                        add_rich_dynamic_relocation_patterns(problem, state, owner, outside,
+                            deadline, fixed, baby, caches, pool);
+                    }
                 }
             }
             return pool;
         });
     }
-    int current_group = -1, best_group = -1;
-    double best_score = 0.0;
-    RichTieredPattern best_pattern;
+    int current_group = -1;
+    double current_score = 0.0;
+    std::map<std::set<int>, RelocationSeed> best_by_owners;
     const auto finish_group = [&]() {
-        if (!geometry.valid() || request_selected || best_group < 0) return;
-        relocation_request.set_value({best_group, best_pattern, best_score});
+        if (!geometry.valid() || request_selected || best_by_owners.empty()) return;
+        std::vector<RelocationSeed> seeds;
+        for (const auto& entry : best_by_owners) seeds.push_back(entry.second);
+        std::stable_sort(seeds.begin(), seeds.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+        // Keep two promising ownership alternatives: the best local pattern can
+        // consume resources whose owner is much more expensive to relocate.
+        if (seeds.size() > 2) seeds.resize(2);
+        relocation_request.set_value({current_group, std::move(seeds)});
         request_selected = true;
     };
     diagnostics.rich_structured = generate_rich_structured_patterns(problem, state.passenger_to_seat, deadline,
         [&](int g, const RichTieredPattern& candidate, double score, bool pinned) {
             record(diagnostics.rich_elite_store, g, candidate, score, pinned);
             // The generator serially merges all patterns for each group in
-            // priority order. Submit its best value-improving pattern only once
+            // priority order. Submit its value-improving alternatives only once
             // that group's complete batch has arrived.
             if (g != current_group) {
-                finish_group(); current_group = g; best_group = -1;
-                best_score = evaluate_rich_group_score(problem, state.passenger_to_seat, g).total();
+                finish_group(); current_group = g; best_by_owners.clear();
+                current_score = evaluate_rich_group_score(problem, state.passenger_to_seat, g).total();
             }
-            if (!geometry.valid() || request_selected || score <= best_score + kTolerance) return;
+            if (!geometry.valid() || request_selected || score <= current_score + kTolerance) return;
             double value_gain = 0.0;
             for (const auto& entry : candidate.pattern.assignments)
                 value_gain += evaluate_rich_individual_score(problem, entry.first, entry.second).score_v
                     - evaluate_rich_individual_score(problem, entry.first, state.passenger_to_seat[entry.first]).score_v;
             if (value_gain <= kTolerance) return;
-            best_group = g; best_score = score; best_pattern = candidate;
+            const auto owners = owners_of(g, candidate);
+            if (owners.empty()) return;
+            const auto found = best_by_owners.find(owners);
+            if (found == best_by_owners.end() || score > found->second.second + kTolerance)
+                best_by_owners[owners] = {candidate, score};
         });
     finish_group();
-    if (!request_selected) relocation_request.set_value({-1, {}, 0.0});
+    if (!request_selected) relocation_request.set_value({-1, {}});
     stop_geometry.store(true);
     if (geometry.valid()) {
         diagnostics.rich_geometry_patterns = geometry.get();
