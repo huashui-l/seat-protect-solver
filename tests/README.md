@@ -22,6 +22,19 @@ heuristic at 5 seconds, each Gurobi route at 150 seconds, and a 600-second
 supplement only for exact runs without an optimality or infeasibility
 certificate.
 
+For runs collected in separate batches, verify and merge the source reports
+without discarding their individual provenance:
+
+```powershell
+python scripts/merge_three_route_benchmarks.py `
+  --sources CPP_5S.json CG_150S.json CG_600S.json DIRECT_150S.json DIRECT_600S.json `
+  --json-output outputs/three_routes.json `
+  --markdown-output outputs/three_routes.md
+```
+
+The merger checks input/configuration hashes, all 40 cases, route budgets,
+duplicate or failed runs, and the conditional 600-second coverage.
+
 Formal24, training, long column generation, and research benchmarks are not
 ordinary pull-request tests.
 

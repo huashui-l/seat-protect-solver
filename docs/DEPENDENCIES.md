@@ -2,10 +2,11 @@
 
 ## Python
 
-Python 3.11 is the supported baseline for this initial import. Core source code
-uses NumPy, SciPy, Matplotlib, and the Python HiGHS bindings. Install the common
-dependencies from `requirements.txt` and column-generation support from
-`requirements-column-generation.txt`.
+Python 3.11 is the supported baseline. Core source code uses NumPy, SciPy,
+and Matplotlib. Install the common dependencies from `requirements.txt`.
+The maintained column-generation and direct solver routes use
+`gurobipy>=13.0`, installed from `requirements-column-generation.txt`, and
+require a Gurobi license that supports the benchmark model sizes.
 
 The initial import does not include GNN training code, so PyTorch and
 scikit-learn are intentionally not core dependencies. Versions are not pinned
@@ -19,7 +20,6 @@ tools, and HiGHS 1.15.1. Pass the extracted HiGHS directory explicitly through
 audited Windows archive had SHA-256
 `26302d9024f307e09128a45a58898917287351dcf754c55aebc07742237f78bf`.
 
-Python `highspy` and the native HiGHS library are separate installations. The
-native ABI target is fixed at 1.15.1; exact Python/native version equivalence
-has not yet been established as a repository-wide requirement.
+The native HiGHS SDK is an internal dependency of the C++ heuristic, separate
+from the two Gurobi solver routes. Its native ABI target is fixed at 1.15.1.
 
