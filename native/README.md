@@ -119,13 +119,23 @@ complete group patterns are kept separately; unassigned groups are not captured.
 The last open master task tries an expanded pool containing these alternatives,
 while the other tasks retain the original Q0/VND pool.
 Successful construction retains its existing pattern-capture behavior.
-The short portfolio also generates geometry patterns on one additional worker,
+The short portfolio generates geometry patterns on one additional worker,
 using a separate elite store while the original structured DFS continues.
-An additional single-threaded Gurobi task merges that store with the original
-pool under the existing elite cap; the original master tasks retain their pools.
-Generation stops when the original stage ends, and all workers are joined before
-return. Geometry pool size and a selected geometry master are identified by
-`geometry_pool_patterns` and `portfolio_pool=geometry` respectively.
+For the first priority group with a locally improving value candidate, the
+structured generator also hands off its two best patterns with different sets
+of current resource owners. After geometry enumeration, the same worker uses
+released-resource pricing to generate complementary placements for those owners,
+allowing the target group to use their seats and the owners to reuse its released
+resources. No additional group MIP or worker is started.
+Geometry and owner-complement patterns stay in separate stores. The additional
+single-threaded Gurobi task merges only geometry patterns under the existing
+elite cap. The last original open master adds owner-complement columns to its
+Q0/fallback portfolio without evicting locally worse relocation columns; the
+other master paths retain their original pools.
+Geometry enumeration stops when the original stage ends. Complement pricing
+uses the same stage deadline, and all workers are joined before returning.
+Pool sizes are reported as `geometry_pool_patterns` and `owner_pool_patterns`;
+a selected geometry master is identified by `portfolio_pool=geometry`.
 All subsequent replacements still require a strict score improvement.
 The restricted master models conditional row/subrow SSR activation explicitly,
 including conflicts involving three different groups. Gurobi environment startup,
