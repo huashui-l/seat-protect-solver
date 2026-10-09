@@ -25,6 +25,9 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
             with self.subTest(case=case_id):
                 result = self.run_case(case_id, "rich-fast", algorithm=profile["algorithm"])
                 self.assertGreaterEqual(result["solve_wall_seconds"], result["wall_seconds"])
+                self.assertGreaterEqual(result["preparation_seconds"], 0.0)
+                self.assertGreaterEqual(result["solve_wall_seconds"],
+                                        result["preparation_seconds"] + result["wall_seconds"])
                 self.assertLessEqual(result["solve_wall_seconds"], 5.0)
                 cabins = result.get("cabin_decomposition", {}).get("cabins", {})
                 if cabins:
@@ -58,20 +61,22 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                 results = [cabin["result"] for cabin in cabins.values()] if cabins else [result]
                 for cabin in results:
                     self.assertEqual("NotRun", cabin["q1_selected_incumbent"])
-                    if cabin["rich_candidate_complete"]:
+                    if cabin["q0_solver_status"] == "NotRun":
                         native_count += 1
-                        self.assertEqual("NotRun", cabin["q0_solver_status"])
+                        self.assertTrue(cabin["rich_candidate_complete"])
                         self.assertTrue(cabin["selected_incumbent"].startswith("rich-"))
                         self.assertGreaterEqual(cabin["native_score"], cabin["rich_repair_score"] - 1e-8)
                     else:
                         fallback_count += 1
-                        self.assertEqual("q0", cabin["selected_incumbent"])
                         self.assertEqual("rich_incomplete", cabin["fallback_reason"])
                         self.assertNotEqual("NotRun", cabin["q0_solver_status"])
-                        self.assertEqual(cabin["native_score"], cabin["q0_score"])
+                        self.assertTrue(cabin["rich_candidate_complete"])
+                        self.assertGreaterEqual(cabin["native_score"], cabin["q0_score"] - 1e-8)
+                        self.assertIn("fallback", cabin["rich_stage_timing"])
                     self.assertEqual(0, cabin["dfs_nodes"] + cabin["beam_nodes"])
                     self.assertEqual(0, cabin["from_scratch_dfs_nodes"] + cabin["from_scratch_beam_nodes"])
-                    self.assertFalse(cabin["rich_multigroup_lns"]["enabled"])
+                    if "tail_exchange" not in cabin["rich_stage_timing"]:
+                        self.assertFalse(cabin["rich_multigroup_lns"]["enabled"])
                     for timing in cabin["rich_stage_timing"].values():
                         self.assertLessEqual(timing["deadline"], cabin["rich_search_deadline"])
 
@@ -125,6 +130,10 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
             runs = diagnostics["cabins"]
             config = copy.deepcopy(self.base_config)
             config["algorithm"].update(algorithm)
+            # Loading/normalizing the raw input now consumes the outer 5s
+            # budget before cabin allocation begins.
+            self.assertLessEqual(diagnostics["total_time_limit_seconds"], 5.0)
+            config["algorithm"]["business_time_limit_seconds"] = diagnostics["total_time_limit_seconds"]
             times = [0.0]
             for cabin in order:
                 run = runs[cabin]
@@ -312,7 +321,9 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                     self.assertAlmostEqual(result["rich_stage_budgets"][stage], budget, places=10)
                 self.assertAlmostEqual(result["rich_business_time_limit"], budgets["business_time_limit"])
                 self.assertAlmostEqual(result["rich_scoring_reserve"], budgets["scoring_reserve"])
-                search_limit = min(budgets["usable_time"], 5.0 - min(budgets["scoring_reserve"], 1.0))
+                remaining = 5.0 - result["preparation_seconds"]
+                search_limit = min(budgets["usable_time"], remaining
+                                   - min(budgets["scoring_reserve"], remaining * 0.2))
                 self.assertAlmostEqual(result["rich_search_deadline"], search_limit)
                 timings = result["rich_stage_timing"]
                 stages = ["construction", "repair", "vnd"]

@@ -130,6 +130,8 @@ FeasibilityResult solve_feasibility_mip(
         // Short-budget mode spends its budget on the independent Rich heuristic.
         // The original group-first/Q0 route remains available for the 60s profile.
         const bool rich_fast = objective == ConstructionObjective::RichFast;
+        const double polish_reserve = rich_fast ? std::min(0.1, search_seconds * 0.05) : 0.0;
+        const double master_deadline = search_seconds - polish_reserve;
         FeasibilityResult result;
         if (rich_fast) {
             result.passenger_to_seat.assign(problem.passengers.size(), -1);
@@ -171,6 +173,7 @@ FeasibilityResult solve_feasibility_mip(
             // A dense protection layout can defeat greedy construction/repair.
             // Only then spend remaining time on a legal Q0 fallback.
             if (rich_fast && !group_result.rich_candidate_complete && Clock::now() < search_deadline) {
+                const double fallback_started = elapsed();
                 const auto fallback = solve_feasibility_mip(problem,
                     std::max(0.0, search_seconds - elapsed()), seed, ConstructionObjective::IndividualSoft);
                 result.q0_solver_status = fallback.status;
@@ -182,7 +185,11 @@ FeasibilityResult solve_feasibility_mip(
                     group_result.group_construction_score = group_result.q0_score;
                     group_result.selected_incumbent = "q0";
                     group_result.fallback_reason = "rich_incomplete";
+                    seed_rich_fallback(problem, group_result);
                 }
+                group_result.rich_stage_timing["fallback"] = {
+                    0.0, search_seconds - fallback_started, fallback_started, elapsed(),
+                    search_seconds, 0.0, 0.0};
             }
             result.rich_m1_elite_store = group_result.rich_elite_store;
             result.rich_m1_selected_score = group_result.group_construction_score;
@@ -202,7 +209,11 @@ FeasibilityResult solve_feasibility_mip(
                     schedule.carry(), schedule.pricing_reserve()};
                 if (group_result.rich_candidate_complete) {
                     const double pattern_started = elapsed();
-                    const auto pattern_window = schedule.begin("pattern_generation", pattern_started);
+                    auto pattern_window = schedule.begin("pattern_generation", pattern_started);
+                    if (rich_fast) {
+                        pattern_window.deadline = std::min(pattern_window.deadline, master_deadline - 0.15);
+                        pattern_window.effective_budget = std::max(0.0, pattern_window.deadline - pattern_started);
+                    }
                     generate_rich_patterns_m3(problem, at(pattern_window.deadline), group_result);
                     const double pattern_finished = elapsed();
                     schedule.finish("pattern_generation", pattern_window, pattern_finished);
@@ -237,7 +248,11 @@ FeasibilityResult solve_feasibility_mip(
                         budgets.stages.at("lns"), lns_window.effective_budget, lns_started, lns_finished, lns_window.deadline,
                         schedule.carry(), schedule.pricing_reserve()};
                     const double restricted_started = elapsed();
-                    const auto restricted_window = schedule.begin("restricted_mip", restricted_started);
+                    auto restricted_window = schedule.begin("restricted_mip", restricted_started);
+                    if (rich_fast) {
+                        restricted_window.deadline = std::min(restricted_window.deadline, master_deadline);
+                        restricted_window.effective_budget = std::max(0.0, restricted_window.deadline - restricted_started);
+                    }
                     result.rich_restricted = improve_rich_restricted_stage(problem, at(restricted_window.deadline), group_result);
                     const double restricted_finished = elapsed();
                     schedule.finish("restricted_mip", restricted_window, restricted_finished);
@@ -255,7 +270,7 @@ FeasibilityResult solve_feasibility_mip(
                     // Recombined group patterns can expose new improving exchanges.
                     // Charge polishing to the same global search deadline.
                     const double refine_started = elapsed();
-                    const double refine_remaining = search_seconds - refine_started;
+                    const double refine_remaining = master_deadline - refine_started;
                     if (refine_remaining > 0.3) {
                         AssignmentState incumbent(problem);
                         incumbent.restore(group_result.rich_state);
@@ -269,10 +284,10 @@ FeasibilityResult solve_feasibility_mip(
                         }
                         generate_rich_patterns_m3(refinement_problem,
                             at(refine_started + refine_remaining * 0.55), group_result);
-                        result.rich_restricted = improve_rich_restricted_stage(problem, at(search_seconds - 0.08), group_result);
+                        result.rich_restricted = improve_rich_restricted_stage(problem, at(master_deadline - 0.08), group_result);
                         group_result.rich_stage_timing["pattern_refinement"] = {
                             0.0, refine_remaining - 0.08, refine_started, elapsed(),
-                            search_seconds - 0.08, 0.0, 0.0};
+                            master_deadline - 0.08, 0.0, 0.0};
                     }
                     const double polish_started = elapsed();
                     if (polish_started + 0.01 < search_seconds) {
@@ -565,7 +580,6 @@ FeasibilityResult solve_feasibility_mip(
     Highs_setIntOptionValue(highs, "threads", 1);
     Highs_setIntOptionValue(highs, "random_seed", seed);
     Highs_setDoubleOptionValue(highs, "mip_rel_gap", 0.0);
-    Highs_setDoubleOptionValue(highs, "time_limit", time_limit_seconds);
     const HighsInt pass_status = Highs_passMip(
         highs, column_count, row_count, static_cast<HighsInt>(indices.size()),
         kHighsMatrixFormatColwise, kHighsObjSenseMinimize, 0.0,
@@ -577,6 +591,8 @@ FeasibilityResult solve_feasibility_mip(
         Highs_destroy(highs);
         throw std::runtime_error("HiGHS rejected native feasibility model");
     }
+    Highs_setDoubleOptionValue(highs, "time_limit", std::max(0.0, time_limit_seconds
+        - std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count()));
     Highs_run(highs);
     const HighsInt model_status = Highs_getModelStatus(highs);
     std::vector<double> solution(column_count, 0.0);

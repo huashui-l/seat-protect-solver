@@ -282,6 +282,13 @@ def _run_method(
         if method == "cpp_heuristic":
             result["proven_optimal"] = False
             result["status"] = "complete" if result["complete"] else "incomplete"
+            result["native_score"] = raw.get("native_score")
+            result["native_score_error"] = (
+                abs(raw["native_score"] - result["score"])
+                if raw.get("native_score") is not None and result.get("score") is not None else None
+            )
+            result["solve_wall_seconds"] = raw.get("solve_wall_seconds")
+            result["preparation_seconds"] = raw.get("preparation_seconds")
     return result
 
 

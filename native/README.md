@@ -105,21 +105,40 @@ a local copy with absolute paths. Private Formal24 inputs are not bundled.
 
 The short profile begins directly with fixed/SSR/caregiver Rich construction and
 relocation repair, followed by VND, a bounded structured pattern pool and up to
-two restricted MIP/local-branching attempts. Protected MIP, special pricing and
-conflict LNS are disabled. Q0 individual-soft MIP runs only if construction/repair
-is incomplete and time remains; Q1/Q2A do not run. A complete legal candidate is
+two unrestricted pattern-MIP attempts. Remaining tail time can run protected
+component exchange and conflict LNS; special pricing stays disabled.
+Q0 individual-soft MIP runs only if construction/repair is incomplete and time
+remains. Its legal assignment is converted into Rich state, including a global
+matching of single-empty protection resources, so VND and pattern search can
+continue from that fallback. Q1/Q2A do not run. A complete legal candidate is
 accepted even when its score is negative and there is no previous incumbent.
 All subsequent replacements still require a strict score improvement.
 If HiGHS fails while solving the optional restricted MIP, the stage keeps the
 best validated assignment and reports `reason=solver_error`; model construction
 errors still fail explicitly.
 
-Nominal single-cabin stage budgets are construction 2.4s, repair 0.3s, VND 0.7s,
-patterns 0.8s, restricted MIP 0.4s, with 0.4s scoring/overhead reserve. Existing
-carry and incomplete-repair borrowing apply; cabin budgets scale these windows.
-Per-group pattern DFS is capped at 0.02s, with four windows and six patterns per
-group. The configuration targets a 5s invocation; measured process time must
-still be checked because native setup and solver termination have overhead.
+The 5s profile enables `enable_restricted_mip_portfolio`: the existing three
+single-threaded master tasks combine an open search and a local-branching search,
+then select the best independently validated full score. All tasks finish before
+returning. The local-branching task uses its remaining time to polish its own
+incumbent with VND, while open master tasks continue searching. Failed or
+non-improving polishing preserves the pre-polish assignment. The short route
+also reserves up to 0.1s for final sequential VND; pattern generation and master
+refinement stop earlier to preserve this time. Worker polishing time and score
+gain are reported separately in the selected master's diagnostics.
+Other profiles retain their configured branching behavior unless the portfolio
+is explicitly enabled.
+
+Stage weights are construction 2.4, repair 0.3, VND 0.7, patterns 1.8, LNS 0.2,
+and restricted MIP 2.2, proportionally scaled to the available search time with
+a 0.4s scoring/overhead reserve. Carry and incomplete-repair borrowing apply;
+cabin budgets scale these windows. Structured search includes small groups and
+three-tier patterns, with 0.12s per-group DFS, 32 windows, 24 generated patterns
+per group and an elite capacity of 64. The native clock includes input loading,
+normalization, search, final validation/scoring and serialization; preparation
+time is recorded and deducted before allocating search/cabin budgets. Feasibility
+MIP construction is also charged to its time limit. Measured process time must
+still be checked because process startup and solver termination have overhead.
 
 For single-cabin diagnostics, `q0_solver_status=NotRun` means the Q0 score and
 Q0-relative delta fields have no baseline interpretation (their numeric defaults

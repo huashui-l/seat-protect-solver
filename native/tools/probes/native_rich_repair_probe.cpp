@@ -12,6 +12,27 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* assignment = replay.find("fallback_assignment")) {
+            full_cpp::GroupConstructionResult result;
+            for (const auto& seat : assignment->array)
+                result.passenger_to_seat.push_back(seat.is_null() ? -1 : problem.seat_index.at(seat.string));
+            const bool seeded = full_cpp::seed_rich_fallback(problem, result);
+            std::cout << "{\"seeded\":" << (seeded ? "true" : "false") << ",\"blocked\":[";
+            if (seeded) for (size_t p = 0; p < result.rich_state.assigned_blocked.size(); ++p) {
+                if (p) std::cout << ',';
+                std::cout << '[';
+                const auto& blocks = result.rich_state.assigned_blocked[p];
+                for (size_t i = 0; i < blocks.size(); ++i) {
+                    if (i) std::cout << ',';
+                    std::cout << '"' << problem.seats[blocks[i]].id << '"';
+                }
+                std::cout << ']';
+            }
+            std::cout << "],\"elite\":";
+            full_cpp::write_rich_elite_store(std::cout, result.rich_elite_store);
+            std::cout << "}\n";
+            return 0;
+        }
         if (const auto* input = replay.find("pattern_context")) {
             full_cpp::AssignmentState state(problem);
             for (const auto& entry : input->at("initial").array) {

@@ -16,6 +16,51 @@ namespace {
 constexpr double kTolerance = 1e-9;
 }  // namespace
 
+bool seed_rich_fallback(const Problem& problem, GroupConstructionResult& result) {
+    const auto& assignment = result.passenger_to_seat;
+    if (validate_complete_assignment(problem, assignment) != 0) return false;
+    std::set<int> occupied(assignment.begin(), assignment.end()), protected_empty;
+    for (int p = 0; p < static_cast<int>(assignment.size()); ++p) {
+        if (!problem.passengers[p].need_both_empty) continue;
+        const auto& seat = problem.seats[assignment[p]];
+        const auto& neighbors = problem.both_side_empty_allow_cross_aisle
+            ? seat.row_neighbors : seat.same_block_neighbors;
+        protected_empty.insert(neighbors.begin(), neighbors.end());
+    }
+    // Match single-empty resources globally; a greedy choice can strand a
+    // later passenger even though the MIP's complete assignment is legal.
+    std::map<int, int> empty_owner;
+    const auto augment = [&](auto&& self, int p, std::set<int>& visited) -> bool {
+        for (int seat : problem.seats[assignment[p]].same_block_neighbors) {
+            if (occupied.count(seat) || protected_empty.count(seat) || !visited.insert(seat).second) continue;
+            const auto owner = empty_owner.find(seat);
+            if (owner == empty_owner.end() || self(self, owner->second, visited)) {
+                empty_owner[seat] = p;
+                return true;
+            }
+        }
+        return false;
+    };
+    for (int p = 0; p < static_cast<int>(assignment.size()); ++p) {
+        if (!problem.passengers[p].need_single_empty || problem.passengers[p].need_both_empty) continue;
+        std::set<int> visited;
+        if (!augment(augment, p, visited)) return false;
+    }
+    std::vector<int> single_block(assignment.size(), -1);
+    for (const auto& owner : empty_owner) single_block[owner.second] = owner.first;
+    AssignmentState state(problem);
+    for (int p = 0; p < static_cast<int>(assignment.size()); ++p) {
+        auto excluded = occupied;
+        excluded.erase(assignment[p]);
+        if (!state.assign_rich_pattern(p, assignment[p], excluded, single_block[p])) return false;
+    }
+    result.rich_state = state.save();
+    result.rich_candidate_complete = true;
+    result.rich_elite_store = RichEliteStore(problem.rich.elite_patterns_per_group);
+    result.rich_elite_store.capture(state, "q0_fallback");
+    return true;
+}
+
 GroupConstructionResult construct_rich_m1(
     const Problem& problem, const std::vector<int>& q0_assignment,
     const GroupConstructionResult& q2a_result,

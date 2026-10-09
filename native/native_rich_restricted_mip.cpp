@@ -26,8 +26,27 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
     if (problem.rich.enable_restricted_pattern_mip && problem.rich_stage_budgets.business_time_limit <= 5.0
         && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.5) {
         for (int seed : {1, 2}) alternatives.push_back(std::async(std::launch::async, [&, seed]() {
+            auto candidate_problem = problem;
+            // Keep one small-change neighborhood alongside the open master.
+            // This varies search structure as well as the solver's random seed.
+            if (problem.rich.enable_restricted_mip_portfolio)
+                candidate_problem.rich.enable_pattern_local_branching = seed == 1;
             AssignmentState candidate(problem); candidate.restore(result.rich_state);
-            auto diagnostics = improve_rich_restricted_mip(problem, candidate, result.rich_elite_store, deadline, seed);
+            auto diagnostics = improve_rich_restricted_mip(candidate_problem, candidate, result.rich_elite_store, deadline, seed);
+            if (problem.rich.enable_restricted_mip_portfolio && seed == 1 && !result.rich_rankings.empty()
+                && std::chrono::steady_clock::now() < deadline) {
+                const auto started = std::chrono::steady_clock::now();
+                const auto before = candidate.save();
+                const double before_score = evaluate_soft_score(problem, candidate.passenger_to_seat);
+                improve_rich_ordinary_vnd(candidate, result.rich_rankings, deadline, true, true);
+                const double after_score = evaluate_soft_score(problem, candidate.passenger_to_seat);
+                if (after_score > before_score + 1e-9
+                    && validate_complete_assignment(problem, candidate.passenger_to_seat) == 0)
+                    diagnostics.portfolio_vnd_improvement = after_score - before_score;
+                else candidate.restore(before);
+                diagnostics.portfolio_vnd_seconds = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - started).count();
+            }
             return MasterResult{candidate.save(), std::move(diagnostics)};
         }));
     }
@@ -241,7 +260,10 @@ void write_rich_restricted_diagnostics(std::ostream& output, const RichRestricte
         << ",\"rebuild_failures\":" << d.rebuild_failures << ",\"hard_invalid_candidates\":" << d.hard_invalid_candidates
         << ",\"nonimproving_candidates\":" << d.nonimproving_candidates << ",\"conditional_ssr_rows\":" << d.conditional_ssr_rows
         << ",\"accepted\":" << d.accepted << ",\"mip_start_supplied\":" << (d.mip_start_supplied ? "true" : "false")
-        << ",\"score_improvement\":" << d.score_improvement << ",\"seconds\":" << d.seconds << ",\"stopped_by_deadline\":" << (d.stopped_by_deadline ? "true" : "false");
+        << ",\"score_improvement\":" << d.score_improvement << ",\"seconds\":" << d.seconds
+        << ",\"portfolio_vnd_seconds\":" << d.portfolio_vnd_seconds
+        << ",\"portfolio_vnd_improvement\":" << d.portfolio_vnd_improvement
+        << ",\"stopped_by_deadline\":" << (d.stopped_by_deadline ? "true" : "false");
     if (!d.reason.empty()) output << ",\"reason\":\"" << d.reason << '"';
     if (d.branching_initialized) {
         output << ",\"local_branching\":{\"enabled\":" << (d.branching_enabled ? "true" : "false")

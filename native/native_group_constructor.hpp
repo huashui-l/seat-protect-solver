@@ -91,6 +91,8 @@ GroupConstructionResult construct_rich_m1(
     RichStageSchedule& schedule
 );
 
+bool seed_rich_fallback(const Problem& problem, GroupConstructionResult& result);
+
 void repair_rich_assignment(
     const Problem& problem, AssignmentState& state,
     const std::vector<std::vector<int>>& passenger_sorted_seats,

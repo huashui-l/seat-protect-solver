@@ -22,6 +22,7 @@ struct RichRestrictedDiagnostics {
     int hard_invalid_candidates = 0, nonimproving_candidates = 0, conditional_ssr_rows = 0, accepted = 0;
     int initial_radius = 0, radius_growth = 0, maximum_radius = 0;
     double score_improvement = 0.0, seconds = 0.0;
+    double portfolio_vnd_seconds = 0.0, portfolio_vnd_improvement = 0.0;
     std::string solver_status, reason;
     std::vector<int> radius_history;
     std::vector<RichRestrictedAccepted> accepted_attempts;

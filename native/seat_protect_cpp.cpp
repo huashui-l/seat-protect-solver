@@ -341,6 +341,7 @@ int main(int argc, char** argv) {
     }
     if (input_path.empty() || time_limit <= 0.0) return 2;
     try {
+        const auto solve_started = std::chrono::steady_clock::now();
         const full_cpp::Problem problem = full_cpp::load_problem(input_path, config_path);
         std::ofstream file;
         std::ostream* output = &std::cout;
@@ -349,7 +350,12 @@ int main(int argc, char** argv) {
             if (!file) return 2;
             output = &file;
         }
-        const auto solve_started = std::chrono::steady_clock::now();
+        double preparation_seconds = 0.0;
+        const auto remaining_time = [&]() {
+            preparation_seconds = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - solve_started).count();
+            return std::max(0.0, time_limit - preparation_seconds);
+        };
         std::ostringstream payload;
         const auto publish = [&](int status) {
             // Includes every search stage, final legality/score evaluation and serialization.
@@ -359,7 +365,8 @@ int main(int argc, char** argv) {
             const auto end = result_json.find_last_of('}');
             if (end == std::string::npos) throw std::runtime_error("missing solver result");
             std::ostringstream timing;
-            timing << std::setprecision(17) << ",\"solve_wall_seconds\":" << solve_seconds;
+            timing << std::setprecision(17) << ",\"solve_wall_seconds\":" << solve_seconds
+                << ",\"preparation_seconds\":" << preparation_seconds;
             result_json.insert(end, timing.str());
             *output << result_json;
             return status;
@@ -379,9 +386,9 @@ int main(int argc, char** argv) {
             const auto* algorithm = config.find("algorithm");
             const auto* enabled = algorithm ? algorithm->find("cabin_decomposition_enabled") : nullptr;
             if (cabins.size() > 1 && (!enabled || enabled->bool_or(true)))
-                return publish(solve_cabins(&payload, problem, config, input_path, config_path, time_limit, seed, construction_objective, cabins));
+                return publish(solve_cabins(&payload, problem, config, input_path, config_path, remaining_time(), seed, construction_objective, cabins));
         }
-        const auto result = full_cpp::solve_feasibility_mip(problem, time_limit, seed, construction_objective);
+        const auto result = full_cpp::solve_feasibility_mip(problem, remaining_time(), seed, construction_objective);
         return publish(write_result(&payload, problem, result, construction_objective));
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
