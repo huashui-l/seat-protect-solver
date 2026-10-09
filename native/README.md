@@ -126,6 +126,10 @@ non-improving polishing preserves the pre-polish assignment. The short route
 also reserves up to 0.1s for final sequential VND; pattern generation and master
 refinement stop earlier to preserve this time. Worker polishing time and score
 gain are reported separately in the selected master's diagnostics.
+After a Q0 fallback, pattern generation leaves at least half of its remaining
+search window, capped by the configured master tail budget, for recombination.
+This prevents late legal construction from leaving only enough time to build
+the master without solving it.
 Other profiles retain their configured branching behavior unless the portfolio
 is explicitly enabled.
 

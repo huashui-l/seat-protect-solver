@@ -211,7 +211,14 @@ FeasibilityResult solve_feasibility_mip(
                     const double pattern_started = elapsed();
                     auto pattern_window = schedule.begin("pattern_generation", pattern_started);
                     if (rich_fast) {
-                        pattern_window.deadline = std::min(pattern_window.deadline, master_deadline - 0.15);
+                        // A late Q0 fallback can consume the carry that normally
+                        // funds the master. Preserve half of the remaining
+                        // window (up to its configured tail) for recombination.
+                        const double master_reserve = group_result.fallback_reason == "rich_incomplete"
+                            ? std::max(0.15, std::min(problem.rich.restricted_pattern_mip_tail_budget,
+                                (master_deadline - pattern_started) * 0.5))
+                            : 0.15;
+                        pattern_window.deadline = std::min(pattern_window.deadline, master_deadline - master_reserve);
                         pattern_window.effective_budget = std::max(0.0, pattern_window.deadline - pattern_started);
                     }
                     generate_rich_patterns_m3(problem, at(pattern_window.deadline), group_result);

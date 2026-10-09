@@ -73,6 +73,12 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
                         self.assertTrue(cabin["rich_candidate_complete"])
                         self.assertGreaterEqual(cabin["native_score"], cabin["q0_score"] - 1e-8)
                         self.assertIn("fallback", cabin["rich_stage_timing"])
+                        pattern = cabin["rich_stage_timing"]["pattern_generation"]
+                        search = cabin["rich_search_deadline"]
+                        master_deadline = search - min(0.1, search * 0.05)
+                        reserve = min(profile["algorithm"]["restricted_pattern_mip_tail_budget"],
+                                      max(0.0, master_deadline - pattern["started"]) * 0.5)
+                        self.assertGreaterEqual(master_deadline - pattern["deadline"], reserve - 1e-8)
                     self.assertEqual(0, cabin["dfs_nodes"] + cabin["beam_nodes"])
                     self.assertEqual(0, cabin["from_scratch_dfs_nodes"] + cabin["from_scratch_beam_nodes"])
                     if "tail_exchange" not in cabin["rich_stage_timing"]:
