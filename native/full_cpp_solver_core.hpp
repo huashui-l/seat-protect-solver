@@ -404,6 +404,7 @@ struct RichStructuredDiagnostics {
     int groups_attempted = 0, groups_with_patterns = 0, patterns_generated = 0;
     int row_windows_attempted = 0, extreme_groups_attempted = 0, span_reducing_patterns = 0;
     long long dfs_nodes = 0;
+    int geometry_pool_patterns = 0;
     double seconds = 0.0;
     std::vector<RichGroupRepairMetric> repair_queue;
     std::map<std::string, int> tier_counts{{"rigid", 0}, {"relaxed", 0}, {"value_block", 0}, {"global_value_block", 0}, {"rebuilt", 0}};

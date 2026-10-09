@@ -374,13 +374,16 @@ RichStructuredDiagnostics generate_rich_structured_patterns(const Problem& probl
 }
 
 void write_rich_structured_diagnostics(std::ostream& output, const RichStructuredDiagnostics& stats) {
+    // Geometry belongs to a separate portfolio pool, not the original DFS counts.
     output << "{\"enabled\":" << (stats.enabled ? "true" : "false")
         << ",\"stopped_by_deadline\":" << (stats.stopped_by_deadline ? "true" : "false")
         << ",\"three_tier_active\":" << (stats.three_tier_active ? "true" : "false")
         << ",\"groups_attempted\":" << stats.groups_attempted << ",\"groups_with_patterns\":" << stats.groups_with_patterns
         << ",\"patterns_generated\":" << stats.patterns_generated << ",\"row_windows_attempted\":" << stats.row_windows_attempted
         << ",\"dfs_nodes\":" << stats.dfs_nodes << ",\"extreme_groups_attempted\":" << stats.extreme_groups_attempted
-        << ",\"span_reducing_patterns\":" << stats.span_reducing_patterns << ",\"seconds\":" << stats.seconds << ",\"tier_counts\":{";
+        << ",\"span_reducing_patterns\":" << stats.span_reducing_patterns << ",\"seconds\":" << stats.seconds;
+    if (stats.geometry_pool_patterns) output << ",\"geometry_pool_patterns\":" << stats.geometry_pool_patterns;
+    output << ",\"tier_counts\":{";
     bool first = true;
     for (const auto& entry : stats.tier_counts) { if (!first) output << ','; first = false; output << '"' << entry.first << "\":" << entry.second; }
     output << "},\"repair_queue\":"; write_rich_repair_queue(output, stats.repair_queue, 20); output << '}';

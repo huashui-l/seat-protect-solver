@@ -68,6 +68,7 @@ $SolverObjects = @(
     'native_rich_paired',
     'native_rich_vnd',
     'native_rich_pipeline',
+    'native_rich_geometry',
     'native_rich_protected_mip',
     'native_rich_restricted_mip',
     'native_rich_master_ssr',

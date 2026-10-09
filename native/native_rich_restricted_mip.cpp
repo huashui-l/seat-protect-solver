@@ -62,6 +62,20 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
             }
             return MasterResult{candidate.save(), std::move(diagnostics)};
         }));
+        if (problem.rich.enable_restricted_mip_portfolio && !result.rich_geometry_patterns.groups().empty())
+            alternatives.push_back(std::async(std::launch::async, [&]() {
+                auto candidate_problem = problem;
+                candidate_problem.rich.enable_pattern_local_branching = false;
+                AssignmentState candidate(problem); candidate.restore(result.rich_state);
+                auto expanded = result.rich_elite_store;
+                for (const auto& group : result.rich_geometry_patterns.groups())
+                    for (const auto& pattern : group.second)
+                        expanded.record_candidate(group.first, pattern, candidate, result.rich_conflict_diversity_active);
+                auto d = improve_rich_restricted_mip(candidate_problem, candidate, expanded, deadline,
+                    problem.rich.restricted_pattern_mip_workers);
+                d.portfolio_pool = "geometry";
+                return MasterResult{candidate.save(), std::move(d)};
+            }));
     }
     auto diagnostics = improve_rich_restricted_mip(problem, state, result.rich_elite_store, deadline);
     double best_score = evaluate_soft_score(problem, state.passenger_to_seat);
@@ -295,6 +309,7 @@ void write_rich_restricted_diagnostics(std::ostream& output, const RichRestricte
         << ",\"portfolio_vnd_improvement\":" << d.portfolio_vnd_improvement
         << ",\"stopped_by_deadline\":" << (d.stopped_by_deadline ? "true" : "false");
     if (!d.reason.empty()) output << ",\"reason\":\"" << d.reason << '"';
+    if (!d.portfolio_pool.empty()) output << ",\"portfolio_pool\":\"" << d.portfolio_pool << '"';
     if (d.branching_initialized) {
         output << ",\"local_branching\":{\"enabled\":" << (d.branching_enabled ? "true" : "false")
             << ",\"initial_radius\":" << d.initial_radius << ",\"radius_growth\":" << d.radius_growth << ",\"maximum_radius\":" << d.maximum_radius << ",\"radius_history\":[";

@@ -1,5 +1,6 @@
 #include "native_group_constructor.hpp"
 #include "native_feasibility_solver.hpp"
+#include "native_rich_geometry.hpp"
 
 #include <iomanip>
 #include <algorithm>
@@ -12,6 +13,36 @@ int main(int argc, char** argv) {
     try {
         const auto problem = full_cpp::load_problem(argv[1], argv[2]);
         const auto replay = native_json::parse_file(argv[3]);
+        if (const auto* geometry = replay.find("geometry")) {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(geometry->at("deadline_seconds").number));
+            const auto fixed = full_cpp::preprocess_fixed_seats(problem);
+            const auto orders = full_cpp::build_rich_geometry_orders(problem, fixed, deadline);
+            const int g = static_cast<int>(geometry->at("group_index").number);
+            const auto options = full_cpp::build_rich_placement_options(problem, g, fixed);
+            std::vector<full_cpp::RichTieredPattern> patterns;
+            full_cpp::generate_rich_geometry_patterns(problem, g, options, orders, {}, deadline, patterns);
+            std::cout << std::setprecision(17) << '[';
+            for (size_t i = 0; i < patterns.size(); ++i) {
+                if (i) std::cout << ',';
+                const auto& pattern = patterns[i].pattern;
+                std::cout << "{\"assignments\":[";
+                for (size_t j = 0; j < pattern.assignments.size(); ++j) {
+                    if (j) std::cout << ',';
+                    const auto& entry = pattern.assignments[j];
+                    std::cout << '[' << entry.first << ",\"" << problem.seats[entry.second].id << "\"]";
+                }
+                std::cout << "],\"blocked\":[";
+                for (size_t j = 0; j < pattern.blocked_by.size(); ++j) {
+                    if (j) std::cout << ',';
+                    const auto& entry = pattern.blocked_by[j];
+                    std::cout << "[\"" << problem.seats[entry.first].id << "\"," << entry.second << ']';
+                }
+                std::cout << "],\"master_cost\":" << pattern.master_cost << '}';
+            }
+            std::cout << "]\n";
+            return 0;
+        }
         if (const auto* assignment = replay.find("fallback_assignment")) {
             full_cpp::GroupConstructionResult result;
             if (const auto* initial = replay.find("construction")) {

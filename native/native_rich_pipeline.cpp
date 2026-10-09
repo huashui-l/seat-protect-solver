@@ -1,8 +1,10 @@
 #include "native_group_constructor.hpp"
 
 #include "native_feasibility_solver.hpp"
+#include "native_rich_geometry.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <future>
 #include <limits>
@@ -209,8 +211,7 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
     if (!diagnostics.rich_candidate_complete) return;
     AssignmentState state(problem);
     state.restore(diagnostics.rich_state);
-    diagnostics.rich_structured = generate_rich_structured_patterns(problem, state.passenger_to_seat, deadline,
-        [&](int g, const RichTieredPattern& candidate, double score, bool pinned) {
+    const auto record = [&](RichEliteStore& pool, int g, const RichTieredPattern& candidate, double score, bool pinned) {
             RichElitePattern pattern;
             pattern.local_score = score; pattern.source = "structured_" + candidate.source; pattern.pinned = pinned;
             for (const auto& entry : candidate.pattern.assignments)
@@ -219,9 +220,46 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
             for (const auto& entry : candidate.pattern.blocked_by)
                 blocked[problem.passengers[entry.second].hostnum].push_back(problem.seats[entry.first].id);
             pattern.blocked_by_host.assign(blocked.begin(), blocked.end());
-            diagnostics.rich_elite_store.record_candidate(problem.groups[g].id, std::move(pattern), state,
+            pool.record_candidate(problem.groups[g].id, std::move(pattern), state,
                 diagnostics.rich_conflict_diversity_active);
+    };
+    std::atomic<bool> stop_geometry{false};
+    std::future<RichEliteStore> geometry;
+    if (problem.rich.enable_structured_pattern_generation && problem.rich.enable_restricted_mip_portfolio
+        && problem.rich_stage_budgets.business_time_limit <= 5.0
+        && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.1) {
+        geometry = std::async(std::launch::async, [&]() {
+            RichEliteStore pool(problem.rich.elite_patterns_per_group);
+            const auto fixed = preprocess_fixed_seats(problem);
+            const auto orders = build_rich_geometry_orders(problem, fixed,
+                std::min(deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(40)));
+            const auto order = build_rich_structured_order(problem, state.passenger_to_seat);
+            for (int g : order.difficult_groups) {
+                if (stop_geometry.load() || std::chrono::steady_clock::now() >= deadline) break;
+                const auto options = build_rich_placement_options(problem, g, fixed);
+                std::vector<RichTieredPattern> patterns;
+                generate_rich_geometry_patterns(problem, g, options, orders, {},
+                    std::min(deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(30)), patterns);
+                for (const auto& candidate : patterns) {
+                    if (stop_geometry.load() || std::chrono::steady_clock::now() >= deadline) break;
+                    auto proposal = state.passenger_to_seat;
+                    for (const auto& entry : candidate.pattern.assignments) proposal[entry.first] = entry.second;
+                    record(pool, g, candidate, evaluate_rich_group_score(problem, proposal, g).total(), false);
+                }
+            }
+            return pool;
         });
+    }
+    diagnostics.rich_structured = generate_rich_structured_patterns(problem, state.passenger_to_seat, deadline,
+        [&](int g, const RichTieredPattern& candidate, double score, bool pinned) {
+            record(diagnostics.rich_elite_store, g, candidate, score, pinned);
+        });
+    stop_geometry.store(true);
+    if (geometry.valid()) {
+        diagnostics.rich_geometry_patterns = geometry.get();
+        for (const auto& group : diagnostics.rich_geometry_patterns.groups())
+            diagnostics.rich_structured.geometry_pool_patterns += static_cast<int>(group.second.size());
+    }
 }
 
 }  // namespace full_cpp
