@@ -69,8 +69,11 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
                 AssignmentState candidate(problem); candidate.restore(result.rich_state);
                 auto expanded = result.rich_elite_store;
                 for (const auto& group : result.rich_geometry_patterns.groups())
-                    for (const auto& pattern : group.second)
-                        expanded.record_candidate(group.first, pattern, candidate, result.rich_conflict_diversity_active);
+                    for (const auto& pattern : group.second) {
+                        if (pattern.source == "released_component_pricing")
+                            expanded.insert_relocation(group.first, pattern, [&]() { return pattern.local_score; });
+                        else expanded.record_candidate(group.first, pattern, candidate, result.rich_conflict_diversity_active);
+                    }
                 auto d = improve_rich_restricted_mip(candidate_problem, candidate, expanded, deadline,
                     problem.rich.restricted_pattern_mip_workers);
                 d.portfolio_pool = "geometry";

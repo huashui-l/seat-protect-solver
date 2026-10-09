@@ -224,6 +224,10 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
                 diagnostics.rich_conflict_diversity_active);
     };
     std::atomic<bool> stop_geometry{false};
+    using RelocationRequest = std::tuple<int, RichTieredPattern, double>;
+    std::promise<RelocationRequest> relocation_request;
+    auto pending_request = relocation_request.get_future();
+    bool request_selected = false;
     std::future<RichEliteStore> geometry;
     if (problem.rich.enable_structured_pattern_generation && problem.rich.enable_restricted_mip_portfolio
         && problem.rich_stage_budgets.business_time_limit <= 5.0
@@ -247,13 +251,69 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
                     record(pool, g, candidate, evaluate_rich_group_score(problem, proposal, g).total(), false);
                 }
             }
+            // Reuse a completed structured search instead of solving another
+            // group MIP. This is the existing sixth generation worker.
+            RelocationRequest request{-1, {}, 0.0};
+            if (pending_request.wait_until(deadline) == std::future_status::ready) request = pending_request.get();
+            const int g = std::get<0>(request);
+            const auto& candidate = std::get<1>(request);
+            const double score = std::get<2>(request);
+            if (g >= 0 && std::chrono::steady_clock::now() < deadline) {
+                record(pool, g, candidate, score, false);
+                std::set<int> requested;
+                for (const auto& entry : candidate.pattern.assignments) requested.insert(entry.second);
+                for (const auto& entry : candidate.pattern.blocked_by) requested.insert(entry.first);
+                std::set<int> owners;
+                for (int p : state.assignment_order) {
+                    bool conflict = requested.count(state.passenger_to_seat[p]) != 0;
+                    for (int seat : state.assigned_blocked[p]) conflict |= requested.count(seat) != 0;
+                    if (conflict && problem.passengers[p].group != g) owners.insert(problem.passengers[p].group);
+                }
+                const auto baby = build_rich_baby_costs(problem);
+                std::map<int, RichPricingCache> caches;
+                for (int owner : owners) {
+                    if (std::chrono::steady_clock::now() >= deadline) break;
+                    auto outside = requested;
+                    for (int p : state.assignment_order)
+                        if (problem.passengers[p].group != g && problem.passengers[p].group != owner) {
+                            outside.insert(state.passenger_to_seat[p]);
+                            outside.insert(state.assigned_blocked[p].begin(), state.assigned_blocked[p].end());
+                        }
+                    add_rich_dynamic_relocation_patterns(problem, state, owner, outside,
+                        deadline, fixed, baby, caches, pool);
+                }
+            }
             return pool;
         });
     }
+    int current_group = -1, best_group = -1;
+    double best_score = 0.0;
+    RichTieredPattern best_pattern;
+    const auto finish_group = [&]() {
+        if (!geometry.valid() || request_selected || best_group < 0) return;
+        relocation_request.set_value({best_group, best_pattern, best_score});
+        request_selected = true;
+    };
     diagnostics.rich_structured = generate_rich_structured_patterns(problem, state.passenger_to_seat, deadline,
         [&](int g, const RichTieredPattern& candidate, double score, bool pinned) {
             record(diagnostics.rich_elite_store, g, candidate, score, pinned);
+            // The generator serially merges all patterns for each group in
+            // priority order. Submit its best value-improving pattern only once
+            // that group's complete batch has arrived.
+            if (g != current_group) {
+                finish_group(); current_group = g; best_group = -1;
+                best_score = evaluate_rich_group_score(problem, state.passenger_to_seat, g).total();
+            }
+            if (!geometry.valid() || request_selected || score <= best_score + kTolerance) return;
+            double value_gain = 0.0;
+            for (const auto& entry : candidate.pattern.assignments)
+                value_gain += evaluate_rich_individual_score(problem, entry.first, entry.second).score_v
+                    - evaluate_rich_individual_score(problem, entry.first, state.passenger_to_seat[entry.first]).score_v;
+            if (value_gain <= kTolerance) return;
+            best_group = g; best_score = score; best_pattern = candidate;
         });
+    finish_group();
+    if (!request_selected) relocation_request.set_value({-1, {}, 0.0});
     stop_geometry.store(true);
     if (geometry.valid()) {
         diagnostics.rich_geometry_patterns = geometry.get();
