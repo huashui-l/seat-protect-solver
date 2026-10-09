@@ -184,6 +184,24 @@ class NativeRichPatternContextTests(unittest.TestCase):
                                   str(work / "replay.json")], capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stderr)
         actual = json.loads(run.stdout)
+        if restricted:
+            # Backend replacement permits different tied assignments and search traces.
+            # Keep the complete/legal, independent-score and frozen-quality contracts.
+            assignment = dict(zip(keys, actual["state"]["assignments"]))
+            violations, unassigned, _ = evaluator.count_hard_constraint_violations(
+                case["newSeatmapData"]["seats"], case["groupsData"], assignment, config)
+            self.assertEqual((violations, unassigned), (0, 0))
+            score = scorer.components(assignment)["total_soft_score"]
+            self.assertGreaterEqual(score + 1e-8, max(initial_score, final_score))
+            diagnostics = actual["diagnostics"]
+            self.assertEqual(diagnostics["backend"], "gurobi")
+            self.assertAlmostEqual(diagnostics["score_improvement"], score - initial_score, places=8)
+            self.assertLessEqual(diagnostics["attempts"], max(1, config["algorithm"].get("restricted_pattern_mip_attempts", 2)))
+            if stage:
+                self.assertAlmostEqual(actual["selected_score"], score, places=8)
+                self.assertEqual(actual["selected_count"], len(keys) if score > initial_score + 1e-9 else 0)
+            self.assertEqual(actual["elite"].keys(), {str(gid) for gid in elite})
+            return actual
         if stage:
             self.assertAlmostEqual(actual["selected_score"], max(initial_score, final_score), places=8)
             self.assertEqual(actual["selected_count"], len(keys) if final_score > initial_score + 1e-9 else 0)
@@ -199,41 +217,10 @@ class NativeRichPatternContextTests(unittest.TestCase):
         native_d = dict(actual["diagnostics"])
         native_d.pop("seconds"); expected.pop("seconds")
         self.assertAlmostEqual(native_d.pop("score_improvement"), expected.pop("score_improvement"), places=8)
-        if restricted:
-            # Frozen replay has no portfolio worker polishing. Verify that it
-            # remains inactive before comparing the original diagnostic schema.
-            self.assertFalse(config["algorithm"].get("enable_restricted_mip_portfolio", False))
-            self.assertEqual(native_d.pop("portfolio_vnd_seconds"), 0.0)
-            self.assertEqual(native_d.pop("portfolio_vnd_improvement"), 0.0)
-            # Protection-only switches now rebuild correctly; the frozen Python
-            # replay classified some nonimproving candidates as rebuild failures.
-            native_failures = native_d.pop("rebuild_failures")
-            expected_failures = expected.pop("rebuild_failures")
-            self.assertLessEqual(native_failures, expected_failures)
-            self.assertEqual(native_failures + native_d.pop("nonimproving_candidates"),
-                             expected_failures + expected.pop("nonimproving_candidates"))
-            if "local_branching" in native_d:
-                # Every active fixture captures the exact incumbent, including blocked seats.
-                # Duplicate assignments with alternate protection must not disable its start.
-                have_start = bool(config["algorithm"].get("enable_restricted_pattern_mip", True)
-                                  and duration > 0 and not empty_elite)
-                self.assertEqual(native_d["mip_start_supplied"], have_start)
-                expected["mip_start_supplied"] = have_start
-                branching = expected["local_branching"]
-                branching["enabled"] = (have_start and not any(
-                    p["source"] == "structured_global_value_block" for p in patterns)
-                    and config["algorithm"].get("enable_pattern_local_branching", True))
-                branching["radius_history"] = [min(len(groups), branching["maximum_radius"],
-                    branching["initial_radius"] + i * branching["radius_growth"])
-                    for i in range(native_d["attempts"])] if branching["enabled"] else []
-            self.assertEqual(len(native_d["accepted_attempts"]), len(expected["accepted_attempts"]))
-            for a, b in zip(native_d["accepted_attempts"], expected["accepted_attempts"]):
-                self.assertAlmostEqual(a.pop("score_improvement"), b.pop("score_improvement"), places=8)
-        else:
-            self.assertEqual(len(native_d["accepted_components"]), len(expected["accepted_components"]))
-            for a, b in zip(native_d["accepted_components"], expected["accepted_components"]):
-                a.pop("elapsed_seconds"); b.pop("elapsed_seconds")
-                self.assertAlmostEqual(a.pop("delta"), b.pop("delta"), places=8)
+        self.assertEqual(len(native_d["accepted_components"]), len(expected["accepted_components"]))
+        for a, b in zip(native_d["accepted_components"], expected["accepted_components"]):
+            a.pop("elapsed_seconds"); b.pop("elapsed_seconds")
+            self.assertAlmostEqual(a.pop("delta"), b.pop("delta"), places=8)
         self.assertEqual(native_d, json.loads(json.dumps(expected)))
         expected_elite = json.loads(json.dumps(expected_elite))
         self.assertEqual(actual["elite"].keys(), expected_elite.keys())
@@ -245,7 +232,7 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 self.assertEqual(a, b)
         return actual
 
-    def test_rich_restricted_master_matches_frozen_function(self):
+    def test_rich_restricted_master_preserves_frozen_fixture_quality(self):
         attempts = accepted = 0
         for case in self.cases[:11]:
             with self.subTest(case=case["id"]):
@@ -376,8 +363,29 @@ class NativeRichPatternContextTests(unittest.TestCase):
                     initial_override=[[0, "3B", "3A"], [1, "1B"]], extra_patterns=[
                         (20, [(1, "1B")], [(1, ["1A"])]), (10, [(1, "1D")], []), (10, [(1, "2A")], [])], restricted=True)
                 self.assertGreater(result["diagnostics"]["conditional_ssr_rows"], 0)
-                self.assertGreater(result["diagnostics"]["rebuild_failures"], 0)
+                if not fixed: self.assertEqual(result["diagnostics"]["rebuild_failures"], 0)
                 if fixed: self.assertGreater(result["diagnostics"]["hard_invalid_candidates"], 0)
+
+    def test_restricted_master_enforces_three_group_conditional_ssr(self):
+        # The flag belongs to TEST_A; the duplicate TEST_B passengers are in two
+        # other groups. Pairwise conflicts with the flagged group miss this case.
+        for rule in ("sameRowNoOtherSSR", "sameSubRowNoOtherSSR", None):
+            with self.subTest(rule=rule):
+                case = self.synthetic([
+                    (20, {"ssr": "TEST_A", "oldSeat": {"seatNum": "2A", "seatValue": ""},
+                          "mandatoryRule": {rule: "Y"} if rule else {}}),
+                    (10, {"ssr": "TEST_B", "oldSeat": {"seatNum": "2B", "seatValue": ""}}),
+                    (30, {"ssr": "TEST_B", "oldSeat": {"seatNum": "2C", "seatValue": ""}}),
+                ])
+                result = self.protected_replay(case, {
+                    "enable_pattern_local_branching": False, "restricted_pattern_mip_attempts": 4},
+                    initial_override=[[0, "2A"], [1, "3B"], [2, "3C"]],
+                    extra_patterns=[(10, [(1, "2B")], []), (30, [(1, "2C")], [])], restricted=True)
+                seated = result["state"]["assignments"]
+                self.assertEqual(sum((seated[1] == "2B", seated[2] == "2C")), 1 if rule else 2)
+                self.assertEqual(result["diagnostics"]["rebuild_failures"], 0)
+                self.assertGreater(result["diagnostics"]["score_improvement"], 0)
+                if rule: self.assertGreater(result["diagnostics"]["conditional_ssr_rows"], 0)
 
     def test_production_protected_and_special_wrappers_match_frozen_pass_loop(self):
         for case in self.cases[:11]:

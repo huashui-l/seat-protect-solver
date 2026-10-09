@@ -225,8 +225,8 @@ class NativeRichLnsTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertEqual(json.loads(run.stdout), [{}])
 
-            # The same failing model must not discard a complete incumbent in
-            # the restricted master either. Reuse the public presolve fixture.
+            # The Gurobi restricted master must also preserve the incumbent
+            # when this public pattern pool is infeasible.
             config["algorithm"]["enable_pattern_local_branching"] = False
             (work / "config.json").write_text(json.dumps(config), encoding="utf-8")
             patterns = [dict(
@@ -247,8 +247,9 @@ class NativeRichLnsTests(unittest.TestCase):
         self.assertEqual(result["state"]["assignments"], seats)
         self.assertEqual(result["diagnostics"]["accepted"], 0)
         self.assertEqual(result["diagnostics"]["score_improvement"], 0.0)
-        self.assertEqual(result["diagnostics"]["reason"], "solver_error")
-        self.assertEqual(result["diagnostics"]["solver_status"], "Solve error")
+        self.assertEqual(result["diagnostics"]["backend"], "gurobi")
+        self.assertEqual(result["diagnostics"]["reason"], "no_integer_solution")
+        self.assertEqual(result["diagnostics"]["solver_status"], "Infeasible")
 
     def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None, options_mode=False):
         config = copy.deepcopy(self.config)

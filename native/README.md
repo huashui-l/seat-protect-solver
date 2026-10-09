@@ -5,7 +5,7 @@ entry points. Historical frontier C++/GNN research status is preserved under
 [`docs/research-status/`](../docs/research-status/frontier-cpp-gnn-roadmap.md).
 
 The production build links only the raw JSON solver sources listed below.
-`build_native_solver_pipeline.ps1 -HighsRoot <path>` builds this solver; add
+`build_native_solver_pipeline.ps1 -HighsRoot <path> -GurobiRoot <path>` builds this solver; add
 `-IncludeTools` to build differential probes and historical pool benchmarks.
 Those tools are separate executables and are not linked into the solver.
 
@@ -31,7 +31,8 @@ The raw JSON production CLI consists of one current implementation per module:
 - `native_rich_vnd.cpp` (VND neighborhoods)
 - `native_rich_pipeline.cpp` (Rich construction/repair/VND stage orchestration)
 - `native_rich_protected_mip.cpp` (protected/priority component MIP)
-- `native_rich_restricted_mip.cpp` (elite-pool restricted MIP and local branching)
+- `native_rich_restricted_mip.cpp` (Gurobi elite-pool restricted MIP and local branching)
+- `native_rich_master_ssr.cpp/.hpp` (conditional row/subrow SSR constraints for the pattern master)
 - `native_rich_lns.cpp` (LNS component search and local MIP)
 - `native_rich_special_pricing.cpp` (special dual-pricing LP and pattern capture)
 - `native_json.hpp` (JSON parsing)
@@ -118,7 +119,11 @@ The last open master task tries an expanded pool containing these alternatives,
 while the other tasks retain the original Q0/VND pool.
 Successful construction retains its existing pattern-capture behavior.
 All subsequent replacements still require a strict score improvement.
-If HiGHS fails while solving the optional restricted MIP, the stage keeps the
+The restricted master models conditional row/subrow SSR activation explicitly,
+including conflicts involving three different groups. Gurobi environment startup,
+model construction, solution extraction and cleanup all consume the same deadline.
+Diagnostics identify the backend as `gurobi`.
+If Gurobi fails while solving the optional restricted MIP, the stage keeps the
 best validated assignment and reports `reason=solver_error`; model construction
 errors still fail explicitly.
 
@@ -272,13 +277,16 @@ the frozen CG integer result and contributes a negative gap.
 ## Build
 
 Windows x64, PowerShell, Visual Studio C++ tools, and an externally obtained
-HiGHS 1.15.1 installation are required. No toolchain or prebuilt binary is
+HiGHS 1.15.1 SDK and a licensed Gurobi 13.0 installation are required.
+Set `GRB_LICENSE_FILE` if the license is outside Gurobi's standard search paths.
+No toolchain, license or prebuilt binary is
 stored in this repository.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File `
   native/build_native_solver_pipeline.ps1 `
   -HighsRoot $env:HIGHS_ROOT `
+  -GurobiRoot $env:GUROBI_HOME `
   -OutputDir build/native
 ```
 

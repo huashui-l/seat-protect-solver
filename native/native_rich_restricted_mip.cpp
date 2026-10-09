@@ -2,7 +2,7 @@
 
 #include "native_group_constructor.hpp"
 
-#include "interfaces/highs_c_api.h"
+#include "native_rich_master_ssr.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -99,23 +99,34 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
         if (!pattern.blocked_seats.empty()) ++d.protected_resource_patterns;
     }
     if (!d.enabled || started >= deadline) { d.stopped_by_deadline = started >= deadline; d.seconds = elapsed(); return d; }
-    std::unique_ptr<void, decltype(&Highs_destroy)> solver(Highs_create(), Highs_destroy);
-    void* highs = solver.get();
-    const auto check = [](HighsInt status, const char* operation = "model construction") {
-        if (status == kHighsStatusError) throw std::runtime_error(std::string("Rich restricted MIP API error: ") + operation);
+    const auto check = [](int code, const char* operation = "model construction") {
+        if (code) throw std::runtime_error(std::string("Gurobi Rich restricted MIP API error: ")
+            + operation + " (" + std::to_string(code) + ")");
     };
-    check(Highs_setBoolOptionValue(highs, "output_flag", 0));
-    check(Highs_setIntOptionValue(highs, "threads", 1));
-    check(Highs_setIntOptionValue(highs, "random_seed", seed));
-    check(Highs_setDoubleOptionValue(highs, "mip_rel_gap", 0.0));
+    GRBenv* raw_env = nullptr;
+    const int env_status = GRBemptyenv(&raw_env);
+    std::unique_ptr<GRBenv, decltype(&GRBfreeenv)> environment(raw_env, GRBfreeenv);
+    check(env_status, "GRBemptyenv");
+    check(GRBsetintparam(raw_env, GRB_INT_PAR_OUTPUTFLAG, 0));
+    check(GRBsetintparam(raw_env, GRB_INT_PAR_THREADS, 1));
+    check(GRBstartenv(raw_env), "GRBstartenv");
+    GRBmodel* raw_model = nullptr;
+    const int model_status = GRBnewmodel(raw_env, &raw_model, "rich_pattern_master", 0, nullptr, nullptr, nullptr, nullptr, nullptr);
+    std::unique_ptr<GRBmodel, decltype(&GRBfreemodel)> solver(raw_model, GRBfreemodel);
+    check(model_status, "GRBnewmodel");
+    GRBmodel* model = solver.get();
+    GRBenv* solver_env = GRBgetenv(model);
+    check(GRBsetintparam(solver_env, GRB_INT_PAR_SEED, seed));
+    check(GRBsetdblparam(solver_env, GRB_DBL_PAR_MIPGAP, 0.0));
     std::map<int, int> groups;
     for (size_t g = 0; g < problem.groups.size(); ++g) groups[problem.groups[g].id] = static_cast<int>(g);
-    std::map<int, HighsInt> group_rows;
-    std::map<std::string, HighsInt> seat_rows;
-    HighsInt row = 0;
-    for (const auto& group : groups) { group_rows[group.first] = row++; check(Highs_addRow(highs, 1.0, 1.0, 0, nullptr, nullptr)); }
+    std::map<int, int> group_rows;
+    std::map<std::string, int> seat_rows;
+    int row = 0;
+    for (const auto& group : groups) { group_rows[group.first] = row++; check(GRBaddconstr(model, 0, nullptr, nullptr, GRB_EQUAL, 1.0, nullptr)); }
     for (const auto& seat : problem.seats) seat_rows[seat.id] = 0;
-    for (auto& seat : seat_rows) { seat.second = row++; check(Highs_addRow(highs, -Highs_getInfinity(highs), 1.0, 0, nullptr, nullptr)); }
+    for (auto& seat : seat_rows) { seat.second = row++; check(GRBaddconstr(model, 0, nullptr, nullptr, GRB_LESS_EQUAL, 1.0, nullptr)); }
+    check(GRBupdatemodel(model));
     const auto signature = [&](int g) {
         std::vector<std::pair<int, std::string>> result;
         for (int p : problem.groups[g].passengers) result.emplace_back(problem.passengers[p].hostnum,
@@ -131,7 +142,7 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
         return resources;
     };
     std::vector<std::pair<int, const RichElitePattern*>> columns;
-    std::vector<HighsInt> incumbent;
+    std::vector<int> incumbent;
     bool global_value_block = false;
     for (const auto& group : elite.groups()) for (const auto& pattern : group.second)
         global_value_block |= pattern.source == "structured_global_value_block";
@@ -147,21 +158,24 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             for (const auto& seat : pattern.seat_resources)
                 if (!resources.insert(seat).second || !seat_rows.count(seat)) valid = false;
             if (!valid) continue;
-            std::vector<HighsInt> indexes{group_rows.at(group.first)};
+            std::vector<int> indexes{group_rows.at(group.first)};
             for (const auto& seat : pattern.seat_resources) indexes.push_back(seat_rows.at(seat));
             std::vector<double> values(indexes.size(), 1.0);
-            const auto column = static_cast<HighsInt>(columns.size());
-            check(Highs_addCol(highs, -pattern.local_score, 0.0, 1.0, static_cast<HighsInt>(indexes.size()), indexes.data(), values.data()));
-            check(Highs_changeColIntegrality(highs, column, kHighsVarTypeInteger));
+            const auto column = static_cast<int>(columns.size());
+            check(GRBaddvar(model, static_cast<int>(indexes.size()), indexes.data(), values.data(),
+                -pattern.local_score, 0.0, 1.0, GRB_BINARY, nullptr));
             columns.emplace_back(group.first, &pattern);
             if (pattern.assignments == signature(group.second)) {
                 const bool already_added = std::any_of(incumbent.begin(), incumbent.end(),
-                    [&](HighsInt index) { return columns[index].first == group.first; });
+                    [&](int index) { return columns[index].first == group.first; });
                 if (!already_added && resources == current_resources) incumbent.push_back(column);
             }
         }
     }
     if (columns.empty()) { d.reason = "no_usable_patterns"; d.seconds = elapsed(); return d; }
+    check(GRBupdatemodel(model));
+    d.conditional_ssr_rows = add_rich_master_ssr_constraints(model, problem, columns);
+    check(GRBgetintattr(model, GRB_INT_ATTR_NUMCONSTRS, &row));
     d.usable_columns = static_cast<int>(columns.size());
     d.branching_initialized = true;
     d.branching_enabled = problem.rich.enable_pattern_local_branching && incumbent.size() == groups.size() && !global_value_block;
@@ -170,17 +184,19 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
     const int configured_radius = problem.rich.pattern_local_branching_max_radius == std::numeric_limits<int>::max()
         ? static_cast<int>(groups.size()) : problem.rich.pattern_local_branching_max_radius;
     d.maximum_radius = std::max(d.initial_radius, configured_radius);
-    HighsInt branching_row = -1;
+    int branching_row = -1;
     if (d.branching_enabled) {
         branching_row = row++;
         std::vector<double> values(incumbent.size(), 1.0);
-        check(Highs_addRow(highs, static_cast<double>(groups.size() - std::min(static_cast<size_t>(d.initial_radius), groups.size())),
-            Highs_getInfinity(highs), static_cast<HighsInt>(incumbent.size()), incumbent.data(), values.data()));
+        check(GRBaddconstr(model, static_cast<int>(incumbent.size()), incumbent.data(), values.data(), GRB_GREATER_EQUAL,
+            static_cast<double>(groups.size() - std::min(static_cast<size_t>(d.initial_radius), groups.size())), nullptr));
     }
+    check(GRBupdatemodel(model));
     if (incumbent.size() == groups.size()) {
         std::vector<double> values(columns.size(), 0.0);
-        for (HighsInt column : incumbent) values[column] = 1.0;
-        d.mip_start_supplied = Highs_setSolution(highs, values.data(), nullptr, nullptr, nullptr) == kHighsStatusOk;
+        for (int column : incumbent) values[column] = 1.0;
+        check(GRBsetdblattrarray(model, GRB_DBL_ATTR_START, 0, static_cast<int>(values.size()), values.data()), "MIP start");
+        d.mip_start_supplied = true;
     }
     const double initial_score = evaluate_rich_group_score(problem, state.passenger_to_seat, -1).total();
     double best_score = initial_score;
@@ -196,33 +212,34 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
         int radius = -1;
         if (branching_row >= 0) {
             radius = std::min({static_cast<int>(groups.size()), d.maximum_radius, d.initial_radius + attempt * d.radius_growth});
-            check(Highs_changeRowBounds(highs, branching_row, static_cast<double>(groups.size()) - radius, Highs_getInfinity(highs)));
+            check(GRBsetdblattrelement(model, GRB_DBL_ATTR_RHS, branching_row, static_cast<double>(groups.size()) - radius));
             d.radius_history.push_back(radius);
         }
-        // HiGHS returns after postsolve; leave time for extraction and legality checks.
+        // Leave time for extraction and independent native legality checks.
         const double solve_remaining = remaining
             - (problem.rich_stage_budgets.business_time_limit <= 5.0 ? 0.05 : 0.0);
         if (solve_remaining <= 0.01) break;
-        // HiGHS otherwise compares the new limit against cumulative run time.
-        check(Highs_zeroAllClocks(highs));
-        check(Highs_setDoubleOptionValue(highs, "time_limit", solve_remaining));
+        check(GRBsetdblparam(solver_env, GRB_DBL_PAR_TIMELIMIT, solve_remaining));
         // This is an optional improvement stage. A failed solve must leave
         // the best validated assignment intact, including earlier attempts.
-        if (Highs_run(highs) == kHighsStatusError) {
+        if (GRBoptimize(model) != 0) {
             d.solver_status = "Solve error";
             d.reason = "solver_error";
             break;
         }
-        const char* names[] = {"Not Set", "Load error", "Model error", "Presolve error", "Solve error", "Postsolve error", "Empty", "Optimal",
-            "Infeasible", "Primal infeasible or unbounded", "Unbounded", "Bound on objective reached", "Target for objective reached", "Time limit reached",
-            "Iteration limit reached", "Unknown", "Solution limit reached", "Interrupted by user", "Memory limit reached", "Interrupted by HiGHS"};
-        const auto status = Highs_getModelStatus(highs);
-        d.solver_status = status >= 0 && status < 20 ? names[status] : "Unknown";
-        std::vector<double> solution(columns.size()); check(Highs_getSolution(highs, solution.data(), nullptr, nullptr, nullptr), "Highs_getSolution");
-        std::vector<HighsInt> selected;
+        int status = 0, solution_count = 0;
+        check(GRBgetintattr(model, GRB_INT_ATTR_STATUS, &status));
+        check(GRBgetintattr(model, GRB_INT_ATTR_SOLCOUNT, &solution_count));
+        d.solver_status = status == GRB_OPTIMAL ? "Optimal"
+            : status == GRB_INFEASIBLE ? "Infeasible"
+            : status == GRB_TIME_LIMIT ? "Time limit reached" : "Status " + std::to_string(status);
+        if (solution_count == 0) { d.reason = "no_integer_solution"; break; }
+        std::vector<double> solution(columns.size());
+        check(GRBgetdblattrarray(model, GRB_DBL_ATTR_X, 0, static_cast<int>(solution.size()), solution.data()), "solution extraction");
+        std::vector<int> selected;
         std::map<int, RichElitePattern> choices, changed;
         for (size_t i = 0; i < columns.size(); ++i) if (solution[i] > .5) {
-            selected.push_back(static_cast<HighsInt>(i)); choices[columns[i].first] = *columns[i].second;
+            selected.push_back(static_cast<int>(i)); choices[columns[i].first] = *columns[i].second;
         }
         if (selected.empty()) break;
         ++d.attempts;
@@ -251,21 +268,21 @@ RichRestrictedDiagnostics improve_rich_restricted_mip(const Problem& problem, As
             for (size_t a = 0; a < selected.size(); ++a) for (size_t b = a + 1; b < selected.size(); ++b) {
                 const auto& left = columns[selected[a]]; const auto& right = columns[selected[b]];
                 if (left.first == right.first || !rich_patterns_have_conditional_ssr_conflict(problem, left.first, *left.second, right.first, *right.second)) continue;
-                const HighsInt indexes[] = {selected[a], selected[b]}; const double values[] = {1.0, 1.0};
-                check(Highs_addRow(highs, -Highs_getInfinity(highs), 1.0, 2, indexes, values)); ++d.conditional_ssr_rows;
+                int indexes[] = {selected[a], selected[b]}; double values[] = {1.0, 1.0};
+                check(GRBaddconstr(model, 2, indexes, values, GRB_LESS_EQUAL, 1.0, nullptr)); ++d.conditional_ssr_rows;
             }
         }
         if (!accepted) ++d.invalid_candidates;
         std::vector<double> values(selected.size(), 1.0);
-        check(Highs_addRow(highs, -Highs_getInfinity(highs), static_cast<double>(selected.size()) - 1.0,
-            static_cast<HighsInt>(selected.size()), selected.data(), values.data()));
+        check(GRBaddconstr(model, static_cast<int>(selected.size()), selected.data(), values.data(),
+            GRB_LESS_EQUAL, static_cast<double>(selected.size()) - 1.0, nullptr));
     }
     d.score_improvement = best_score - initial_score; d.seconds = elapsed(); d.stopped_by_deadline = Clock::now() >= deadline;
     return d;
 }
 
 void write_rich_restricted_diagnostics(std::ostream& output, const RichRestrictedDiagnostics& d) {
-    output << "{\"enabled\":" << (d.enabled ? "true" : "false") << ",\"patterns\":" << d.patterns
+    output << "{\"backend\":\"gurobi\",\"enabled\":" << (d.enabled ? "true" : "false") << ",\"patterns\":" << d.patterns
         << ",\"resource_complete_patterns\":" << d.resource_complete_patterns << ",\"protected_resource_patterns\":" << d.protected_resource_patterns
         << ",\"solver_status\":";
     if (d.solver_status.empty()) output << "null"; else output << '"' << d.solver_status << '"';

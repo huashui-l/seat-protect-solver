@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$HighsRoot,
+    [Parameter(Mandatory = $true)]
+    [string]$GurobiRoot,
     [string]$OutputDir = "",
     [string]$Vswhere = "",
     [switch]$IncludeTools
@@ -9,6 +11,10 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $HighsRoot = (Resolve-Path $HighsRoot).Path
+$GurobiRoot = (Resolve-Path $GurobiRoot).Path
+$GurobiInclude = Join-Path $GurobiRoot "include"
+$GurobiLibrary = Join-Path $GurobiRoot "lib\gurobi130.lib"
+if (-not (Test-Path -LiteralPath $GurobiLibrary)) { throw "Gurobi 13 C library was not found" }
 if (-not $OutputDir) {
     $OutputDir = Join-Path $ProjectRoot "build\native"
 }
@@ -36,13 +42,13 @@ $Commands = [System.Collections.Generic.List[string]]::new()
 $Commands.Add(('call "{0}" -arch=x64 -host_arch=x64 >nul' -f $DevCmd))
 function Add-Compile([string]$Name, [string]$Source = "", [string]$Define = "") {
     if (-not $Source) { $Source = $Name }
-    $Commands.Add(('cl /nologo /O2 /EHsc /W4 /std:c++17 /c {0} /I"{1}" /I"{2}" /I"{5}" /Fo"{3}\{4}.obj" "{5}\{6}.cpp"' -f
-        $Define, $Include, $HighsInclude, $OutputDir, $Name, $PSScriptRoot, $Source))
+    $Commands.Add(('cl /nologo /O2 /EHsc /W4 /std:c++17 /c {0} /I"{7}" /I"{1}" /I"{2}" /I"{5}" /Fo"{3}\{4}.obj" "{5}\{6}.cpp"' -f
+        $Define, $Include, $HighsInclude, $OutputDir, $Name, $PSScriptRoot, $Source, $GurobiInclude))
 }
 function Add-Link([string]$Name, [string[]]$Objects) {
     $Inputs = ($Objects | ForEach-Object { '"{0}\{1}.obj"' -f $OutputDir, $_ }) -join ' '
-    $Commands.Add(('link /nologo {0} /LIBPATH:"{1}" highs.lib /OUT:"{2}\{3}.exe"' -f
-        $Inputs, $Library, $OutputDir, $Name))
+    $Commands.Add(('link /nologo {0} /LIBPATH:"{1}" highs.lib "{4}" /OUT:"{2}\{3}.exe"' -f
+        $Inputs, $Library, $OutputDir, $Name, $GurobiLibrary))
 }
 $SolverObjects = @(
     'full_cpp_solver_core',
@@ -64,6 +70,7 @@ $SolverObjects = @(
     'native_rich_pipeline',
     'native_rich_protected_mip',
     'native_rich_restricted_mip',
+    'native_rich_master_ssr',
     'native_rich_lns',
     'native_rich_special_pricing'
 )
@@ -106,4 +113,5 @@ try {
     Remove-Item -LiteralPath $BuildScript
 }
 Copy-Item -LiteralPath (Join-Path $HighsRoot "bin\highs.dll") -Destination (Join-Path $OutputDir "highs.dll") -Force
+Copy-Item -LiteralPath (Join-Path $GurobiRoot "bin\gurobi130.dll") -Destination (Join-Path $OutputDir "gurobi130.dll") -Force
 Write-Host "built=$OutputDir\seat_protect_cpp.exe include_tools=$IncludeTools highs=$HighsRoot"
