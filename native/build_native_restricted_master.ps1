@@ -27,7 +27,7 @@ if (-not $VsInstall) {
     throw "Visual Studio C++ x64 tools were not found"
 }
 $DevCmd = Join-Path $VsInstall "Common7\Tools\VsDevCmd.bat"
-$Source = Join-Path $PSScriptRoot "native_restricted_master.cpp"
+$Source = Join-Path $PSScriptRoot "tools\legacy_pool\native_restricted_master.cpp"
 $Output = Join-Path $OutputDir "native_restricted_master.exe"
 $Object = Join-Path $OutputDir "native_restricted_master.obj"
 $Include = Join-Path $HighsRoot "include"

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from src import allocation_evaluator as evaluator
-from src import exact_column_generation as exact
+from archive.legacy_column_generation import exact_column_generation as exact
 from tests.general_validation_case_factory import materialize_cases
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from src import heuristic_seat_allocator as rich
 from src import allocation_evaluator as evaluator
-from src import exact_column_generation as exact
+from archive.legacy_column_generation import exact_column_generation as exact
 from tests import test_native_rich_repair as repair_tests
 from tests.test_native_rich_pipeline import construction_prefix
 from tests.test_native_rich_elite import python_capture_namespace
@@ -564,7 +564,7 @@ class NativeRichStructuredTests(unittest.TestCase):
         self.assertEqual(coverage, {"positive_upper", "negative_pairs", "flagged", "protected"})
 
     def test_pricing_symmetry_matches_frozen_dfs(self):
-        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        tree = ast.parse(Path(exact.__file__).read_text(encoding="utf-8"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
         start = next(i for i, n in enumerate(function.body) if isinstance(n, ast.FunctionDef) and n.name == "physical_option_key")
         stop = next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)
@@ -652,7 +652,7 @@ class NativeRichStructuredTests(unittest.TestCase):
         self.assertEqual(coverage, {"classes", "merged_raw_buckets", "pruned"})
 
     def test_pricing_resource_flag_and_caregiver_workspace_match_python(self):
-        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        tree = ast.parse(Path(exact.__file__).read_text(encoding="utf-8"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
         def index(name):
             return next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)
@@ -776,7 +776,7 @@ class NativeRichStructuredTests(unittest.TestCase):
                                    "impossible_care", "satisfied_care", "pending_care", "care_words"})
 
     def test_pricing_rectangle_bounds_match_frozen_dfs(self):
-        tree = ast.parse((ROOT / "src/exact_column_generation.py").read_text(encoding="utf-8"))
+        tree = ast.parse(Path(exact.__file__).read_text(encoding="utf-8"))
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_price_group_exact_dfs")
         def index(name):
             return next(i for i, n in enumerate(function.body) if isinstance(n, ast.Assign)

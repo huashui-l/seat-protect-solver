@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from src import allocation_evaluator as evaluator
-from src import exact_column_generation as exact
+from archive.legacy_column_generation import exact_column_generation as exact
 from tests import test_native_rich_repair as repair_tests
 
 

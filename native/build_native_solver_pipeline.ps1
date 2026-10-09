@@ -36,7 +36,7 @@ $Commands = [System.Collections.Generic.List[string]]::new()
 $Commands.Add(('call "{0}" -arch=x64 -host_arch=x64 >nul' -f $DevCmd))
 function Add-Compile([string]$Name, [string]$Source = "", [string]$Define = "") {
     if (-not $Source) { $Source = $Name }
-    $Commands.Add(('cl /nologo /O2 /EHsc /W4 /std:c++17 /c {0} /I"{1}" /I"{2}" /Fo"{3}\{4}.obj" "{5}\{6}.cpp"' -f
+    $Commands.Add(('cl /nologo /O2 /EHsc /W4 /std:c++17 /c {0} /I"{1}" /I"{2}" /I"{5}" /Fo"{3}\{4}.obj" "{5}\{6}.cpp"' -f
         $Define, $Include, $HighsInclude, $OutputDir, $Name, $PSScriptRoot, $Source))
 }
 function Add-Link([string]$Name, [string[]]$Objects) {
@@ -50,11 +50,22 @@ $SolverObjects = @(
     'full_cpp_solver_core_scoring',
     'full_cpp_solver_core_rich_repair',
     'full_cpp_solver_core_rich_patterns',
+    'full_cpp_solver_core_pricing',
     'full_cpp_solver_core_state',
+    'full_cpp_solver_core_schedule',
+    'full_cpp_solver_core_candidates',
+    'full_cpp_solver_core_lns',
     'full_cpp_solver_core_elite',
     'native_feasibility_solver',
     'native_group_constructor',
-    'native_rich_construction'
+    'native_rich_construction',
+    'native_rich_paired',
+    'native_rich_vnd',
+    'native_rich_pipeline',
+    'native_rich_protected_mip',
+    'native_rich_restricted_mip',
+    'native_rich_lns',
+    'native_rich_special_pricing'
 )
 foreach ($Object in $SolverObjects) { Add-Compile $Object }
 Add-Compile 'seat_protect_cpp'
@@ -63,22 +74,22 @@ Add-Link 'seat_protect_cpp' ($SolverObjects + 'seat_protect_cpp')
 # Probes and historical pool benchmarks are separate executables, never solver dependencies.
 if ($IncludeTools) {
     foreach ($Probe in @('native_full_core_probe', 'native_state_replay')) {
-        Add-Compile $Probe
+        Add-Compile $Probe "tools\probes\$Probe"
         Add-Link $Probe ($SolverObjects + $Probe)
     }
-    Add-Compile 'native_rich_repair_probe'
+    Add-Compile 'native_rich_repair_probe' 'tools\probes\native_rich_repair_probe'
     Add-Link 'native_rich_repair_probe' ($SolverObjects + 'native_rich_repair_probe')
-    Add-Compile 'native_pattern_kernel_library' 'native_pattern_kernel' '/DNATIVE_PATTERN_KERNEL_LIBRARY'
-    Add-Compile 'native_restricted_master_library' 'native_restricted_master' '/DNATIVE_RESTRICTED_MASTER_LIBRARY'
+    Add-Compile 'native_pattern_kernel_library' 'tools\legacy_pool\native_pattern_kernel' '/DNATIVE_PATTERN_KERNEL_LIBRARY'
+    Add-Compile 'native_restricted_master_library' 'tools\legacy_pool\native_restricted_master' '/DNATIVE_RESTRICTED_MASTER_LIBRARY'
     foreach ($Pipeline in @('native_solver_pipeline', 'native_monotonic_pipeline')) {
-        Add-Compile $Pipeline
+        Add-Compile $Pipeline "tools\legacy_pool\$Pipeline"
         Add-Link $Pipeline @('native_pattern_kernel_library', 'native_restricted_master_library', $Pipeline)
     }
-    Add-Compile 'native_master_benchmark'
+    Add-Compile 'native_master_benchmark' 'tools\legacy_pool\native_master_benchmark'
     Add-Link 'native_master_benchmark' @('native_restricted_master_library', 'native_master_benchmark')
-    Add-Compile 'native_pool_exporter'
+    Add-Compile 'native_pool_exporter' 'tools\legacy_pool\native_pool_exporter'
     Add-Link 'native_pool_exporter' @('native_pattern_kernel_library', 'native_pool_exporter')
-    Add-Compile 'native_pattern_kernel'
+    Add-Compile 'native_pattern_kernel' 'tools\legacy_pool\native_pattern_kernel'
     Add-Link 'native_pattern_kernel' @('native_pattern_kernel')
 }
 $BuildScript = Join-Path $OutputDir "compile_native.cmd"

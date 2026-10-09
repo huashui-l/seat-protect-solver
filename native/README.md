@@ -9,30 +9,50 @@ The production build links only the raw JSON solver sources listed below.
 `-IncludeTools` to build differential probes and historical pool benchmarks.
 Those tools are separate executables and are not linked into the solver.
 
-The raw JSON feasibility CLI consists of:
+The raw JSON production CLI consists of one current implementation per module:
 
-- `seat_protect_cpp.cpp`
+- `seat_protect_cpp.cpp` (CLI and result serialization)
 - `full_cpp_solver_core.cpp/.hpp` (shared input/topology helpers and public types)
-- `full_cpp_solver_core_internal.hpp` / `full_cpp_solver_core_sections.hpp` (shared section declarations and compile includes)
-- `full_cpp_solver_core_input.inc` (case/config normalization)
-- `full_cpp_solver_core_input.cpp` (input translation unit)
-- `full_cpp_solver_core_scoring.inc` (individual, group, and full scoring)
-- `full_cpp_solver_core_scoring.cpp` (scoring translation unit)
-- `full_cpp_solver_core_rich_repair.inc` (repair metrics and fixed-seat preprocessing)
-- `full_cpp_solver_core_rich_repair.cpp` (repair translation unit)
-- `full_cpp_solver_core_rich_patterns.inc` (placement, structured patterns, and pricing)
-- `full_cpp_solver_core_rich_patterns.cpp` (patterns/pricing translation unit)
-- `full_cpp_solver_core_state.inc` (stage schedule, assignment state, and LNS)
-- `full_cpp_solver_core_state.cpp` (state/LNS translation unit)
-- `full_cpp_solver_core_elite.inc` (elite pattern storage and relocation diagnostics)
-- `full_cpp_solver_core_elite.cpp` (elite translation unit)
-- `native_feasibility_solver.cpp/.hpp`
-- `native_group_constructor.cpp/.hpp`
-- `native_json.hpp`
-- `native_rich_construction.cpp`
+- `full_cpp_solver_core_internal.hpp` / `full_cpp_solver_core_sections.hpp` (internal declarations and compile includes)
+- `full_cpp_solver_core_input.cpp` (case/config normalization)
+- `full_cpp_solver_core_scoring.cpp` (individual, group, and full scoring)
+- `full_cpp_solver_core_rich_repair.cpp` (repair metrics and fixed-seat preprocessing)
+- `full_cpp_solver_core_rich_patterns.cpp` (structured pattern generation and diagnostics)
+- `full_cpp_solver_core_pricing.cpp` (placements/resources, pricing caches/bounds/symmetry, and pricing DFS)
+- `full_cpp_solver_core_state.cpp` (assignment legality, mutations, and save/restore)
+- `full_cpp_solver_core_schedule.cpp` (stage budgets, deadline carry, and tail reserves)
+- `full_cpp_solver_core_candidates.cpp` (static placement domains, candidate costs, and rankings)
+- `full_cpp_solver_core_lns.cpp` (LNS matching, subset generation, and group options)
+- `full_cpp_solver_core_elite.cpp` (elite pattern storage and relocation diagnostics)
+- `native_feasibility_solver.cpp/.hpp` (main solve orchestration, feasibility MIP, and hard validation)
+- `native_group_constructor.cpp/.hpp` (shared DFS/Beam construction and relocation repair)
+- `native_rich_construction.cpp` (remaining passenger assignment and construction order)
+- `native_rich_paired.cpp` (SSR/caregiver paired construction and rescue)
+- `native_rich_vnd.cpp` (VND neighborhoods)
+- `native_rich_pipeline.cpp` (Rich construction/repair/VND stage orchestration)
+- `native_rich_protected_mip.cpp` (protected/priority component MIP)
+- `native_rich_restricted_mip.cpp` (elite-pool restricted MIP and local branching)
+- `native_rich_lns.cpp` (LNS component search and local MIP)
+- `native_rich_special_pricing.cpp` (special dual-pricing LP and pattern capture)
+- `native_json.hpp` (JSON parsing)
 
-`native_state_replay.cpp` is a build-time public-fixture differential probe for
-high-volume `AssignmentState` legality and save/restore replay tests.
+Implementation bodies live directly in their `.cpp` files; there are no `.inc`
+wrappers or alternate copies of the production implementation. The frequently
+called placement, bound, and DFS routines share one pricing translation unit to
+preserve compiler optimization across the finite-time search kernel. All source paths
+in the build are relative to this checkout's `native/` directory. The build links
+an explicit object list, never a wildcard over old build outputs.
+
+Differential probes live in `tools/probes/`. The `native_state_replay.cpp` probe
+checks high-volume `AssignmentState` legality and save/restore on public fixtures.
+Historical RR/pool sources live separately in `tools/legacy_pool/`, including
+`native_master_types.hpp`, `native_pattern_kernel.cpp`, `native_restricted_master.cpp`,
+`native_solver_pipeline.cpp`, `native_monotonic_pipeline.cpp`,
+`native_master_benchmark.cpp`, and `native_pool_exporter.cpp`.
+`-IncludeTools` builds both tool sets as separate executables; neither tool source
+set is linked into `seat_protect_cpp.exe`. Executable names and CLI interfaces
+remain the same. The standalone `build_native_restricted_master.ps1` also builds
+only the historical pool tool, not the production Rich restricted MIP.
 
 The CLI defaults to the frozen `feasibility` construction objective. The
 experimental `--construction-objective individual-soft` mode minimizes the
@@ -60,14 +80,6 @@ attempt to rebuild the immediately preceding group before retrying. The Q0
 and Q1 assignments remain intact incumbents: Q2A is selected only when it is
 complete, passes the native hard validator, and has a strictly better full
 native score than Q1. Otherwise the Q1 result is returned unchanged.
-
-The RR and restricted-master pipeline consists of:
-
-- `native_master_types.hpp`
-- `native_pattern_kernel.cpp`
-- `native_restricted_master.cpp`
-- `native_solver_pipeline.cpp`
-- `native_pool_exporter.cpp`
 
 The raw `group-first` path also runs the complete Rich stage sequence and
 outer cabin decomposition. Detailed diagnostics are nested under
@@ -98,6 +110,9 @@ conflict LNS are disabled. Q0 individual-soft MIP runs only if construction/repa
 is incomplete and time remains; Q1/Q2A do not run. A complete legal candidate is
 accepted even when its score is negative and there is no previous incumbent.
 All subsequent replacements still require a strict score improvement.
+If HiGHS fails while solving the optional restricted MIP, the stage keeps the
+best validated assignment and reports `reason=solver_error`; model construction
+errors still fail explicitly.
 
 Nominal single-cabin stage budgets are construction 2.4s, repair 0.3s, VND 0.7s,
 patterns 0.8s, restricted MIP 0.4s, with 0.4s scoring/overhead reserve. Existing

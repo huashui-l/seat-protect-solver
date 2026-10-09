@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -12,14 +13,15 @@ from archive.legacy_column_generation import exact_column_generation as exact
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CORPUS = PROJECT_ROOT / "data/generator_v3_2/d3_official_24cases_2026-09-07"
 CONFIG_PATH = PROJECT_ROOT / "rich_python_reference_config.json"
-PROBE = PROJECT_ROOT / "outputs/research/native_full_core_probe.exe"
+NATIVE_EXE = os.environ.get("SEAT_PROTECT_NATIVE_EXE")
+PROBE = Path(NATIVE_EXE).resolve().with_name("native_full_core_probe.exe") if NATIVE_EXE else None
 
 
 class FullCppCoreParityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not PROBE.exists():
-            raise unittest.SkipTest("native_full_core_probe.exe has not been built")
+        if PROBE is None or not PROBE.exists():
+            raise unittest.SkipTest("set SEAT_PROTECT_NATIVE_EXE to a binary built from this checkout")
         cls.config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
     def test_formal24_raw_problem_and_topology_match_python(self):

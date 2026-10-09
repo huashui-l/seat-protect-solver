@@ -222,8 +222,33 @@ class NativeRichLnsTests(unittest.TestCase):
                 (work / name).write_text(json.dumps(value), encoding="utf-8")
             run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"), str(work / "replay.json")],
                                  capture_output=True, text=True)
-        self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertEqual(json.loads(run.stdout), [{}])
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(json.loads(run.stdout), [{}])
+
+            # The same failing model must not discard a complete incumbent in
+            # the restricted master either. Reuse the public presolve fixture.
+            config["algorithm"]["enable_pattern_local_branching"] = False
+            (work / "config.json").write_text(json.dumps(config), encoding="utf-8")
+            patterns = [dict(
+                group_id=(10, 20, 30)[g], local_score=-cost, source="fixture",
+                assignments=[[i + 1, seats[s]] for i, s in enumerate(indexes)],
+                blocked_by_host=[],
+            ) for g, cost, indexes in columns]
+            (work / "replay.json").write_text(json.dumps({"pattern_context": dict(
+                initial=[[i, seat] for i, seat in enumerate(seats)],
+                patterns=patterns, pairs=[], restricted_mip=True, deadline_seconds=2.0,
+            )}), encoding="utf-8")
+            restricted = subprocess.run(
+                [str(self.probe), str(work / "case.json"), str(work / "config.json"), str(work / "replay.json")],
+                capture_output=True, text=True,
+            )
+        self.assertEqual(restricted.returncode, 0, restricted.stderr)
+        result = json.loads(restricted.stdout)
+        self.assertEqual(result["state"]["assignments"], seats)
+        self.assertEqual(result["diagnostics"]["accepted"], 0)
+        self.assertEqual(result["diagnostics"]["score_improvement"], 0.0)
+        self.assertEqual(result["diagnostics"]["reason"], "solver_error")
+        self.assertEqual(result["diagnostics"]["solver_status"], "Solve error")
 
     def replay_matching(self, case, initial=None, calls=None, expired=False, algorithm=None, options_mode=False):
         config = copy.deepcopy(self.config)
