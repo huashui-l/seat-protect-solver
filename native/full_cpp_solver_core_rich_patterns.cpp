@@ -383,6 +383,7 @@ void write_rich_structured_diagnostics(std::ostream& output, const RichStructure
         << ",\"dfs_nodes\":" << stats.dfs_nodes << ",\"extreme_groups_attempted\":" << stats.extreme_groups_attempted
         << ",\"span_reducing_patterns\":" << stats.span_reducing_patterns << ",\"seconds\":" << stats.seconds;
     if (stats.geometry_pool_patterns) output << ",\"geometry_pool_patterns\":" << stats.geometry_pool_patterns;
+    if (stats.owner_pool_patterns) output << ",\"owner_pool_patterns\":" << stats.owner_pool_patterns;
     output << ",\"tier_counts\":{";
     bool first = true;
     for (const auto& entry : stats.tier_counts) { if (!first) output << ','; first = false; output << '"' << entry.first << "\":" << entry.second; }

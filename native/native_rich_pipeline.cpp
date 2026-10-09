@@ -241,12 +241,14 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
     std::promise<RelocationRequest> relocation_request;
     auto pending_request = relocation_request.get_future();
     bool request_selected = false;
-    std::future<RichEliteStore> geometry;
+    struct GenerationPools { RichEliteStore geometry, owners; };
+    std::future<GenerationPools> geometry;
     if (problem.rich.enable_structured_pattern_generation && problem.rich.enable_restricted_mip_portfolio
         && problem.rich_stage_budgets.business_time_limit <= 5.0
         && std::chrono::duration<double>(deadline - std::chrono::steady_clock::now()).count() > 0.1) {
         geometry = std::async(std::launch::async, [&]() {
-            RichEliteStore pool(problem.rich.elite_patterns_per_group);
+            GenerationPools pools{RichEliteStore(problem.rich.elite_patterns_per_group), RichEliteStore(problem.rich.elite_patterns_per_group)};
+            auto& pool = pools.geometry;
             const auto fixed = preprocess_fixed_seats(problem);
             const auto orders = build_rich_geometry_orders(problem, fixed,
                 std::min(deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(40)));
@@ -275,7 +277,7 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
                 for (const auto& seed : request.second) {
                     if (std::chrono::steady_clock::now() >= deadline) break;
                     const auto& candidate = seed.first;
-                    record(pool, g, candidate, seed.second, false);
+                    record(pools.owners, g, candidate, seed.second, false);
                     std::set<int> requested;
                     for (const auto& entry : candidate.pattern.assignments) requested.insert(entry.second);
                     for (const auto& entry : candidate.pattern.blocked_by) requested.insert(entry.first);
@@ -288,11 +290,11 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
                                 outside.insert(state.assigned_blocked[p].begin(), state.assigned_blocked[p].end());
                             }
                         add_rich_dynamic_relocation_patterns(problem, state, owner, outside,
-                            deadline, fixed, baby, caches, pool);
+                            deadline, fixed, baby, caches, pools.owners);
                     }
                 }
             }
-            return pool;
+            return pools;
         });
     }
     int current_group = -1;
@@ -335,7 +337,11 @@ void generate_rich_patterns_m3(const Problem& problem, std::chrono::steady_clock
     if (!request_selected) relocation_request.set_value({-1, {}});
     stop_geometry.store(true);
     if (geometry.valid()) {
-        diagnostics.rich_geometry_patterns = geometry.get();
+        auto pools = geometry.get();
+        diagnostics.rich_geometry_patterns = std::move(pools.geometry);
+        diagnostics.rich_owner_patterns = std::move(pools.owners);
+        for (const auto& group : diagnostics.rich_owner_patterns.groups())
+            diagnostics.rich_structured.owner_pool_patterns += static_cast<int>(group.second.size());
         for (const auto& group : diagnostics.rich_geometry_patterns.groups())
             diagnostics.rich_structured.geometry_pool_patterns += static_cast<int>(group.second.size());
     }

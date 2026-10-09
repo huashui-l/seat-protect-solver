@@ -13,6 +13,7 @@ struct GroupConstructionResult {
     RichEliteStore rich_elite_store;
     RichEliteStore rich_fallback_patterns;
     RichEliteStore rich_geometry_patterns;
+    RichEliteStore rich_owner_patterns;
     bool rich_conflict_diversity_active = false;
     AssignmentSnapshot rich_state;
     std::vector<std::vector<int>> rich_rankings;
