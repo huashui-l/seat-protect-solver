@@ -3840,15 +3840,32 @@
   },
   "quality_stability_2026_10_11": {
     "file": "quality-stability-2026-10-11.zip",
-    "size_bytes": 869292,
-    "sha256": "421219871e9f06ae33e308146a68069671d5305f572ec5bf27049c7f7692441b",
-    "members": 63,
-    "paired_invocations": 464,
+    "size_bytes": 896921,
+    "sha256": "bc35aa8d7a748b1e78094e9004df2482c2cc445818454fc3f799bc6bc9ae34e3",
+    "members": 68,
+    "paired_invocations": 580,
     "diagnostic_captures": 9,
     "fixed_node_equivalence_cases": 2,
-    "candidates_accepted": 0,
-    "production_algorithm_unchanged": true,
+    "candidates_accepted": 1,
+    "production_algorithm_unchanged": false,
     "full_process_budget_overruns": 1,
-    "full_process_within_budget_invocations": 463
-  }
+    "full_process_within_budget_invocations": 579,
+    "production_algorithm_commit": "11b1b3fdb79877022cf845ba46e1afef44da2892"
+  },
+  "current_accepted_2026_10_11": {
+    "algorithm_commit": "11b1b3fdb79877022cf845ba46e1afef44da2892",
+    "tested_equivalent_commit": "ffe02ace13d58c937554d56398133241a91bfe1c",
+    "evidence_archive": "quality-stability-2026-10-11.zip",
+    "evidence_member": "round74-paired.json",
+    "binary_sha256": "ccc4609df66e34f553b8b265ca196f5d4d025ba2abf36e6061a9a5fb93247f35",
+    "config_sha256": "93f2da37c204eebadc6c475928d84cdfe619b533fa1041eefa9c3972b348d99f",
+    "invocations": 58,
+    "complete_legal_score_parity_within_5s": 58,
+    "main_gap_le_2_count": 36,
+    "main_reference_count": 39,
+    "main_mean_gap_percent": 0.5646770293671408,
+    "main_worst_gap_percent": 2.9437453007161936,
+    "max_elapsed_seconds": 4.903921699999046
+  },
+  "algorithm_commit_scope": "Historical experiment-data.zip from 2026-10-10; see current_accepted_2026_10_11 for current production evidence."
 }
