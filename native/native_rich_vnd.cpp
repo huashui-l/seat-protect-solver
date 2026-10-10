@@ -315,6 +315,8 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
             const auto& ordinary_keys = keys_by_group[ordinary_group];
             auto joint = care_keys;
             joint.insert(joint.end(), ordinary_keys.begin(), ordinary_keys.end());
+            const bool moves_infant = std::any_of(joint.begin(), joint.end(),
+                [&](int p) { return problem.passengers[p].ssr == "BSCT"; });
             std::vector<int> seats;
             double current = 0.0;
             for (int p : joint) { seats.push_back(state.passenger_to_seat[p]); current += individual(p, seats.back()); }
@@ -358,7 +360,9 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
                     for (int p : keys_by_group[g]) group_seat_list.push_back(proposal[p]);
                     value += compact(group_seat_list);
                 }
-                value += baby_score(proposal);
+                // With all infants fixed, permuting these two complete groups
+                // preserves the occupied seat set seen by every outside infant.
+                value += moves_infant ? baby_score(proposal) : baseline_baby;
                 ++diagnostics.evaluated_moves;
                 if (value > best + problem.rich.local_search_epsilon) { best = value; best_assignment = std::move(proposal); }
             } while (std::next_permutation(permutation.begin(), permutation.end()));

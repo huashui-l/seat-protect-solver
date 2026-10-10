@@ -110,3 +110,19 @@ class NativeRichVndCaregiverTests(NativeRichVndGroupTests):
         kwargs["vnd_group_rebuild"] = True
         kwargs["vnd_caregiver_rebuild"] = True
         return repair_tests.NativeRichRepairTests.replay(self, *args, **kwargs)
+
+    def test_outside_infant_score_is_preserved_during_caregiver_rebuild(self):
+        case = self.synthetic([(101, {"ssr": "BLND"}), (101, {}),
+                               (202, {}), (202, {}), (303, {"ssr": "BSCT"}), (303, {})])
+        for seatmap in ("oldSeatmapData", "newSeatmapData"):
+            next(s for s in case[seatmap]["seats"] if s["seatId"] == "3A")["hasBassinet"] = True
+        desired = ["2A", "2B", "1A", "1B", "3A", "3B"]
+        passengers = [p for g in case["groupsData"] for p in g["psrs"]]
+        for passenger, seat in zip(passengers, desired):
+            passenger["oldSeat"]["seatNum"] = seat
+        initial = [[1, "1B"], [0, "1A"], [2, "2A"], [3, "2B"], [5, "3B"], [4, "3A"]]
+        result = self.replay(case, initial,
+                             [[s] for s in ["1A", "1B", "2A", "2B", "3A", "3B"]],
+                             vnd_algorithm={})
+        self.assertGreater(result["vnd"]["caregiver_rebuilds"], 0)
+        self.assertEqual(result["assignments"], desired)
