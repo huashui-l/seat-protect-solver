@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.benchmark_three_routes import (  # noqa: E402
+from scripts.benchmark_methods import (  # noqa: E402
     METHODS, _certified, _read_json, _sha256, load_cases,
 )
 

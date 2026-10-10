@@ -17,7 +17,7 @@
   artifact-independent deadline-fallback test was available to migrate.
 
 The shared 24-case Formal24 plus 16-case D4 benchmark is driven by
-`scripts/benchmark_three_routes.py`. Its default schedule is the C++ native
+`scripts/benchmark_methods.py`. Its default schedule is the C++ native
 heuristic at 5 seconds, each Gurobi route at 150 seconds, and a 600-second
 supplement only for exact runs without an optimality or infeasibility
 certificate.
@@ -26,10 +26,10 @@ For runs collected in separate batches, verify and merge the source reports
 without discarding their individual provenance:
 
 ```powershell
-python scripts/merge_three_route_benchmarks.py `
+python scripts/merge_method_benchmarks.py `
   --sources CPP_5S.json CG_150S.json CG_600S.json DIRECT_150S.json DIRECT_600S.json `
-  --json-output outputs/three_routes.json `
-  --markdown-output outputs/three_routes.md
+  --json-output outputs/benchmark.json `
+  --markdown-output outputs/benchmark.md
 ```
 
 The merger checks input/configuration hashes, all 40 cases, route budgets,

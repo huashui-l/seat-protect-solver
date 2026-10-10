@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.benchmark_three_routes import load_d3_cases, load_d4_cases
-from scripts.merge_three_route_benchmarks import merge_reports
+from scripts.benchmark_methods import load_d3_cases, load_d4_cases
+from scripts.merge_method_benchmarks import merge_reports
 
 
 class ThreeRouteBenchmarkCorpusTests(unittest.TestCase):
@@ -59,7 +59,7 @@ class ThreeRouteMergeTests(unittest.TestCase):
         }
 
     def merge(self, report=None):
-        with patch("scripts.merge_three_route_benchmarks._sha256", return_value="hash"):
+        with patch("scripts.merge_method_benchmarks._sha256", return_value="hash"):
             return merge_reports([(Path("source.json"), report or self.source)], self.cases)
 
     def test_conditional_supplement_and_source_provenance(self):
