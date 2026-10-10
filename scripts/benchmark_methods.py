@@ -10,6 +10,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import platform
 import subprocess
 import sys
@@ -278,6 +279,16 @@ def _run_method(
             "variables": raw.get("variables"),
             "constraints": raw.get("constraints"),
             "raw_seconds": raw.get("seconds"),
+            # Keep root, tree and safe bounds separate: an open upper bound is
+            # not an optimal objective value, and a root gap may remain after B&P.
+            "safe_bound": raw.get("safe_bound"),
+            "bp_bound": raw.get("bp_bound"),
+            "cabins": raw.get("cabins"),
+            "bp_bound_certified": raw.get("bp_bound_certified") is True or (
+                bool(raw.get("cabins")) and all(
+                    cabin.get("bp_bound_certified") is True for cabin in raw["cabins"].values()
+                )
+            ),
         })
         if method == "cpp_heuristic":
             result["proven_optimal"] = False
@@ -289,7 +300,35 @@ def _run_method(
             )
             result["solve_wall_seconds"] = raw.get("solve_wall_seconds")
             result["preparation_seconds"] = raw.get("preparation_seconds")
+    result["optimality_certificate"] = audit_optimality(result)
     return result
+
+
+def audit_optimality(run: Mapping[str, Any]) -> str:
+    """Classify retained proof evidence; a solver flag alone is insufficient."""
+    claimed = run.get("proven_optimal") is True
+    unproven = "unverified_claim" if claimed else "not_proven"
+    score = run.get("score")
+    if (run.get("error") or run.get("complete") is not True
+            or run.get("violations") != 0 or run.get("unassigned") != 0
+            or not isinstance(score, (int, float)) or not math.isfinite(score)):
+        return "invalid_incumbent"
+    # Absolute score tolerance; no rounding a positive gap to a proof.
+    def closed(bound):
+        return isinstance(bound, (int, float)) and math.isfinite(bound) and abs(bound - score) <= 1e-6
+
+    if run.get("method") == "cg_gurobi":
+        if run.get("bound_certified") is True and closed(run.get("bound")):
+            return "cg_root_lp_closed"
+        if run.get("bp_bound_certified") is True and closed(run.get("bp_bound")):
+            return "cg_branch_price_closed"
+    elif run.get("method") == "direct_gurobi":
+        error, gap = run.get("objective_error"), run.get("mip_gap")
+        if (run.get("solver_status") == "optimal" and closed(run.get("bound"))
+                and isinstance(error, (int, float)) and 0 <= error <= 1e-6
+                and isinstance(gap, (int, float)) and 0 <= gap <= 1e-9):
+            return "direct_global_bound_closed"
+    return unproven
 
 
 def _certified(result: Mapping[str, Any]) -> bool:

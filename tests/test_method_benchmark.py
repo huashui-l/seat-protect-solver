@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import copy
+import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.benchmark_methods import load_d3_cases, load_d4_cases
+from scripts.benchmark_methods import _run_method, audit_optimality, load_d3_cases, load_d4_cases
 from scripts.merge_method_benchmarks import merge_reports
 
 
@@ -22,6 +24,57 @@ class ThreeRouteBenchmarkCorpusTests(unittest.TestCase):
             self.assertTrue(case["groups_path"].is_file(), case)
             self.assertTrue(case["old_seatmap_path"].is_file(), case)
             self.assertTrue(case["new_seatmap_path"].is_file(), case)
+
+
+class OptimalityEvidenceTests(unittest.TestCase):
+    def row(self, **fields):
+        return dict(method="cg_gurobi", complete=True, violations=0, unassigned=0,
+                    score=-10.0, proven_optimal=True, error=None) | fields
+
+    def test_open_safe_and_lp_bounds_do_not_prove_optimality(self):
+        for fields in ({"safe_bound": -5.0}, {"bound": -9.0, "bound_certified": True},
+                       {"bound": -10.0, "bound_certified": False}):
+            with self.subTest(fields=fields):
+                self.assertEqual("unverified_claim", audit_optimality(self.row(**fields)))
+        self.assertEqual("cg_root_lp_closed", audit_optimality(
+            self.row(bound=-10.0, bound_certified=True)))
+
+    def test_closed_tree_bound_can_prove_an_open_root_gap(self):
+        row = self.row(bound=-9.0, bound_certified=True, bp_bound=-10.0, bp_bound_certified=True)
+        self.assertEqual("cg_branch_price_closed", audit_optimality(row))
+        row["bp_bound_certified"] = False
+        self.assertEqual("unverified_claim", audit_optimality(row))
+
+    def test_runner_retains_cabin_tree_evidence_without_top_level_flag(self):
+        cabins = {"Economy": {"bp_bound_certified": True, "bp_bound": -10.0,
+                              "branch_and_price": {"open_nodes": 0, "proven": True}}}
+        raw = dict(assigned_seats={}, lp_bound=-9.0, lp_bound_certified=True,
+                   bp_bound=-10.0, safe_bound=-8.0, cabins=cabins, proven_optimal=True)
+        module = SimpleNamespace(solve=lambda *args: raw)
+        with patch.dict(sys.modules, {"src.cg_gurobi": module}), \
+                patch("scripts.benchmark_methods._load_case", return_value=([], [], [])), \
+                patch("scripts.benchmark_methods._metrics", return_value=self.row()):
+            result = _run_method({}, "cg_gurobi", 900, {})
+        self.assertEqual("cg_branch_price_closed", result["optimality_certificate"])
+        self.assertEqual(cabins, result["cabins"])
+        self.assertEqual(-8.0, result["safe_bound"])
+        self.assertEqual(-9.0, result["bound"])
+
+    def test_direct_proof_requires_closed_bound_and_matching_objective(self):
+        row = self.row(method="direct_gurobi", solver_status="optimal", bound=-10.0,
+                       objective_error=0.0, mip_gap=0.0)
+        self.assertEqual("direct_global_bound_closed", audit_optimality(row))
+        for fields in ({"bound": -9.0}, {"objective_error": 0.01}, {"mip_gap": 0.01},
+                       {"solver_status": "time_limit"}):
+            with self.subTest(fields=fields):
+                self.assertEqual("unverified_claim", audit_optimality(row | fields))
+
+    def test_illegal_or_nonfinite_incumbent_cannot_have_a_certificate(self):
+        for fields in ({"complete": False}, {"violations": 1}, {"unassigned": 1},
+                       {"score": float("nan")}, {"score": None}, {"error": "failed"}):
+            with self.subTest(fields=fields):
+                self.assertEqual("invalid_incumbent", audit_optimality(
+                    self.row(bound=-10.0, bound_certified=True) | fields))
 
 
 class ThreeRouteMergeTests(unittest.TestCase):
