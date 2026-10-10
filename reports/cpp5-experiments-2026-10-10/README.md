@@ -41,11 +41,13 @@ WB `d100` 尚无最优性证明。HTML中的“记录为已证最优”统计是
 
 - [`experiment-data.zip`](experiment-data.zip)：516个原始文件，96,962,687字节未压缩数据，压缩后7,546,317字节。
 - [`manifest.json`](manifest.json)：压缩包及每个成员的字节数、SHA-256、原始位置；各轮接受标记、提交；40个实验/备份分支与提交。
+- [`experiment-code.bundle`](experiment-code.bundle)：独立Git代码归档，保存40个实验/备份版本及其历史；清单记录哈希。它们不作为远程分支发布。
 - `rounds/`：59份轮次记录，包括主测试、筛选、诊断和消融；不是59轮全部通过正式验收。
 - `capture/`：版本目录下的原始JSON、历史测试脚本、LP和SOL文件。诊断运行可能有额外采集开销，不能替代正式5秒验收。
 - `solver-records/`：5份原始求解记录。历史C++记录用于追溯，不代表当前采用版本；当前结果以round56/57为准。
 
-代码版本由Git分支保存，不在压缩包中重复打包源码。`experiment/cpp5-*` 保存被比较过的变体，
+当前采用代码由功能分支维护。实验代码集中存放在Git bundle归档中，按原分支名和提交哈希区分，
+同时保留本地分支；远程不保留这40个实验/备份分支。归档内 `experiment/cpp5-*` 保存被比较过的变体，
 `archive/pre-cpp5-*` 保存变更前检查点。未接受或被后续替换的变体不会作为正式实现入口。
 清单中的 `accepted` 为各轮原始结论；缺失值表示原记录未提供，不能推断为通过。
 历史路径与历史文件名按原样保留用于证据追踪，不是新的模块组织。
@@ -58,6 +60,15 @@ a900aa85437d2c83494abd88da50351c3608e0378681292d2b54f41ef926df5e
 ```
 
 ## 复现入口
+
+查看实验代码可将归档克隆到独立目录，避免与当前工作目录混用：
+
+```powershell
+git clone reports/cpp5-experiments-2026-10-10/experiment-code.bundle ../seatprotect-experiment-archive
+git -C ../seatprotect-experiment-archive switch experiment/cpp5-fallback-owner-complements-20261010
+```
+
+归档仅包含实验/备份引用，克隆时可能提示没有默认HEAD；随后显式切换所需版本即可。
 
 依赖和许可证配置见 [`docs/DEPENDENCIES.md`](../../docs/DEPENDENCIES.md)。Windows Release构建：
 
