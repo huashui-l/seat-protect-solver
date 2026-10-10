@@ -282,9 +282,7 @@ RichOrdinaryVndDiagnostics improve_rich_ordinary_vnd(
         return item.need_cared || (rule != problem.ssr_rules.end() && rule->second.requires_caregiver);
     };
     const auto individual = [&](int p, int seat) {
-        std::vector<int> isolated(n, -1);
-        isolated[p] = seat;
-        return evaluate_rich_group_score(problem, isolated, problem.passengers[p].group).total();
+        return evaluate_rich_individual_score(problem, p, seat).total();
     };
     const auto baby_score = [&](const std::vector<int>& assignment) {
         return evaluate_score_components(problem, assignment).score_b;
