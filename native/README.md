@@ -33,6 +33,7 @@ The raw JSON production CLI consists of one current implementation per module:
 - `native_rich_geometry.cpp/.hpp` (geometry resource shapes, special-passenger enumeration, and ordinary identity matching)
 - `native_rich_protected_mip.cpp` (protected/priority component MIP)
 - `native_rich_restricted_mip.cpp` (Gurobi elite-pool restricted MIP and local branching)
+- `native_rich_dual_pricing.cpp` (Gurobi LP-guided pattern discovery for one short-budget worker)
 - `native_rich_master_ssr.cpp/.hpp` (conditional row/subrow SSR constraints for the pattern master)
 - `native_rich_lns.cpp` (LNS component search and local MIP)
 - `native_rich_special_pricing.cpp` (special dual-pricing LP and pattern capture)
@@ -136,6 +137,12 @@ Geometry enumeration stops when the original stage ends. Complement pricing
 uses the same stage deadline, and all workers are joined before returning.
 Pool sizes are reported as `geometry_pool_patterns` and `owner_pool_patterns`;
 a selected geometry master is identified by `portfolio_pool=geometry`.
+
+One existing short-budget base-pool worker uses up to one fifth of its remaining
+window to solve a Gurobi resource LP and discover reduced-cost patterns with the
+existing DFS. It then solves the enriched integer pool against the same deadline;
+selection reports `portfolio_pool=dual-priced`. Other worker paths are retained.
+The context-scored resource LP guides search and is not a global optimality bound.
 All subsequent replacements still require a strict score improvement.
 The restricted master models conditional row/subrow SSR activation explicitly,
 including conflicts involving three different groups. Gurobi environment startup,
