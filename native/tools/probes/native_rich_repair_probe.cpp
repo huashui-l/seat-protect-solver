@@ -302,10 +302,13 @@ int main(int argc, char** argv) {
             };
             if (const auto* mode = input->find("restricted_mip"); mode && mode->bool_or()) {
                 full_cpp::RichEliteStore elite;
-                std::set<int> fallback_indexes;
+                std::set<int> fallback_indexes, geometry_indexes;
                 if (const auto* indexes = input->find("fallback_pattern_indexes"))
                     for (const auto& index : indexes->array) fallback_indexes.insert(static_cast<int>(index.number));
-                for (size_t i = 0; i < patterns.size(); ++i) if (!fallback_indexes.count(static_cast<int>(i))) {
+                if (const auto* indexes = input->find("geometry_pattern_indexes"))
+                    for (const auto& index : indexes->array) geometry_indexes.insert(static_cast<int>(index.number));
+                for (size_t i = 0; i < patterns.size(); ++i)
+                    if (!fallback_indexes.count(static_cast<int>(i)) && !geometry_indexes.count(static_cast<int>(i))) {
                     const auto& entry = patterns[i];
                     elite.insert_relocation(entry.first, entry.second, [&]() { return entry.second.local_score; });
                 }
@@ -320,6 +323,11 @@ int main(int argc, char** argv) {
                     for (int i : fallback_indexes) {
                         const auto& entry = patterns.at(i);
                         result.rich_fallback_patterns.insert_relocation(entry.first, entry.second,
+                            [&]() { return entry.second.local_score; });
+                    }
+                    for (int i : geometry_indexes) {
+                        const auto& entry = patterns.at(i);
+                        result.rich_geometry_patterns.insert_relocation(entry.first, entry.second,
                             [&]() { return entry.second.local_score; });
                     }
                     result.group_construction_score = full_cpp::evaluate_soft_score(problem, state.passenger_to_seat);

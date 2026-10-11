@@ -38,7 +38,8 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
             RichEliteStore expanded;
             const auto* pool = &result.rich_elite_store;
             if (problem.rich.enable_restricted_mip_portfolio && seed == problem.rich.restricted_pattern_mip_workers - 1
-                && (!result.rich_fallback_patterns.groups().empty() || !result.rich_owner_patterns.groups().empty())) {
+                && (!result.rich_fallback_patterns.groups().empty() || !result.rich_owner_patterns.groups().empty()
+                    || !result.rich_geometry_patterns.groups().empty())) {
                 expanded = result.rich_elite_store;
                 for (const auto& group : result.rich_fallback_patterns.groups())
                     for (const auto& pattern : group.second)
@@ -46,9 +47,13 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
                 for (const auto& group : result.rich_owner_patterns.groups())
                     for (const auto& pattern : group.second)
                         expanded.insert_relocation(group.first, pattern, [&]() { return pattern.local_score; });
+                for (const auto& group : result.rich_geometry_patterns.groups())
+                    for (const auto& pattern : group.second)
+                        expanded.insert_relocation(group.first, pattern, [&]() { return pattern.local_score; });
                 pool = &expanded;
             }
             auto diagnostics = improve_rich_restricted_mip(candidate_problem, candidate, *pool, deadline, seed);
+            if (pool == &expanded) diagnostics.portfolio_pool = "combined";
             if (problem.rich.enable_restricted_mip_portfolio && seed == 1 && !result.rich_rankings.empty()
                 && std::chrono::steady_clock::now() < deadline) {
                 const auto started = std::chrono::steady_clock::now();

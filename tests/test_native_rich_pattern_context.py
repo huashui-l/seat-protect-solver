@@ -312,12 +312,15 @@ class NativeRichPatternContextTests(unittest.TestCase):
                 "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"],
             }.items():
                 (work / name).write_text(json.dumps(value), encoding="utf-8")
-            for separate_fallback_pool in (False, True):
-                with self.subTest(separate_fallback_pool=separate_fallback_pool):
+            for separate_pool in ("none", "fallback", "complementary"):
+                with self.subTest(separate_pool=separate_pool):
                     replay = {"pattern_context": dict(initial=[[0, "2A"], [1, "1A"]],
                         patterns=patterns, pairs=[], restricted_mip=True, protected_stage=True, deadline_seconds=2.0)}
-                    if separate_fallback_pool:
+                    if separate_pool == "fallback":
                         replay["pattern_context"]["fallback_pattern_indexes"] = [1, 3]
+                    elif separate_pool == "complementary":
+                        replay["pattern_context"]["fallback_pattern_indexes"] = [1]
+                        replay["pattern_context"]["geometry_pattern_indexes"] = [3]
                     (work / "replay.json").write_text(json.dumps(replay), encoding="utf-8")
                     results = []
                     for enabled in (False, True):
@@ -331,9 +334,11 @@ class NativeRichPatternContextTests(unittest.TestCase):
                     self.assertEqual(results[1]["state"]["assignments"], ["1A", "2A"])
                     self.assertGreater(results[1]["selected_score"], results[0]["selected_score"])
                     self.assertFalse(results[1]["diagnostics"]["local_branching"]["enabled"])
-                    if separate_fallback_pool:
+                    if separate_pool != "none":
                         for result in results:
                             self.assertEqual(sum(len(v) for v in result["elite"].values()), 2)
+                    if separate_pool == "complementary":
+                        self.assertEqual(results[1]["diagnostics"]["portfolio_pool"], "combined")
 
     def test_rich_restricted_branching_and_early_returns(self):
         case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),
