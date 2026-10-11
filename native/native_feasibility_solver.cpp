@@ -313,9 +313,23 @@ FeasibilityResult solve_feasibility_mip(
                 const double tail_started = elapsed();
                 tail_problem.rich.protected_multigroup_enabled = true;
                 tail_problem.rich.priority_multigroup_enabled = true;
+                // Keep the protected-then-LNS trajectory while an independent
+                // protected search uses the whole remaining window.
+                auto alternative = std::async(std::launch::async,
+                    [&, candidate = group_result]() mutable {
+                        auto diagnostics = improve_rich_protected_stage(tail_problem,
+                            at(search_seconds - 0.05), candidate);
+                        return std::make_pair(std::move(candidate), std::move(diagnostics));
+                    });
                 result.rich_protected = improve_rich_protected_stage(tail_problem,
                     at(tail_started + (search_seconds - 0.05 - tail_started) * 0.6), group_result);
                 result.rich_lns = improve_rich_lns_stage(tail_problem, at(search_seconds - 0.05), group_result);
+                auto candidate = alternative.get();
+                if (candidate.first.group_construction_score > group_result.group_construction_score + 1e-9
+                    && validate_complete_assignment(problem, candidate.first.passenger_to_seat) == 0) {
+                    group_result = std::move(candidate.first);
+                    result.rich_protected = std::move(candidate.second);
+                }
                 group_result.rich_stage_timing["tail_exchange"] = {
                     0.0, search_seconds - 0.05 - tail_started, tail_started, elapsed(),
                     search_seconds - 0.05, 0.0, 0.0};
