@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <future>
 #include <sstream>
 #include <fstream>
 #include <iomanip>
@@ -186,8 +187,8 @@ int write_result(std::ostream* output, const full_cpp::Problem& problem,
         return result.native_hard_violations == 0 && unassigned == 0 ? 0 : 4;
 }
 
-// The outer frozen Python allocator solves homogeneous cabins in increasing
-// target-seat count order; each call constructs its own topology and budgets.
+// Each homogeneous cabin constructs its own topology and search state.
+// Short Rich solves share one deadline; other modes retain the frozen order.
 int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
     const native_json::Value& config, const std::string& input_path,
     const std::string& config_path, double time_limit, int seed,
@@ -200,6 +201,7 @@ int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
         const auto* value = algorithm.find(key); return value ? value->number_or(fallback) : fallback;
     };
     const double total = std::min(time_limit, std::max(.1, setting("business_time_limit_seconds", 5.0)));
+    const bool parallel = objective == full_cpp::ConstructionObjective::RichFast && total <= 5.0;
     const double minimum = std::min(total / groups.size(), std::max(.1, setting("cabin_min_time_seconds", 1.0)));
     const auto raw = native_json::parse_file(input_path);
     const auto& paths = config.at("input_contract").at("seatmaps_by_direction").at(problem.direction);
@@ -227,13 +229,19 @@ int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
     merged.selected_incumbent = "rich-cabin-decomposition";
     std::ostringstream diagnostics;
     diagnostics << std::setprecision(17) << "{\"enabled\":true,\"total_time_limit_seconds\":" << total
-        << ",\"minimum_time_seconds\":" << minimum << ",\"solve_order\":[";
+        << ",\"minimum_time_seconds\":" << minimum << ",\"parallel\":" << (parallel ? "true" : "false")
+        << ",\"solve_order\":[";
     for (size_t i = 0; i < cabins.size(); ++i) {
         if (i) diagnostics << ',';
         diagnostics << '"' << escape_json(cabins[i].second) << '"';
     }
     diagnostics << "],\"cabins\":{";
-    for (size_t i = 0; i < cabins.size(); ++i) {
+    struct CabinRun {
+        full_cpp::Problem problem;
+        full_cpp::FeasibilityResult result;
+        double budget, budget_started, finished;
+    };
+    const auto solve = [&](size_t i) {
         const auto& cabin = cabins[i].second;
         auto cabin_config = config, cabin_raw = raw, cabin_new = new_map, cabin_old = old_map;
         auto& raw_groups = cabin_raw.object.at("groups").array;
@@ -248,14 +256,25 @@ int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
         }
         const double budget_started = elapsed();
         const double remaining = std::max(.1, total - budget_started);
-        const size_t future = cabins.size() - i - 1;
+        const size_t future = parallel ? 0 : cabins.size() - i - 1;
         const double budget = future == 0 ? remaining : std::min(
             std::max(minimum, total * cabins[i].first / target_total),
             std::max(.1, remaining - future * minimum));
         auto& limit = cabin_config.object.at("algorithm").object["business_time_limit_seconds"];
         limit.type = native_json::Value::Type::Number; limit.number = budget;
-        const auto subproblem = full_cpp::make_problem(cabin_raw, cabin_config, cabin_new, cabin_old);
-        const auto result = full_cpp::solve_feasibility_mip(subproblem, budget, seed, objective);
+        auto subproblem = full_cpp::make_problem(cabin_raw, cabin_config, cabin_new, cabin_old);
+        auto result = full_cpp::solve_feasibility_mip(subproblem,
+            parallel ? std::max(0.0, total - elapsed()) : budget, seed, objective);
+        return CabinRun{std::move(subproblem), std::move(result), budget, budget_started, elapsed()};
+    };
+    std::vector<std::future<CabinRun>> alternatives;
+    if (parallel) for (size_t i = 0; i < cabins.size(); ++i)
+        alternatives.push_back(std::async(std::launch::async, solve, i));
+    for (size_t i = 0; i < cabins.size(); ++i) {
+        auto run = parallel ? alternatives[i].get() : solve(i);
+        const auto& cabin = cabins[i].second;
+        const auto& subproblem = run.problem;
+        const auto& result = run.result;
         for (size_t p = 0; p < subproblem.passengers.size(); ++p) {
             const int seat = result.passenger_to_seat[p];
             if (seat < 0) continue;
@@ -272,8 +291,8 @@ int solve_cabins(std::ostream* output, const full_cpp::Problem& problem,
         merged.rich_construction_assigned += result.rich_construction_assigned;
         merged.rich_construction_unassigned += result.rich_construction_unassigned;
         if (i) diagnostics << ',';
-        diagnostics << '"' << escape_json(cabin) << "\":{\"time_budget_seconds\":" << budget
-            << ",\"budget_started\":" << budget_started << ",\"finished\":" << elapsed()
+        diagnostics << '"' << escape_json(cabin) << "\":{\"time_budget_seconds\":" << run.budget
+            << ",\"budget_started\":" << run.budget_started << ",\"finished\":" << run.finished
             << ",\"traveler_count\":" << subproblem.passengers.size()
             << ",\"target_seats\":" << subproblem.seats.size() << ",\"result\":";
         write_result(&diagnostics, subproblem, result, objective);

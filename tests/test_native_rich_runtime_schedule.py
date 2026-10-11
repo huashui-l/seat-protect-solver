@@ -169,6 +169,20 @@ class NativeRichRuntimeScheduleTests(unittest.TestCase):
             self.assertTrue(result["rich_candidate_complete"])
             self.assertEqual(result["rich_construction_assigned"], len(result["assignments"]))
 
+    def test_short_rich_cabins_share_deadline_and_join_before_return(self):
+        profile = json.loads((Path(__file__).resolve().parents[1]
+                              / "configs/config_native_rich_5s.json").read_text(encoding="utf-8"))
+        result = self.run_case("two_cabin_valid_groups", "rich-fast", algorithm=profile["algorithm"])
+        diagnostics = result["cabin_decomposition"]
+        self.assertTrue(diagnostics["parallel"])
+        self.assertTrue(result["complete"])
+        self.assertLessEqual(result["solve_wall_seconds"], 5.0)
+        for run in diagnostics["cabins"].values():
+            self.assertAlmostEqual(run["budget_started"] + run["time_budget_seconds"],
+                                   diagnostics["total_time_limit_seconds"])
+            self.assertGreaterEqual(result["solve_wall_seconds"], run["finished"])
+            self.assertTrue(run["result"]["complete"])
+
     def test_single_cabin_and_disabled_decomposition_keep_single_pipeline(self):
         for case_id, algorithm in (("identity_keep_seats", {}),
                                    ("two_cabin_valid_groups", {"cabin_decomposition_enabled": False})):
