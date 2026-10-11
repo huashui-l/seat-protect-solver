@@ -52,8 +52,15 @@ RichRestrictedDiagnostics improve_rich_restricted_stage(const Problem& problem,
                         expanded.insert_relocation(group.first, pattern, [&]() { return pattern.local_score; });
                 pool = &expanded;
             }
+            const bool dual_pool = problem.rich.enable_restricted_mip_portfolio && seed == 2;
+            if (dual_pool) {
+                expanded = *pool;
+                const auto now = std::chrono::steady_clock::now();
+                enrich_rich_dual_pool(problem, candidate, expanded, now + (deadline - now) / 5);
+                pool = &expanded;
+            }
             auto diagnostics = improve_rich_restricted_mip(candidate_problem, candidate, *pool, deadline, seed);
-            if (pool == &expanded) diagnostics.portfolio_pool = "combined";
+            if (pool == &expanded) diagnostics.portfolio_pool = dual_pool ? "dual-priced" : "combined";
             if (problem.rich.enable_restricted_mip_portfolio && seed == 1 && !result.rich_rankings.empty()
                 && std::chrono::steady_clock::now() < deadline) {
                 const auto started = std::chrono::steady_clock::now();

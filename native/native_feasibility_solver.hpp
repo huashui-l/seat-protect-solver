@@ -91,6 +91,10 @@ struct RichSpecialPricingDiagnostics {
     std::vector<std::pair<RichExactPattern, double>> accepted_patterns;
 };
 
+RichSpecialPricingDiagnostics enrich_rich_dual_pool(const Problem& problem,
+    const AssignmentState& state, RichEliteStore& elite,
+    std::chrono::steady_clock::time_point deadline);
+
 RichSpecialPricingDiagnostics generate_rich_special_dual_patterns(
     const Problem& problem, const AssignmentState& state, const RichEliteStore& elite,
     std::chrono::steady_clock::time_point deadline, bool enabled,

@@ -314,6 +314,12 @@ int main(int argc, char** argv) {
                 }
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(input->at("deadline_seconds").number));
+                full_cpp::RichSpecialPricingDiagnostics dual_pricing;
+                const bool price_pool = input->find("dual_pool_pricing") && input->at("dual_pool_pricing").bool_or();
+                if (price_pool) {
+                    const auto now = std::chrono::steady_clock::now();
+                    dual_pricing = full_cpp::enrich_rich_dual_pool(problem, state, elite, now + (deadline - now) / 2);
+                }
                 full_cpp::RichRestrictedDiagnostics stats;
                 full_cpp::GroupConstructionResult result;
                 const bool stage = input->find("protected_stage") && input->at("protected_stage").bool_or();
@@ -336,6 +342,10 @@ int main(int argc, char** argv) {
                 } else stats = full_cpp::improve_rich_restricted_mip(problem, state, elite, deadline);
                 std::cout << std::setprecision(17) << "],\"diagnostics\":";
                 full_cpp::write_rich_restricted_diagnostics(std::cout, stats);
+                if (price_pool) {
+                    std::cout << ",\"dual_pricing\":";
+                    full_cpp::write_rich_special_pricing_diagnostics(std::cout, problem, dual_pricing);
+                }
                 if (stage) std::cout << ",\"selected_score\":" << result.group_construction_score << ",\"selected_count\":" << result.passenger_to_seat.size();
                 std::cout << ",\"elite\":"; full_cpp::write_rich_elite_store(std::cout, elite);
                 std::cout << ",\"state\":"; write_snapshot(state.save());

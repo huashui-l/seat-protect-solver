@@ -338,7 +338,47 @@ class NativeRichPatternContextTests(unittest.TestCase):
                         for result in results:
                             self.assertEqual(sum(len(v) for v in result["elite"].values()), 2)
                     if separate_pool == "complementary":
-                        self.assertEqual(results[1]["diagnostics"]["portfolio_pool"], "combined")
+                        self.assertIn(results[1]["diagnostics"]["portfolio_pool"], ("combined", "dual-priced"))
+
+    def test_dual_pool_discovers_missing_exchange_and_honors_expired_deadline(self):
+        case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),
+                               (10, {"oldSeat": {"seatNum": "2A", "seatValue": ""}})])
+        config = copy.deepcopy(self.config)
+        config["algorithm"].update(enable_pattern_local_branching=False, restricted_pattern_mip_attempts=1)
+        config["input_contract"] = {"seatmaps_by_direction": {
+            "public-test": {"old": "old.json", "new": "new.json"}}}
+        scorer = evaluator.IncrementalSoftScorer(case["newSeatmapData"]["seats"],
+            case["oldSeatmapData"]["seats"], case["groupsData"], config["weights"], config)
+        initial = {(20, 1): "2A", (10, 1): "1A"}
+        patterns = [dict(group_id=gid, assignments=[[1, seat]], blocked_by_host=[],
+                         local_score=scorer.components(initial, {gid})["total_soft_score"], source="fixture")
+                    for gid, seat in [(20, "2A"), (10, "1A")]]
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            files = {"case.json": {"caseId": "missing-exchange", "direction": "public-test", "groups": case["groupsData"]},
+                     "old.json": case["oldSeatmapData"], "new.json": case["newSeatmapData"], "config.json": config}
+            for name, value in files.items():
+                (work / name).write_text(json.dumps(value), encoding="utf-8")
+            for duration in (0.0, 2.0):
+                with self.subTest(duration=duration):
+                    replay = {"pattern_context": dict(initial=[[0, "2A"], [1, "1A"]], patterns=patterns,
+                        pairs=[], restricted_mip=True, dual_pool_pricing=True, deadline_seconds=duration)}
+                    (work / "replay.json").write_text(json.dumps(replay), encoding="utf-8")
+                    run = subprocess.run([str(self.probe), str(work / "case.json"), str(work / "config.json"),
+                                          str(work / "replay.json")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    actual = json.loads(run.stdout)
+                    if duration == 0:
+                        self.assertEqual(actual["dual_pricing"]["lp_status"], "deadline")
+                        self.assertEqual(actual["state"]["assignments"], ["2A", "1A"])
+                        self.assertEqual(sum(map(len, actual["elite"].values())), 2)
+                    else:
+                        self.assertEqual(actual["dual_pricing"]["lp_status"], "LP Optimal")
+                        self.assertEqual(actual["dual_pricing"]["groups_attempted"], 2)
+                        self.assertGreaterEqual(actual["dual_pricing"]["negative_patterns"], 2)
+                        self.assertEqual(actual["state"]["assignments"], ["1A", "2A"])
+                        self.assertGreater(scorer.components({(20, 1): "1A", (10, 1): "2A"})["total_soft_score"],
+                                           scorer.components(initial)["total_soft_score"])
 
     def test_rich_restricted_branching_and_early_returns(self):
         case = self.synthetic([(20, {"oldSeat": {"seatNum": "1A", "seatValue": ""}}),

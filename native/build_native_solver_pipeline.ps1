@@ -77,6 +77,7 @@ $SolverObjects = @(
     'native_rich_restricted_mip',
     'native_rich_master_ssr',
     'native_rich_lns',
+    'native_rich_dual_pricing',
     'native_rich_special_pricing'
 )
 foreach ($Object in $SolverObjects) { Add-Compile $Object }
