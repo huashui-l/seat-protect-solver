@@ -155,37 +155,36 @@ class DirectModel:
         model: gp.Model,
         assignment: Mapping[Tuple[PassengerKey, str], gp.Var],
     ) -> None:
-        # The evaluator counts conflicts per SSR type.  A flagged passenger
-        # therefore forbids a second passenger of the same SSR type at its
-        # row/subrow, while different SSR types may coexist.
-        passengers = list(instance.passengers.values())
-        seen = set()
-        for flagged in passengers:
-            if not flagged.ssr:
+        # Any flagged SSR activates isolation at its location for every SSR
+        # type, including types different from the triggering passenger's.
+        counts = {}
+        triggers = {}
+        for passenger in instance.passengers.values():
+            if not passenger.ssr:
                 continue
-            flags = []
-            if flagged.row_flag:
-                flags.append(("row", instance.row_location))
-            if flagged.subrow_flag:
-                flags.append(("subrow", instance.subrow_location))
-            for kind, location_fn in flags:
-                for sid in flagged.domain:
-                    location = location_fn(sid)
-                    left = assignment[(flagged.key, sid)]
-                    for other in passengers:
-                        if other.key == flagged.key or other.ssr != flagged.ssr:
-                            continue
-                        for other_sid in other.domain:
-                            if location_fn(other_sid) != location:
-                                continue
-                            key = (flagged.key, sid, other.key, other_sid, kind)
-                            if key in seen:
-                                continue
-                            seen.add(key)
-                            model.addConstr(
-                                left + assignment[(other.key, other_sid)] <= 1.0,
-                                name=f"ssr_{kind}_{flagged.gid}_{flagged.hostnum}_{sid}_{other.gid}_{other.hostnum}_{other_sid}",
-                            )
+            for sid in passenger.domain:
+                var = assignment[(passenger.key, sid)]
+                for kind, flagged in (("row", passenger.row_flag), ("subrow", passenger.subrow_flag)):
+                    location = instance.location_of(sid, kind)
+                    if location not in instance.flag_locations:
+                        continue
+                    counts.setdefault((location, passenger.ssr), []).append(var)
+                    if flagged:
+                        triggers.setdefault((location, passenger.key), []).append(var)
+        for index, location in enumerate(sorted(instance.flag_locations, key=str)):
+            types = [ssr for ssr in instance.ssr_types if instance.big_m(location, ssr) > 1]
+            if not types:
+                continue
+            activation = model.addVar(lb=0.0, ub=1.0, name=f"ssr_activation_{index}")
+            for (trigger_location, key), terms in triggers.items():
+                if trigger_location == location:
+                    model.addConstr(gp.quicksum(terms) <= activation,
+                                    name=f"ssr_trigger_{index}_{key[0]}_{key[1]}")
+            for ssr in types:
+                maximum = instance.big_m(location, ssr)
+                model.addConstr(gp.quicksum(counts.get((location, ssr), []))
+                                + (maximum - 1) * activation <= maximum,
+                                name=f"ssr_count_{index}_{ssr}")
 
     @staticmethod
     def _add_compactness_constraints(

@@ -71,6 +71,12 @@ class DirectGurobiTests(unittest.TestCase):
             "ssr_flags": (_seatmap(2, ["A", "B"]), _groups(
                 (1, [_pax(1, "1A", "UM", rowflag="Y", subflag="Y")]),
                 (2, [_pax(1, "1B", "UM")]), (3, [_pax(1, "2A", "TEST")]))),
+            "ssr_other_type_row": (_seatmap(2, ["A", "B", "C"]), _groups(
+                (1, [_pax(1, "1A", "TYPE_A", rowflag="Y")]),
+                (2, [_pax(1, "1B", "TYPE_B")]), (3, [_pax(1, "1C", "TYPE_B")]))),
+            "ssr_other_type_subrow": (_seatmap(2, ["A", "B", "C"]), _groups(
+                (1, [_pax(1, "1A", "TYPE_A", subflag="Y")]),
+                (2, [_pax(1, "1B", "TYPE_B")]), (3, [_pax(1, "1C", "TYPE_B")]))),
             "baby": (_seatmap(2, ["A", "B", "C"], bassinet_rows=(1,)), _groups(
                 (1, [_pax(1, "1A", "BSCT"), _pax(2, "1B")]), (2, [_pax(1, "2A")]))),
         }
