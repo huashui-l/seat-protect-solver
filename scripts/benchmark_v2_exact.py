@@ -51,6 +51,7 @@ def verified_proof(method, raw, legal, parity):
 
 
 def run_case(case, method, budget, config, folder):
+    folder = folder.resolve()
     folder.mkdir(parents=True, exist_ok=True)
     inputs = [(Path(case["groups_path"]), case["groups_sha256"]),
               (Path(case["old_seatmap_path"]), case["old_seatmap_sha256"]),
@@ -135,6 +136,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=2)
     args = parser.parse_args()
+    args.output = args.output.resolve()
     audit, model_audit = read(args.input_audit), read(args.model_audit)
     assert audit["audit_complete"] and audit["case_count"] == 72
     assert audit["inherited_infeasibility_certificates_revalidated"]
