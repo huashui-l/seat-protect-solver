@@ -36,11 +36,12 @@ def main() -> None:
     new = json.loads(args.new_seatmap.read_text(encoding="utf-8-sig"))["seats"]
     old = json.loads(args.old_seatmap.read_text(encoding="utf-8-sig"))["seats"]
     groups = json.loads(args.groups.read_text(encoding="utf-8-sig"))["groups"]
-    result = _clean(solve(new, old, groups, config.get("weights", {}), config, time_limit=args.time_limit))
+    result = solve(new, old, groups, config.get("weights", {}), config, time_limit=args.time_limit)
     serializable = dict(result)
     serializable["assigned_seats"] = {
         f"{key[0]}:{key[1]}": value for key, value in result["assigned_seats"].items()
     }
+    serializable = _clean(serializable)
     summary = {k: v for k, v in serializable.items()
                if k not in ("assigned_seats", "score_detail", "violation_detail")}
     print(json.dumps(summary, ensure_ascii=False, indent=2))

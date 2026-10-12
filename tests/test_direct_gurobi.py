@@ -4,6 +4,11 @@ from __future__ import annotations
 import unittest
 import copy
 import itertools
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 from unittest.mock import patch
 
 try:
@@ -17,6 +22,33 @@ from tests.test_cg_gurobi import _config, _groups, _pax, _seatmap, _brute_force
 
 @unittest.skipUnless(HAVE_GUROBI, "gurobipy 不可用")
 class DirectGurobiTests(unittest.TestCase):
+    def test_cli_roundtrip_preserves_every_passenger_and_score(self):
+        from src import allocation_evaluator as evaluator
+        cfg = _config()
+        cfg["direct_gurobi"] = {"threads": 1, "log": False}
+        seatmap = _seatmap(2, ["A", "B"])
+        groups = _groups((12, [_pax(1, "1A"), _pax(2, "1B")]),
+                         (13, [_pax(1, "2A")]))
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            for name, value in (("config", cfg), ("seatmap", seatmap), ("groups", {"groups": groups})):
+                (folder / (name + ".json")).write_text(json.dumps(value), encoding="utf-8")
+            output = folder / "result.json"
+            result = subprocess.run([sys.executable, "-m", "src.direct_gurobi",
+                "--config", str(folder / "config.json"), "--groups", str(folder / "groups.json"),
+                "--old-seatmap", str(folder / "seatmap.json"), "--new-seatmap", str(folder / "seatmap.json"),
+                "--time-limit", "20", "--output", str(output), "--quiet"],
+                cwd=Path(__file__).resolve().parents[1], capture_output=True, timeout=40)
+            self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
+            raw = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(set(raw["assigned_seats"]), {"12:1", "12:2", "13:1"})
+        assignment = {tuple(map(int, key.split(":"))): value for key, value in raw["assigned_seats"].items()}
+        hard, missing, _ = evaluator.count_hard_constraint_violations(seatmap["seats"], groups, assignment, cfg)
+        score, _ = evaluator.calculate_soft_score(seatmap["seats"], seatmap["seats"], groups, assignment, cfg["weights"], cfg)
+        self.assertEqual((hard, missing), (0, 0))
+        self.assertAlmostEqual(score, raw["total_score"], places=6)
+        self.assertTrue(raw["proven_optimal"])
+
     def test_every_small_assignment_matches_evaluator_feasibility_and_objective(self):
         import gurobipy as gp
         from src import allocation_evaluator as evaluator
