@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import math
 from typing import Any, Dict, Mapping, Sequence, Tuple
 
 import gurobipy as gp
@@ -42,7 +43,8 @@ def solve(
     env.start()
     try:
         direct = DirectModel.build(instance, env)
-        direct.model.Params.TimeLimit = max(0.01, float(cfg["direct_gurobi"]["time_limit"]))
+        remaining = float(cfg["direct_gurobi"]["time_limit"]) - (time.perf_counter() - started)
+        direct.model.Params.TimeLimit = max(0.0, remaining)
         direct.model.Params.Seed = int(cfg["direct_gurobi"].get("seed", 0))
         direct.model.Params.MIPGap = 0.0
         direct.model.Params.MIPGapAbs = 0.0
@@ -72,15 +74,18 @@ def solve(
             GRB.INTERRUPTED: "interrupted",
         }.get(direct.model.Status, f"status_{direct.model.Status}")
         complete = bool(assigned) and hard == 0 and unassigned == 0
-        proven = status == "optimal" and complete
         objective = float(direct.model.ObjVal) if direct.model.SolCount else None
         bound = float(direct.model.ObjBound) if direct.model.SolCount or status != "infeasible" else None
         objective_error = None if objective is None else abs(objective - score)
+        proven = (status == "optimal" and complete and objective_error is not None
+                  and objective_error <= 1e-6 and bound is not None and math.isfinite(bound)
+                  and abs(bound - score) <= 1e-6)
         return {
             "status": "complete" if complete else status,
             "solver_status": status,
             "complete": complete,
             "proven_optimal": proven,
+            "proven_infeasible": status == "infeasible",
             "assigned_seats": assigned,
             "total_score": score if assigned else None,
             "score_detail": score_detail,
@@ -93,6 +98,8 @@ def solve(
             "mip_gap": float(direct.model.MIPGap) if direct.model.SolCount else None,
             "variables": direct.model.NumVars,
             "constraints": direct.model.NumConstrs,
+            "optimization_time_limit": max(0.0, remaining),
+            "optimization_seconds": direct.model.Runtime,
             "seconds": time.perf_counter() - started,
         }
     finally:
