@@ -35,12 +35,12 @@ def package(work, report):
     for path in work.glob("*.log"):
         include(path, "audit_or_execution_log")
     for path in work.glob("report-*.json"):
-        include(path, "report_browser_audit")
+        include(path, "report_or_certificate_audit")
     for path in work.glob("report-*.png"):
         include(path, "report_browser_screenshot")
     include(work / "direct-ssr-counterexample-audit.json", "model_counterexample_audit")
     for path in (work / "upstream").rglob("*"):
-        if path.is_file():
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
             include(path, "unchanged_collaborator_snapshot")
     for record in benchmark["records"]:
         folder = (ROOT / record["raw_output"]).parent
@@ -71,7 +71,7 @@ def package(work, report):
         case_count=72, formal_run_count=len(benchmark["records"]), complete=True,
         path_policy="Archive paths equal repository-relative paths. Windows absolute command paths in raw records describe the original environment.",
         attribution="The upstream snapshot is unchanged collaborator material at upstream_commit; its original authorship is preserved. User-owned direct CLI and benchmark/audit changes are recorded separately in Git.",
-        exclusion_policy="Failed path/key attempts are retained as evidence and never counted as formal benchmark runs.",
+        exclusion_policy="Failed path/key attempts and the superseded SSR-model batch are retained as evidence and never counted as formal benchmark runs.",
         members={relative: dict(sha256=sha(item["path"]), bytes=item["path"].stat().st_size,
             category=item["category"]) for relative, item in sorted(files.items())})
     archive = report / "experiment-data.zip"

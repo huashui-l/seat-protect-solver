@@ -14,6 +14,29 @@ def load(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def verify_call(record, case, config, base_config, folder):
+    method, budget, command = record["method"], record["budget_seconds"], record["command"]
+    assert command[1:3] == ["-m", "src." + method]
+    assert float(command[command.index("--time-limit") + 1]) == budget
+    paths = {"--groups": ROOT / case["groups_path"], "--old-seatmap": ROOT / case["old_seatmap_path"],
+             "--new-seatmap": ROOT / case["new_seatmap_path"], "--config": folder / "config.json",
+             "--output": ROOT / record["raw_output"]}
+    for option, expected in paths.items():
+        assert Path(command[command.index(option) + 1]).resolve() == expected.resolve(), option
+    route_keys = {"direct_gurobi", "cg_gurobi"}
+    assert {k: v for k, v in config.items() if k not in route_keys} == {
+        k: v for k, v in base_config.items() if k not in route_keys}, "mathematical configuration changed"
+    if method == "direct_gurobi":
+        assert config[method]["time_limit"] == budget and config[method]["threads"] == 1
+        assert config[method]["seed"] == 0
+    else:
+        assert config[method]["total_time_limit"] == budget
+        assert all(config[method][key] == 1 for key in ("pricing_workers", "master_threads", "pricing_threads"))
+        resource_keys = {"total_time_limit", "pricing_workers", "master_threads", "pricing_threads", "log"}
+        assert {k: v for k, v in config[method].items() if k not in resource_keys} == {
+            k: v for k, v in base_config.get(method, {}).items() if k not in resource_keys}, "CG search configuration changed"
+
+
 def comparison(audit, benchmark, verify_files=True):
     cases = {c["case_id"]: c for c in audit["cases"]}
     assert len(cases) == 72 and audit["audit_complete"]
@@ -21,6 +44,7 @@ def comparison(audit, benchmark, verify_files=True):
     for record in benchmark["records"]:
         key = (record["case_id"], record["method"], record["budget_seconds"])
         assert key not in records and key[0] in cases and key[1] in ("direct_gurobi", "cg_gurobi") and key[2] in (60, 900)
+        case = cases[key[0]]
         if verify_files:
             if record["raw_sha256"]:
                 assert sha(ROOT / record["raw_output"]) == record["raw_sha256"]
@@ -28,7 +52,7 @@ def comparison(audit, benchmark, verify_files=True):
             assert sha(folder / "config.json") == record["config_sha256"]
             assert sha(folder / "solver.log") == record["log_sha256"]
             assert load(folder / "record.json") == record, "per-run checkpoint disagrees with aggregate"
-        case = cases[key[0]]
+            verify_call(record, case, load(folder / "config.json"), audit["config"], folder)
         for name in ("groups", "old_seatmap", "new_seatmap"):
             assert record[name + "_sha256"] == case[name + "_sha256"]
         if record["valid_for_comparison"]:
@@ -87,6 +111,8 @@ def comparison(audit, benchmark, verify_files=True):
                     if best is not None and record["valid_for_comparison"] else None)
             rows.append(dict(case_id=cid, tier_seconds=budget, reference_score=best,
                 reference_type="certified_optimum" if proofs else "best_known_legal_integer" if best is not None else "none",
+                reference_proof_sources=[{k: r.get(k) for k in ("method", "budget_seconds", "score",
+                    "certified_upper_bound", "raw_output", "raw_sha256")} for r in proofs],
                 certified_upper_bound=min(bounds) if bounds else None,
                 external_infeasibility_certificate=infeasible, methods=methods))
     summaries = []
@@ -96,6 +122,9 @@ def comparison(audit, benchmark, verify_files=True):
                 continue
             selected = [r["methods"][method] for r in rows if r["tier_seconds"] == budget]
             summaries.append(dict(method=method, tier_seconds=budget, cases=len(selected),
+                attempted=sum(r["solver_status"] not in ("pending", "not_required") for r in selected),
+                pending=sum(r["solver_status"] == "pending" for r in selected),
+                not_required=sum(r["solver_status"] == "not_required" for r in selected),
                 valid=sum(r["valid_for_comparison"] for r in selected),
                 proven_optimal=sum(r["proven_optimal"] for r in selected),
                 proven_infeasible_by_method=sum(bool(r.get("proven_infeasible_by_method")) for r in selected),
@@ -117,13 +146,13 @@ def comparison(audit, benchmark, verify_files=True):
         summaries=summaries, paired_60s=paired, rows=rows)
 
 
-LABELS = {"collaborator_heuristic": "合作者启发式 60s", "direct_gurobi": "直接 MIP", "cg_gurobi": "列生成"}
+LABELS = {"collaborator_heuristic": "合作者启发式 60s（继承）", "direct_gurobi": "直接 MIP", "cg_gurobi": "列生成"}
 
 
 def cell(record):
     escape = html.escape
     if record["score"] is None:
-        status = escape(str(record["solver_status"]))
+        status = escape(str(record["solver_status"] or "未返回求解器状态"))
         if record.get("not_run_reason"):
             status += '<br>' + escape(record['not_run_reason'])
         if record.get("proven_infeasible_by_method"):
@@ -135,11 +164,13 @@ def cell(record):
         return status + '<details><summary>证据字段</summary><pre>' + escape(json.dumps(record, ensure_ascii=False, indent=2)) + '</pre></details>'
     status = "已证明最优" if record["proven_optimal"] else "合法可行，未证明最优"
     bound = record.get("certified_upper_bound")
+    bound_gap = record.get("gap_to_certified_upper_percent")
     timing = record.get("process_seconds", record.get("solver_seconds"))
     detail = json.dumps(record, ensure_ascii=False, indent=2, allow_nan=False)
     return (f'<strong>{record["score"]:.6f}</strong><br>{status}'
         f'<br>参考差距 {record["gap_to_reference_percent"]:.3f}%'
         + (f'<br>认证上界 {bound:.6f}' if bound is not None else '')
+        + (f'<br>认证上界差距 {bound_gap:.3f}%' if bound_gap is not None else '')
         + (f'<br>耗时 {timing:.3f}s' if timing is not None else '')
         + (' · 超预算' if record.get('process_over_budget') else '')
         + f'<details><summary>证据字段</summary><pre>{escape(detail)}</pre></details>')
@@ -148,6 +179,7 @@ def cell(record):
 def render(data):
     escape = html.escape
     stats = ''.join(f'<tr><td>{LABELS[s["method"]]}</td><td>{s["tier_seconds"]}</td>'
+        f'<td>{s["attempted"]}</td><td>{s["pending"]}</td><td>{s["not_required"]}</td>'
         f'<td>{s["valid"]}</td><td>{s["proven_optimal"]}</td><td>{s["proven_infeasible_by_method"]}</td>'
         f'<td>{s["failures"]}</td><td>{s["process_over_budget"]}</td></tr>' for s in data['summaries'])
     pairs = ''.join(f'<tr><td>{LABELS[p["left"]]} / {LABELS[p["right"]]}</td><td>{p["shared_legal_cases"]}</td>'
@@ -162,19 +194,23 @@ def render(data):
         rows += f'<tr data-tier="{row["tier_seconds"]}"><td>{escape(row["case_id"])}<br>{reference}'
         if row['reference_score'] is not None:
             rows += f'<br>{row["reference_score"]:.6f}'
+        for source in row['reference_proof_sources']:
+            rows += '<br>证明来源：' + LABELS[source['method']] + f' {source["budget_seconds"]}s'
         rows += '</td><td>' + str(row['tier_seconds']) + '</td>'
         rows += ''.join('<td>' + cell(row['methods'][m]) + '</td>' for m in LABELS) + '</tr>'
     state = '已完成' if data['complete'] else '运行中：以下是阶段快照，不能作为最终结论'
+    downloads = (' · <a href="experiment-data.zip">原始实验数据与源码</a> · <a href="artifact-manifest.json">归档校验清单</a>'
+                 if data['complete'] else '')
     return f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V2 72例精确方法比较</title><style>
 body{{font:15px/1.6 system-ui,sans-serif;margin:24px;color:#172536;background:#f6f8fb}}h1{{font-size:26px}}
 table{{border-collapse:collapse;width:100%;min-width:800px;background:white;margin:16px 0}}th,td{{padding:10px;border:1px solid #d9e0e9;text-align:left;vertical-align:top}}th{{background:#e9eff8;position:sticky;top:0}}td:first-child{{overflow-wrap:anywhere;max-width:270px}}code{{overflow-wrap:anywhere}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;max-width:350px;font-size:11px}}.scroll{{overflow:auto}}select,input{{padding:8px;margin-right:12px}}.notice{{background:#fff3cd;padding:12px}}a{{color:#1458a5}}
 </style><h1>V2 72例：启发式、直接 MIP 与列生成</h1><p class="notice">{state}</p>
 <p>启发式沿用合作者 focused60，未重跑。两种精确方法先各跑72例60秒，未证明最优且无不可行证明时独立补跑900秒。下表900秒栏的启发式仍为原60秒基线；未补跑的精确方法明确标注 not_required，不用60秒记录冒充900秒记录。</p>
-<p>只有完整合法且独立评分一致的解参与比较。参考取所有已记录预算的最佳合法整数，仅在认证全局界闭合时称最优。安全上界与列池最优均不构成证明。三个匹配不可行证书已独立重算；方法自身证明与外部证明分别保留。</p>
+<p>只有完整合法且独立评分一致的解参与比较。参考取所有已记录预算的最佳合法整数，仅在认证全局界闭合时称最优。参考差距为 (参考分−得分)/max(1,|参考分|)；认证上界差距为 (认证上界−得分)/max(1,|得分|)，两者均以百分比显示。安全上界与列池最优均不构成证明。三个匹配不可行证书已独立重算；方法自身证明与外部证明分别保留。</p>
 <p>合作者：Apple M5，10核，16GiB，CP-SAT最多8线程。本次：Ryzen 7 5800H，8核16线程，约16GiB，最多4例并行，每个Gurobi模型1线程。硬件不同，不能作严格同机速度比较。耗时列为本次完整求解进程时间，启发式为继承的算法报告时间；独立复核时间不计入。实际超预算如实标注。</p>
-<p>受测提交 <code>{escape(data['metadata']['algorithm_commit'])}</code>。<a href="comparison.json">逐例完整字段 JSON</a> · <a href="README.md">建模审查、版本与证书说明</a></p>
-<div class="scroll"><table><thead><tr><th>方法</th><th>预算秒</th><th>合法</th><th>证明最优</th><th>方法证明不可行</th><th>运行失败</th><th>进程超预算</th></tr></thead><tbody>{stats}</tbody></table></div>
+<p>受测提交 <code>{escape(data['metadata']['algorithm_commit'])}</code>。<a href="comparison.json">逐例完整字段 JSON</a> · <a href="README.md">建模审查、版本与证书说明</a>{downloads}</p>
+<div class="scroll"><table><thead><tr><th>方法</th><th>预算秒</th><th>实际运行</th><th>待运行</th><th>无需补跑</th><th>合法</th><th>证明最优</th><th>方法证明不可行</th><th>运行失败</th><th>进程超预算</th></tr></thead><tbody>{stats}</tbody></table></div>
 <p>60秒共同合法案例比较：每对方法只比较双方均合法的同一批案例。平均优势为 (左方法得分−右方法得分)/max(1,|右方法得分|)，正值表示左方法更好；不使用900秒结果替换首轮成绩。</p>
 <div class="scroll"><table><thead><tr><th>左方法 / 右方法</th><th>共同合法例数</th><th>左胜 / 平 / 右胜</th><th>左方法平均相对优势</th></tr></thead><tbody>{pairs}</tbody></table></div>
 <label>预算 <select id="tier"><option value="60">60秒首轮</option><option value="900">900秒补跑</option><option value="all">全部</option></select></label><label>案例筛选 <input id="query" placeholder="方向、负载或组类型"></label>
