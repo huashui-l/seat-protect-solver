@@ -21,8 +21,8 @@ def package(work, report):
         assert sha(ROOT / relative) == digest, (relative, "frozen algorithm source changed")
     data = comparison(load(work / "input-audit.json"), benchmark)
     report.mkdir(parents=True, exist_ok=True)
-    (report / "comparison.json").write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
-    (report / "index.html").write_text(render(data), encoding="utf-8")
+    (report / "comparison.json").write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8", newline="\n")
+    (report / "index.html").write_text(render(data), encoding="utf-8", newline="\n")
     files = {}
 
     def include(path, category):
@@ -95,7 +95,7 @@ def package(work, report):
         all_members_verified=True, algorithm_commit=manifest["algorithm_commit"],
         upstream_commit=manifest["upstream_commit"], formal_run_count=manifest["formal_run_count"],
         files={name: sha(report / name) for name in ("comparison.json", "index.html", "README.md")})
-    (report / "artifact-manifest.json").write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
+    (report / "artifact-manifest.json").write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
     print(json.dumps(artifact, ensure_ascii=False))
     return artifact
 

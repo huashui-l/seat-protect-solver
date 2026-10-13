@@ -230,8 +230,8 @@ def main():
     assert sha(args.input_audit) == benchmark["metadata"]["input_audit_sha256"]
     data = comparison(load(args.input_audit), benchmark)
     args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "comparison.json").write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
-    (args.output / "index.html").write_text(render(data), encoding="utf-8")
+    (args.output / "comparison.json").write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8", newline="\n")
+    (args.output / "index.html").write_text(render(data), encoding="utf-8", newline="\n")
     print(f"Validated {len(benchmark['records'])} exact runs; complete={data['complete']}")
 
 
